@@ -62,6 +62,12 @@ public class KarakterHareket : MonoBehaviour
                 }
             }
         }
+
+        // Ateş etme bileşeni yoksa otomatik ekle
+        if (GetComponent<KarakterAtes>() == null)
+        {
+            gameObject.AddComponent<KarakterAtes>();
+        }
     }
 
     void Start()
@@ -98,9 +104,15 @@ public class KarakterHareket : MonoBehaviour
 
         bool hareketEdiyor = hareketYonu.sqrMagnitude > 0.01f;
 
-        // Karakter hareket ettiği yöne doğru yumuşakça dönsün
-        if (hareketEdiyor)
+        // Karakterin dönüş kontrolü:
+        if (KameraTakip.IsFirstPerson)
         {
+            // 1. Şahıs modunda (Sağ tık basılıyken) karakter daima kameranın baktığı yatay yöne anında kilitlenir
+            transform.rotation = Quaternion.Euler(0f, KameraTakip.CurrentYaw, 0f);
+        }
+        else if (hareketEdiyor)
+        {
+            // 3. Şahıs modunda hareket ettiği yöne doğru yumuşakça dönsün
             Quaternion hedefRotasyon = Quaternion.LookRotation(hareketYonu);
             transform.rotation = Quaternion.Slerp(transform.rotation, hedefRotasyon, Time.deltaTime * donusHizi);
         }

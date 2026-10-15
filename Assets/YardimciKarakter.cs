@@ -23,6 +23,10 @@ public class YardimciKarakter : MonoBehaviour
     [Tooltip("Karakterin oyuncuya doğru dönme yumuşaklık hızı.")]
     public float donusHizi = 8.0f;
 
+    [Header("Görsel / Renk Farkı")]
+    [Tooltip("Yardımcı karakterin ana karakterden ayırt edilmesi için kıyafet/üniforma rengi.")]
+    public Color kiyafetRengi = new Color(0.2f, 0.45f, 0.95f, 1f); // Taktiksel Mavi
+
     [Header("Takip Edilecek Oyuncu")]
     [Tooltip("Döneceği hedef oyuncu. Boş bırakılırsa sahnede otomatik bulunur.")]
     public Transform hedef;
@@ -53,6 +57,9 @@ public class YardimciKarakter : MonoBehaviour
     {
         HedefiBul();
 
+        // Yardımcı karakterin rengini ana karakterden farklı yap
+        RengiUygula();
+
         // Karakter sabit duracağı için idle (bekleme) animasyonunda kalmasını sağla
         if (animator != null)
         {
@@ -63,6 +70,33 @@ public class YardimciKarakter : MonoBehaviour
             }
             catch { }
         }
+    }
+
+    /// <summary>
+    /// Yardımcı karakterin kıyafet rengini değiştirerek ana oyuncudan ayrışmasını sağlar.
+    /// </summary>
+    public void RengiUygula()
+    {
+        SkinnedMeshRenderer smr = GetComponentInChildren<SkinnedMeshRenderer>();
+        if (smr != null && smr.sharedMaterial != null)
+        {
+            Material mat = new Material(smr.sharedMaterial);
+            mat.name = "US_soldier_companion_instance";
+            if (mat.HasProperty("_BaseColor"))
+            {
+                mat.SetColor("_BaseColor", kiyafetRengi);
+            }
+            if (mat.HasProperty("_Color"))
+            {
+                mat.SetColor("_Color", kiyafetRengi);
+            }
+            smr.material = mat;
+        }
+    }
+
+    void OnValidate()
+    {
+        RengiUygula();
     }
 
     void Update()
@@ -114,13 +148,13 @@ public class YardimciKarakter : MonoBehaviour
             return;
         }
 
-        // 3. ToonSoldier_WW2_demo_Prefab isimli nesneyi ara
-        GameObject[] nesneler = FindObjectsByType<GameObject>(FindObjectsSortMode.None);
-        foreach (var obj in nesneler)
+        // 3. KarakterHareket nesnesini ara
+        KarakterHareket[] karakterler = FindObjectsByType<KarakterHareket>(FindObjectsInactive.Exclude);
+        foreach (var k in karakterler)
         {
-            if (obj != gameObject && obj.GetComponent<KarakterHareket>() != null)
+            if (k.gameObject != gameObject)
             {
-                hedef = obj.transform;
+                hedef = k.transform;
                 return;
             }
         }

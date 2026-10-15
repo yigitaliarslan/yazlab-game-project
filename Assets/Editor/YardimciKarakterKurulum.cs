@@ -42,12 +42,17 @@ public class YardimciKarakterKurulum
                 kt.hedef = kh.transform;
             }
             kt.mesafe = 4.5f;
-            kt.bakisYuksekligi = 1.4f;
+            kt.bakisYuksekligi = 1.50f;
             kt.fareHassasiyeti = 2.0f;
             kt.takipHizi = 12.0f;
-            kt.donusHizi = 12.0f;
-            kt.minPitch = -20f;
+            kt.donusHizi = 14.0f;
+            kt.minPitch = -35f;
             kt.maxPitch = 60f;
+            kt.sagTiklaBirinciSahis = true;
+            kt.birinciSahisOfset = new Vector3(0.0f, 1.82f, 0.28f);
+            kt.normalFOV = 60f;
+            kt.nisanFOV = 58f;
+            kt.gecisHizi = 15f;
             EditorUtility.SetDirty(kt);
         }
 
@@ -93,14 +98,44 @@ public class YardimciKarakterKurulum
                 EditorUtility.SetDirty(instance);
             }
         }
-        else
+        // 3. Ana Oyuncu için Ateş Etme Bileşeni (KarakterAtes)
+        KarakterHareket oyuncuKh = Object.FindAnyObjectByType<KarakterHareket>();
+        if (oyuncuKh != null)
         {
-            KarakterHareket oyuncu = Object.FindAnyObjectByType<KarakterHareket>();
-            if (oyuncu != null)
+            KarakterAtes ates = oyuncuKh.GetComponent<KarakterAtes>();
+            if (ates == null)
             {
-                yk.hedef = oyuncu.transform;
+                ates = oyuncuKh.gameObject.AddComponent<KarakterAtes>();
+            }
+            if (Camera.main != null)
+            {
+                ates.kamera = Camera.main.transform;
+            }
+            ates.namluOfset3P = new Vector3(0.22f, 1.20f, 0.95f);
+            ates.namluOfset1P = new Vector3(0.20f, -0.32f, 0.55f);
+            EditorUtility.SetDirty(oyuncuKh.gameObject);
+        }
+
+        // 4. Yardımcı Karakterin Materyalini Mavi Üniforma Yap (Görsel Fark)
+        if (yk != null)
+        {
+            if (oyuncuKh != null)
+            {
+                yk.hedef = oyuncuKh.transform;
             }
             yk.donusModu = YardimciKarakter.DonusModu.OyuncuyaBak;
+
+            Material companionMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/ToonSoldiers_WW2_demo/model/Materials/US_soldier_companion.mat");
+            if (companionMat != null)
+            {
+                SkinnedMeshRenderer smr = yk.GetComponentInChildren<SkinnedMeshRenderer>();
+                if (smr != null)
+                {
+                    smr.sharedMaterial = companionMat;
+                    EditorUtility.SetDirty(smr);
+                }
+            }
+            yk.RengiUygula();
             EditorUtility.SetDirty(yk);
         }
 
