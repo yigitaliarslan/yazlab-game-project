@@ -221,18 +221,8 @@ namespace Yazlab.Editor
             yoldasSpawn.transform.SetParent(spawnGrup.transform);
             yoldasSpawn.transform.position = new Vector3(2.5f, 0f, 0f);
 
-            // Sahnede varsa oyuncuyu ve yoldaşı başlangıca taşı
-            KarakterHareket kh = Object.FindAnyObjectByType<KarakterHareket>();
-            if (kh != null)
-            {
-                kh.transform.position = oyuncuSpawn.transform.position;
-            }
-
-            YardimciKarakter yk = Object.FindAnyObjectByType<YardimciKarakter>();
-            if (yk != null)
-            {
-                yk.transform.position = yoldasSpawn.transform.position;
-            }
+            // Karakterleri ve animasyonları sahneye kur
+            KarakterleriSahneyeKur();
 
             // ==========================================
             // 7. NAVMESH SURFACE BAKE ETME
@@ -245,12 +235,183 @@ namespace Yazlab.Editor
             EditorSceneManager.SaveScene(scene);
 
             EditorUtility.DisplayDialog("Tamamlandı!", 
-                "Harita başarıyla oluşturuldu!\n\n" +
+                "Harita ve Karakterler başarıyla hazırlandı!\n\n" +
+                "✓ Oyuncu Askeri (3. Şahıs Kamera + Animasyonlar) eklendi.\n" +
+                "✓ Yoldaş Karakter başlangıç noktasına yerleştirildi.\n" +
+                "✓ NPC Muhafız çıkış kapısı önüne yerleştirildi.\n" +
                 "✓ Fiziksel Engel Kapısı ve Şalter kuruldu.\n" +
-                "✓ Siperler ve Koridor eklendi.\n" +
-                "✓ NPC Çıkış Kapısı ve Muhafız Alanı hazırlandı.\n" +
                 "✓ NavMesh otomatik olarak Bake edildi!\n\n" +
-                "Şimdi Play tuşuna basarak karakterinizle gezinebilirsiniz.", "Harika!");
+                "Şimdi Play (▶) tuşuna basarak W-A-S-D ile karakterinizi koşturabilirsiniz!", "Harika!");
+        }
+
+        [MenuItem("Tools/YazLab/2. Karakterleri ve Animasyonları Sahneye Ekle (Otomatik)")]
+        public static void KarakterleriSahneyeKurMenu()
+        {
+            KarakterleriSahneyeKur();
+            var scene = EditorSceneManager.GetActiveScene();
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+
+            EditorUtility.DisplayDialog("Başarılı", 
+                "Oyuncu, Yoldaş ve NPC Muhafız karakterleri animasyonlarıyla birlikte sahneye eklendi ve 3. şahıs kamera bağlandı!\n\nŞimdi Play (▶) tuşuna basıp test edebilirsiniz.", 
+                "Tamam");
+        }
+
+        public static void KarakterleriSahneyeKur()
+        {
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/ToonSoldiers_WW2_demo/ToonSoldier_WW2_demo_Prefab.prefab");
+            RuntimeAnimatorController animCtrl = AssetDatabase.LoadAssetAtPath<RuntimeAnimatorController>("Assets/ToonSoldiers_WW2_demo/KarakterAnimator.controller");
+
+            if (prefab == null || animCtrl == null)
+            {
+                Debug.LogError("[HaritaOlusturucu] Asker prefabı veya Animator Controller bulunamadı!");
+                return;
+            }
+
+            // 1. OYUNCU (PLAYER)
+            KarakterHareket oyuncuHareket = Object.FindAnyObjectByType<KarakterHareket>();
+            GameObject oyuncuObj;
+            if (oyuncuHareket == null)
+            {
+                oyuncuObj = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
+                oyuncuObj.name = "Oyuncu";
+                oyuncuObj.tag = "Player";
+                oyuncuObj.transform.position = new Vector3(0f, 0.05f, 0f);
+                oyuncuObj.transform.rotation = Quaternion.identity;
+
+                CharacterController cc = oyuncuObj.GetComponent<CharacterController>();
+                if (cc == null) cc = oyuncuObj.AddComponent<CharacterController>();
+                cc.height = 1.8f;
+                cc.radius = 0.35f;
+                cc.center = new Vector3(0f, 0.9f, 0f);
+
+                oyuncuHareket = oyuncuObj.AddComponent<KarakterHareket>();
+                oyuncuHareket.hiz = 5.5f;
+                oyuncuHareket.donusHizi = 12f;
+                oyuncuHareket.ziplamaGucu = 6.5f;
+
+                Animator anim = oyuncuObj.GetComponent<Animator>();
+                if (anim != null)
+                {
+                    anim.runtimeAnimatorController = animCtrl;
+                    anim.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+                }
+
+                Undo.RegisterCreatedObjectUndo(oyuncuObj, "Oyuncu Olusturuldu");
+            }
+            else
+            {
+                oyuncuObj = oyuncuHareket.gameObject;
+                oyuncuObj.tag = "Player";
+                Animator anim = oyuncuObj.GetComponent<Animator>();
+                if (anim != null)
+                {
+                    anim.runtimeAnimatorController = animCtrl;
+                    anim.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+                }
+            }
+
+            // 2. YOLDAŞ KARAKTER (COMPANION)
+            YardimciKarakter yoldas = Object.FindAnyObjectByType<YardimciKarakter>();
+            if (yoldas == null)
+            {
+                GameObject yoldasObj = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
+                yoldasObj.name = "YardimciKarakter";
+                yoldasObj.tag = "Companion";
+                yoldasObj.transform.position = new Vector3(2.5f, 0.05f, 0f);
+                yoldasObj.transform.rotation = Quaternion.identity;
+
+                KarakterHareket kh = yoldasObj.GetComponent<KarakterHareket>();
+                if (kh != null) Object.DestroyImmediate(kh);
+
+                CharacterController cc = yoldasObj.GetComponent<CharacterController>();
+                if (cc != null) Object.DestroyImmediate(cc);
+
+                CapsuleCollider col = yoldasObj.GetComponent<CapsuleCollider>();
+                if (col == null) col = yoldasObj.AddComponent<CapsuleCollider>();
+                col.height = 1.8f;
+                col.radius = 0.35f;
+                col.center = new Vector3(0f, 0.9f, 0f);
+
+                yoldas = yoldasObj.AddComponent<YardimciKarakter>();
+                yoldas.hedef = oyuncuObj.transform;
+                yoldas.donusModu = YardimciKarakter.DonusModu.OyuncuyaBak;
+                yoldas.donusHizi = 8.0f;
+
+                Animator anim = yoldasObj.GetComponent<Animator>();
+                if (anim != null)
+                {
+                    anim.runtimeAnimatorController = animCtrl;
+                    anim.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+                }
+
+                Undo.RegisterCreatedObjectUndo(yoldasObj, "Yoldas Olusturuldu");
+            }
+            else
+            {
+                yoldas.hedef = oyuncuObj.transform;
+                Animator anim = yoldas.GetComponent<Animator>();
+                if (anim != null)
+                {
+                    anim.runtimeAnimatorController = animCtrl;
+                    anim.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+                }
+            }
+
+            // 3. NPC MUHAFIZ (Bölüm 3'teki Çıkış Kapısını Bekleyen Karakter)
+            GameObject npcMuhafiz = GameObject.Find("NPC_Muhafiz");
+            if (npcMuhafiz == null)
+            {
+                npcMuhafiz = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
+                npcMuhafiz.name = "NPC_Muhafiz";
+                npcMuhafiz.transform.position = new Vector3(3.5f, 0.05f, 47.5f);
+                npcMuhafiz.transform.rotation = Quaternion.Euler(0f, 180f, 0f);
+
+                KarakterHareket kh = npcMuhafiz.GetComponent<KarakterHareket>();
+                if (kh != null) Object.DestroyImmediate(kh);
+
+                CharacterController cc = npcMuhafiz.GetComponent<CharacterController>();
+                if (cc != null) Object.DestroyImmediate(cc);
+
+                CapsuleCollider col = npcMuhafiz.GetComponent<CapsuleCollider>();
+                if (col == null) col = npcMuhafiz.AddComponent<CapsuleCollider>();
+                col.height = 1.8f;
+                col.radius = 0.35f;
+                col.center = new Vector3(0f, 0.9f, 0f);
+
+                Animator anim = npcMuhafiz.GetComponent<Animator>();
+                if (anim != null)
+                {
+                    anim.runtimeAnimatorController = animCtrl;
+                    anim.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+                }
+
+                Undo.RegisterCreatedObjectUndo(npcMuhafiz, "NPC Muhafiz Olusturuldu");
+            }
+
+            // 4. ANA KAMERA (3. ŞAHIS KAMERA TAKİBİ)
+            Camera mainCam = Camera.main;
+            if (mainCam != null)
+            {
+                OyuncuHareket oh = mainCam.GetComponent<OyuncuHareket>();
+                if (oh != null) Object.DestroyImmediate(oh);
+
+                KameraTakip kt = mainCam.GetComponent<KameraTakip>();
+                if (kt == null) kt = mainCam.gameObject.AddComponent<KameraTakip>();
+
+                kt.hedef = oyuncuObj.transform;
+                kt.mesafe = 4.5f;
+                kt.bakisYuksekligi = 1.4f;
+                kt.fareHassasiyeti = 2.0f;
+                kt.takipHizi = 12.0f;
+                kt.donusHizi = 12.0f;
+                kt.minPitch = -20f;
+                kt.maxPitch = 60f;
+
+                oyuncuHareket.kamera = mainCam.transform;
+
+                EditorUtility.SetDirty(kt);
+            }
         }
 
         private static GameObject DuvarOlustur(string isim, Vector3 pos, Vector3 scale, Material mat, Transform parent)
