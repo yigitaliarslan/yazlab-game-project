@@ -10,11 +10,11 @@ public class YardimciKarakterKurulum
         EditorApplication.delayCall += Yapilandir;
     }
 
-    [MenuItem("Tools/Yardımcı Karakter ve 3. Şahıs Kamerayı Güncelle")]
+    [MenuItem("Tools/Yardımcı Askeri ve Sistemleri Güncelle")]
     public static void YapilandirMenu()
     {
         Yapilandir();
-        EditorUtility.DisplayDialog("Başarılı", "Ana karakter 3. şahıs kameraya geçirildi ve yardımcı karakter hazırlandı!", "Tamam");
+        EditorUtility.DisplayDialog("Başarılı", "Müttefik asker karakteri (düşmanlara ateş eden takım arkadaşı) hazırlandı!", "Tamam");
     }
 
     public static void Yapilandir()
@@ -56,23 +56,44 @@ public class YardimciKarakterKurulum
             EditorUtility.SetDirty(kt);
         }
 
-        // 2. Yardımcı Karakter kontrolü
+        // 2. Yardımcı Asker Karakteri Kurulumu (Düşmanlara sıkan müttefik asker)
         YardimciKarakter yk = Object.FindAnyObjectByType<YardimciKarakter>();
-        if (yk == null)
+        bool eskiAjanMi = false;
+        if (yk != null)
         {
-            // Prefab yükle
+            SkinnedMeshRenderer smr = yk.GetComponentInChildren<SkinnedMeshRenderer>();
+            if (smr != null && smr.sharedMaterial != null && (smr.sharedMaterial.name.Contains("Ajan") || smr.sharedMaterial.name.Contains("criminal")))
+            {
+                eskiAjanMi = true;
+            }
+        }
+
+        if (yk == null || eskiAjanMi)
+        {
+            Vector3 spawnPos = new Vector3(2.5f, 0f, 2.0f);
+            if (yk != null)
+            {
+                spawnPos = yk.transform.position;
+                Object.DestroyImmediate(yk.gameObject);
+            }
+
+            // Orijinal Asker Prefabını Yükle
             GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/ToonSoldiers_WW2_demo/ToonSoldier_WW2_demo_Prefab.prefab");
+            Material companionMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/ToonSoldiers_WW2_demo/model/Materials/US_soldier_companion.mat");
+            RuntimeAnimatorController animCtrl = AssetDatabase.LoadAssetAtPath<RuntimeAnimatorController>("Assets/ToonSoldiers_WW2_demo/KarakterAnimator.controller");
+
             if (prefab != null)
             {
                 GameObject instance = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
                 instance.name = "YardimciKarakter";
-                instance.transform.position = new Vector3(2.5f, 0f, 2.0f);
+                instance.transform.position = spawnPos;
                 instance.transform.rotation = Quaternion.identity;
 
-                // KarakterHareket varsa kaldır (hareket etmesin)
+                // Fazlalık oyuncu scriptlerini temizle
                 KarakterHareket kh = instance.GetComponent<KarakterHareket>();
                 if (kh != null) Object.DestroyImmediate(kh);
-
+                OyuncuHareket oh = instance.GetComponent<OyuncuHareket>();
+                if (oh != null) Object.DestroyImmediate(oh);
                 CharacterController cc = instance.GetComponent<CharacterController>();
                 if (cc != null) Object.DestroyImmediate(cc);
 
@@ -86,8 +107,16 @@ public class YardimciKarakterKurulum
                     yk.hedef = oyuncu.transform;
                 }
 
-                // Animator Controller
-                RuntimeAnimatorController animCtrl = AssetDatabase.LoadAssetAtPath<RuntimeAnimatorController>("Assets/ToonSoldiers_WW2_demo/KarakterAnimator.controller");
+                if (companionMat != null)
+                {
+                    SkinnedMeshRenderer smr = instance.GetComponentInChildren<SkinnedMeshRenderer>();
+                    if (smr != null)
+                    {
+                        smr.sharedMaterial = companionMat;
+                        EditorUtility.SetDirty(smr);
+                    }
+                }
+
                 if (animCtrl != null)
                 {
                     Animator anim = instance.GetComponent<Animator>();
@@ -98,6 +127,7 @@ public class YardimciKarakterKurulum
                 EditorUtility.SetDirty(instance);
             }
         }
+
         // 3. Ana Oyuncu için Ateş Etme Bileşeni (KarakterAtes)
         KarakterHareket oyuncuKh = Object.FindAnyObjectByType<KarakterHareket>();
         if (oyuncuKh != null)
@@ -116,26 +146,10 @@ public class YardimciKarakterKurulum
             EditorUtility.SetDirty(oyuncuKh.gameObject);
         }
 
-        // 4. Yardımcı Karakterin Materyalini Mavi Üniforma Yap (Görsel Fark)
-        if (yk != null)
+        // 4. Ajan Hedefini Doğrula
+        if (yk != null && oyuncuKh != null)
         {
-            if (oyuncuKh != null)
-            {
-                yk.hedef = oyuncuKh.transform;
-            }
-            yk.donusModu = YardimciKarakter.DonusModu.OyuncuyaBak;
-
-            Material companionMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/ToonSoldiers_WW2_demo/model/Materials/US_soldier_companion.mat");
-            if (companionMat != null)
-            {
-                SkinnedMeshRenderer smr = yk.GetComponentInChildren<SkinnedMeshRenderer>();
-                if (smr != null)
-                {
-                    smr.sharedMaterial = companionMat;
-                    EditorUtility.SetDirty(smr);
-                }
-            }
-            yk.RengiUygula();
+            yk.hedef = oyuncuKh.transform;
             EditorUtility.SetDirty(yk);
         }
 

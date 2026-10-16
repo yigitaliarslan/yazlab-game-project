@@ -1,80 +1,117 @@
+using System.Collections;
 using UnityEngine;
 
 /// <summary>
-/// Oyuncunun yardımcısı olan karakter kontrolcüsü.
-/// Haritada sabit durur (kesinlikle hareket etmez), oyuncu hangi yöne dönerse veya nereye giderse
-/// sadece yüzünü ve gövdesini oyuncuya doğru döndürür (bana doğru döner).
+/// Oyuncunun müttefiki olan asker kontrolcüsü.
+/// - Canı vardır ve hasar alabilir.
+/// - Sahnede düşman gördüğünde onlara ateş açar ve hasar verir.
+/// - Çatışma yokken oyuncuya doğru döner ve oyuncuyu izler.
+/// - Öldüğünde yere yığılır.
 /// </summary>
 public class YardimciKarakter : MonoBehaviour
 {
+    public static YardimciKarakter Instance { get; private set; }
+
     public enum DonusModu
     {
-        [Tooltip("Daima oyuncunun bulunduğu yöne/konuma doğru döner (Sadece bana doğru dönsün).")]
         OyuncuyaBak,
-
-        [Tooltip("Oyuncu hangi yöne bakıyorsa kendisini o yöne döndürür.")]
         OyuncununBaktigiYon
     }
 
-    [Header("Dönüş Ayarları")]
-    [Tooltip("Yardımcının dönme davranışı. 'OyuncuyaBak' seçildiğinde sadece bana doğru döner.")]
+    [Header("Sağlık Ayarları")]
+    public float maksimumCan = 100f;
+    public float mevcutCan = 100f;
+
+    [Header("Dönüş ve Takip")]
     public DonusModu donusModu = DonusModu.OyuncuyaBak;
-
-    [Tooltip("Karakterin oyuncuya doğru dönme yumuşaklık hızı.")]
     public float donusHizi = 8.0f;
-
-    [Header("Görsel / Renk Farkı")]
-    [Tooltip("Yardımcı karakterin ana karakterden ayırt edilmesi için kıyafet/üniforma rengi.")]
-    public Color kiyafetRengi = new Color(0.2f, 0.45f, 0.95f, 1f); // Taktiksel Mavi
-
-    [Header("Takip Edilecek Oyuncu")]
-    [Tooltip("Döneceği hedef oyuncu. Boş bırakılırsa sahnede otomatik bulunur.")]
     public Transform hedef;
 
+    [Header("Ateş ve Çatışma Ayarları")]
+    [Tooltip("Düşmanı görebileceği ve ateş edebileceği maksimum menzil.")]
+    public float atesMenzili = 30f;
+
+    [Tooltip("İki atış arasındaki süre.")]
+    public float atesAraligi = 0.9f;
+
+    [Tooltip("Düşmana her vuruşunda vereceği hasar.")]
+    public float atesHasari = 20f;
+
+    [Header("Görsel Ayarlar")]
+    public Color kiyafetRengi = new Color(0.2f, 0.50f, 0.95f, 1f); // Taktiksel Mavi Müttefik
+
     private Animator animator;
-    private static readonly int IsRunningHash = Animator.StringToHash("IsRunning");
+    private AudioSource audioSource;
+    private CapsuleCollider col;
+    private LineRenderer mermiIziRenderer;
+    private Light namluIsigi;
+    private LineRenderer namluFlasRenderer;
+    private Transform namluNoktasi;
+
+    private float sonrakiAtesZamani = 0f;
+    private bool oldu = false;
+    private DusmanKontrol hedefDusman;
+
+    public bool IsDead => oldu;
 
     void Awake()
     {
-        animator = GetComponent<Animator>();
-        if (animator == null)
+        Instance = this;
+
+        // Oyuncuyla aynı can kapasitesini ve değerini al
+        OyuncuCani oyuncu = Object.FindAnyObjectByType<OyuncuCani>();
+        if (oyuncu != null)
         {
-            animator = GetComponentInChildren<Animator>();
+            maksimumCan = oyuncu.maksimumCan;
+            mevcutCan = oyuncu.maksimumCan;
+        }
+        else
+        {
+            maksimumCan = 100f;
+            mevcutCan = 100f;
         }
 
-        // Oyuncunun içinden geçmemesi için CapsuleCollider ekle
-        CapsuleCollider col = GetComponent<CapsuleCollider>();
+        animator = GetComponent<Animator>();
+        if (animator == null) animator = GetComponentInChildren<Animator>();
+
+        audioSource = GetComponent<AudioSource>();
+        if (audioSource == null)
+        {
+            audioSource = gameObject.AddComponent<AudioSource>();
+            audioSource.playOnAwake = false;
+            audioSource.spatialBlend = 0.7f;
+            audioSource.maxDistance = 35f;
+        }
+
+        col = GetComponent<CapsuleCollider>();
         if (col == null)
         {
             col = gameObject.AddComponent<CapsuleCollider>();
             col.height = 1.8f;
-            col.radius = 0.35f;
+            col.radius = 0.38f;
             col.center = new Vector3(0f, 0.9f, 0f);
         }
+
+        // Namlu ucu
+        GameObject namluObj = new GameObject("YardimciNamluUcu");
+        namluObj.transform.SetParent(transform);
+        namluObj.transform.localPosition = new Vector3(0.22f, 1.20f, 0.95f);
+        namluNoktasi = namluObj.transform;
+
+        KurMermiEfektleri();
     }
 
     void Start()
     {
         HedefiBul();
-
-        // Yardımcı karakterin rengini ana karakterden farklı yap
         RengiUygula();
 
-        // Karakter sabit duracağı için idle (bekleme) animasyonunda kalmasını sağla
         if (animator != null)
         {
-            try
-            {
-                animator.SetBool(IsRunningHash, false);
-                animator.CrossFade("infantry_combat_idle", 0.2f);
-            }
-            catch { }
+            animator.CrossFade("infantry_combat_idle", 0.2f);
         }
     }
 
-    /// <summary>
-    /// Yardımcı karakterin kıyafet rengini değiştirerek ana oyuncudan ayrışmasını sağlar.
-    /// </summary>
     public void RengiUygula()
     {
         SkinnedMeshRenderer smr = GetComponentInChildren<SkinnedMeshRenderer>();
@@ -82,81 +119,285 @@ public class YardimciKarakter : MonoBehaviour
         {
             Material mat = new Material(smr.sharedMaterial);
             mat.name = "US_soldier_companion_instance";
-            if (mat.HasProperty("_BaseColor"))
-            {
-                mat.SetColor("_BaseColor", kiyafetRengi);
-            }
-            if (mat.HasProperty("_Color"))
-            {
-                mat.SetColor("_Color", kiyafetRengi);
-            }
+            if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", kiyafetRengi);
+            if (mat.HasProperty("_Color")) mat.SetColor("_Color", kiyafetRengi);
             smr.material = mat;
         }
     }
 
-    void OnValidate()
-    {
-        RengiUygula();
-    }
-
     void Update()
     {
+        if (oldu) return;
+
         HedefiBul();
 
-        if (hedef == null) return;
+        // 1. En yakın canlı düşmanı ara
+        hedefDusman = EnYakinCanliDusmaniBul();
 
-        Vector3 bakisYonu = Vector3.zero;
-
-        if (donusModu == DonusModu.OyuncuyaBak)
+        if (hedefDusman != null)
         {
-            // Sabit durur, oyuncu neredeyse sadece ona doğru döner
-            bakisYonu = hedef.position - transform.position;
+            // Düşmana doğru dön
+            Vector3 dusmanYon = (hedefDusman.transform.position - transform.position);
+            dusmanYon.y = 0f;
+            if (dusmanYon.sqrMagnitude > 0.01f)
+            {
+                Quaternion hedefRot = Quaternion.LookRotation(dusmanYon);
+                transform.rotation = Quaternion.Slerp(transform.rotation, hedefRot, Time.deltaTime * donusHizi * 1.5f);
+            }
+
+            // Düşmana ateş et!
+            if (Time.time >= sonrakiAtesZamani)
+            {
+                sonrakiAtesZamani = Time.time + atesAraligi + Random.Range(-0.1f, 0.2f);
+                DusmanaAtesEt(hedefDusman);
+            }
         }
-        else if (donusModu == DonusModu.OyuncununBaktigiYon)
+        else
         {
-            // Oyuncu kendi etrafında hangi yöne bakıyorsa o da o yöne döner
-            bakisYonu = hedef.forward;
+            // Etrafta düşman yoksa oyuncuya doğru dön
+            if (hedef != null)
+            {
+                Vector3 bakisYonu = donusModu == DonusModu.OyuncuyaBak ? (hedef.position - transform.position) : hedef.forward;
+                bakisYonu.y = 0f;
+
+                if (bakisYonu.sqrMagnitude > 0.001f)
+                {
+                    Quaternion hedefRotasyon = Quaternion.LookRotation(bakisYonu);
+                    transform.rotation = Quaternion.Slerp(transform.rotation, hedefRotasyon, Time.deltaTime * donusHizi);
+                }
+            }
+        }
+    }
+
+    private DusmanKontrol EnYakinCanliDusmaniBul()
+    {
+        DusmanKontrol[] dusmanlar = Object.FindObjectsByType<DusmanKontrol>(FindObjectsInactive.Exclude);
+        DusmanKontrol enYakin = null;
+        float enKisaMesafe = atesMenzili;
+
+        foreach (var d in dusmanlar)
+        {
+            if (d == null || d.IsDead) continue;
+
+            float mesafe = Vector3.Distance(transform.position, d.transform.position);
+            if (mesafe <= enKisaMesafe)
+            {
+                // Görüş çizgisi kontrolü (arada engel var mı?)
+                Vector3 goz = transform.position + Vector3.up * 1.3f;
+                Vector3 hedefGovde = d.transform.position + Vector3.up * 1.0f;
+                RaycastHit hit;
+                if (Physics.Raycast(goz, (hedefGovde - goz).normalized, out hit, atesMenzili))
+                {
+                    if (hit.transform == d.transform || hit.transform.IsChildOf(d.transform))
+                    {
+                        enKisaMesafe = mesafe;
+                        enYakin = d;
+                    }
+                }
+            }
         }
 
-        // Karakterin dik durması, yere eğilmemesi veya göğe bakmaması için Y eksenini sıfırlıyoruz
-        bakisYonu.y = 0f;
+        return enYakin;
+    }
 
-        if (bakisYonu.sqrMagnitude > 0.001f)
+    private void DusmanaAtesEt(DusmanKontrol hedef)
+    {
+        if (oldu || hedef == null || hedef.IsDead) return;
+
+        // 1. Ateş Animasyonu
+        if (animator != null)
         {
-            Quaternion hedefRotasyon = Quaternion.LookRotation(bakisYonu);
-            transform.rotation = Quaternion.Slerp(transform.rotation, hedefRotasyon, Time.deltaTime * donusHizi);
+            animator.CrossFade("infantry_combat_shoot", 0.05f);
         }
+
+        // 2. Ses
+        if (audioSource != null)
+        {
+            audioSource.pitch = Random.Range(0.9f, 1.1f);
+            audioSource.Play();
+        }
+
+        // 3. Namlu Konumu
+        Vector3 baslangic = namluNoktasi != null ? namluNoktasi.position : (transform.position + Vector3.up * 1.2f + transform.forward * 0.8f);
+        Vector3 hedefNokta = hedef.transform.position + Vector3.up * 1.0f + Random.insideUnitSphere * 0.15f;
+
+        // 4. Efektler
+        StartCoroutine(NamluFlasiParla(baslangic));
+        if (mermiIziRenderer != null)
+        {
+            StartCoroutine(MermiIziCiz(baslangic, hedefNokta));
+        }
+
+        // 5. Düşmana Hasar Ver!
+        hedef.HasarAl(atesHasari);
+    }
+
+    private float sonHasarZamani = -1f;
+
+    /// <summary>
+    /// Düşman mermisi isabet ettiğinde çağrılır.
+    /// Oyuncu ile birebir aynı hasar kurallarına ve direncine tabidir.
+    /// </summary>
+    public void HasarAl(float miktar)
+    {
+        if (oldu) return;
+
+        // Oyuncuyla aynı spam koruması (0.18s)
+        if (Time.time < sonHasarZamani + 0.18f) return;
+        sonHasarZamani = Time.time;
+
+        // Oyuncuyla aynı mermi hasar tavanı (8 HP)
+        OyuncuCani oyuncu = Object.FindAnyObjectByType<OyuncuCani>();
+        float limit = oyuncu != null ? oyuncu.mermiHasarLimiti : 8f;
+        float gercekHasar = Mathf.Min(miktar, limit);
+
+        mevcutCan -= gercekHasar;
+        StartCoroutine(HasarFlasGoster());
+
+        if (mevcutCan <= 0f)
+        {
+            mevcutCan = 0f;
+            Olum();
+        }
+    }
+
+    private IEnumerator HasarFlasGoster()
+    {
+        SkinnedMeshRenderer smr = GetComponentInChildren<SkinnedMeshRenderer>();
+        if (smr != null && smr.material != null)
+        {
+            Material mat = smr.material;
+            if (mat.HasProperty("_BaseColor"))
+            {
+                mat.SetColor("_BaseColor", Color.white);
+                yield return new WaitForSeconds(0.08f);
+                if (!oldu) mat.SetColor("_BaseColor", kiyafetRengi);
+            }
+        }
+    }
+
+    private void Olum()
+    {
+        if (oldu) return;
+        oldu = true;
+
+        if (col != null) col.enabled = false;
+        if (namluIsigi != null) namluIsigi.enabled = false;
+        if (namluFlasRenderer != null) namluFlasRenderer.enabled = false;
+        if (mermiIziRenderer != null) mermiIziRenderer.enabled = false;
+
+        StartCoroutine(OlumSekansi());
+    }
+
+    private IEnumerator OlumSekansi()
+    {
+        float gecen = 0f;
+        float sure = 0.7f;
+        Quaternion startRot = transform.rotation;
+        Quaternion endRot = startRot * Quaternion.Euler(-80f, 0f, 0f);
+        Vector3 startPos = transform.position;
+        Vector3 endPos = startPos + Vector3.down * 0.4f - transform.forward * 0.5f;
+
+        while (gecen < sure)
+        {
+            gecen += Time.deltaTime;
+            float t = Mathf.SmoothStep(0f, 1f, gecen / sure);
+            transform.rotation = Quaternion.Slerp(startRot, endRot, t);
+            transform.position = Vector3.Lerp(startPos, endPos, t);
+            yield return null;
+        }
+    }
+
+    private void KurMermiEfektleri()
+    {
+        GameObject lineObj = new GameObject("YardimciMermiIzi");
+        lineObj.transform.SetParent(transform);
+        mermiIziRenderer = lineObj.AddComponent<LineRenderer>();
+        mermiIziRenderer.startWidth = 0.04f;
+        mermiIziRenderer.endWidth = 0.015f;
+        mermiIziRenderer.positionCount = 2;
+        mermiIziRenderer.useWorldSpace = true;
+        mermiIziRenderer.enabled = false;
+
+        Material lineMat = new Material(Shader.Find("Sprites/Default") ?? Shader.Find("Universal Render Pipeline/Unlit"));
+        lineMat.color = new Color(0.3f, 0.75f, 1f, 0.9f);
+        mermiIziRenderer.material = lineMat;
+        mermiIziRenderer.startColor = new Color(0.3f, 0.75f, 1f, 0.9f);
+        mermiIziRenderer.endColor = new Color(0.1f, 0.4f, 1f, 0.2f);
+
+        GameObject lightObj = new GameObject("YardimciNamluIsigi");
+        lightObj.transform.SetParent(namluNoktasi != null ? namluNoktasi : transform);
+        lightObj.transform.localPosition = Vector3.zero;
+
+        namluIsigi = lightObj.AddComponent<Light>();
+        namluIsigi.type = LightType.Point;
+        namluIsigi.color = new Color(0.3f, 0.75f, 1f);
+        namluIsigi.range = 3.5f;
+        namluIsigi.intensity = 4.0f;
+        namluIsigi.enabled = false;
+
+        GameObject flashObj = new GameObject("YardimciNamluFlasi");
+        flashObj.transform.SetParent(namluNoktasi != null ? namluNoktasi : transform);
+        flashObj.transform.localPosition = Vector3.zero;
+
+        namluFlasRenderer = flashObj.AddComponent<LineRenderer>();
+        namluFlasRenderer.startWidth = 0.09f;
+        namluFlasRenderer.endWidth = 0.02f;
+        namluFlasRenderer.positionCount = 2;
+        namluFlasRenderer.useWorldSpace = true;
+        namluFlasRenderer.enabled = false;
+
+        Material flashMat = new Material(Shader.Find("Sprites/Default") ?? Shader.Find("Universal Render Pipeline/Unlit"));
+        flashMat.color = new Color(0.4f, 0.8f, 1f, 1f);
+        namluFlasRenderer.material = flashMat;
+        namluFlasRenderer.startColor = new Color(0.4f, 0.8f, 1f, 1f);
+        namluFlasRenderer.endColor = new Color(0.1f, 0.4f, 1f, 0.1f);
+    }
+
+    private IEnumerator NamluFlasiParla(Vector3 namluPos)
+    {
+        if (namluIsigi != null)
+        {
+            namluIsigi.transform.position = namluPos;
+            namluIsigi.enabled = true;
+        }
+        if (namluFlasRenderer != null)
+        {
+            namluFlasRenderer.SetPosition(0, namluPos);
+            namluFlasRenderer.SetPosition(1, namluPos + transform.forward * 0.16f);
+            namluFlasRenderer.enabled = true;
+        }
+
+        yield return new WaitForSeconds(0.05f);
+
+        if (namluIsigi != null) namluIsigi.enabled = false;
+        if (namluFlasRenderer != null) namluFlasRenderer.enabled = false;
+    }
+
+    private IEnumerator MermiIziCiz(Vector3 baslangic, Vector3 bitis)
+    {
+        mermiIziRenderer.enabled = true;
+        mermiIziRenderer.SetPosition(0, baslangic);
+        mermiIziRenderer.SetPosition(1, bitis);
+
+        yield return new WaitForSeconds(0.06f);
+
+        if (mermiIziRenderer != null) mermiIziRenderer.enabled = false;
     }
 
     private void HedefiBul()
     {
         if (hedef != null) return;
-
-        // 1. KarakterHareket bileşenine sahip ana oyuncuyu ara
         KarakterHareket kh = FindAnyObjectByType<KarakterHareket>();
         if (kh != null && kh.gameObject != gameObject)
         {
             hedef = kh.transform;
             return;
         }
-
-        // 2. 'Player' etiketli nesneyi ara
         GameObject player = GameObject.FindWithTag("Player");
         if (player != null && player != gameObject)
         {
             hedef = player.transform;
-            return;
-        }
-
-        // 3. KarakterHareket nesnesini ara
-        KarakterHareket[] karakterler = FindObjectsByType<KarakterHareket>(FindObjectsInactive.Exclude);
-        foreach (var k in karakterler)
-        {
-            if (k.gameObject != gameObject)
-            {
-                hedef = k.transform;
-                return;
-            }
         }
     }
 }

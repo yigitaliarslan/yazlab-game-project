@@ -68,6 +68,12 @@ public class KarakterHareket : MonoBehaviour
         {
             gameObject.AddComponent<KarakterAtes>();
         }
+
+        // Can ve sağlık barı bileşeni yoksa otomatik ekle
+        if (GetComponent<OyuncuCani>() == null)
+        {
+            gameObject.AddComponent<OyuncuCani>();
+        }
     }
 
     void Start()

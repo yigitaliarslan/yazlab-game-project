@@ -300,7 +300,15 @@ public class KarakterAtes : MonoBehaviour
             }
 
             // Vurulan nesneye hasar mesajı ilet (Varsa)
-            hit.collider.SendMessage("HasarAl", 25f, SendMessageOptions.DontRequireReceiver);
+            DusmanKontrol dusman = hit.collider.GetComponentInParent<DusmanKontrol>();
+            if (dusman != null)
+            {
+                dusman.HasarAl(25f);
+            }
+            else
+            {
+                hit.collider.SendMessageUpwards("HasarAl", 25f, SendMessageOptions.DontRequireReceiver);
+            }
 
             // Çarpma efekti
             CarpmaEfektiGoster(hit.point, hit.normal);
