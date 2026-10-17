@@ -104,6 +104,9 @@ public class KameraTakip : MonoBehaviour
 
     void Update()
     {
+        // Minigame açıkken fare serbesttir, kamerayı döndürme
+        if (Yazlab.Mekanikler.KapiBulmacaPaneli.MinigameAcik) return;
+
         // Fare girdileri ile kamerayı karakter etrafında döndür
         FareyiOku();
         CurrentYaw = yaw;

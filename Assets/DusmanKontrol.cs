@@ -77,6 +77,18 @@ public class DusmanKontrol : MonoBehaviour
     private GUIStyle canMetniStili;
     private GUIStyle dusmanBaslikStili;
 
+    // Görüş Hattı (Line of Sight) ve Duvar Arkası Gizleme
+    private bool oyuncuBeniGoruyorMu = false;
+    private float sonGorusKontrolZamani = 0f;
+    private const float GORUS_KONTROL_ARALIGI = 0.04f;
+
+    // NavMesh Takip & Siper Arkası Nişan Alma
+    private UnityEngine.AI.NavMeshAgent navAgent;
+    private Vector3 sonHedefVurusNoktasi;
+    private float sonHedefGormeZamani = -10f;
+    private static readonly int IsRunningHash = Animator.StringToHash("IsRunning");
+    private bool hasIsRunningParam = false;
+
     public bool IsDead => oldu;
 
     void Awake()
@@ -113,6 +125,25 @@ public class DusmanKontrol : MonoBehaviour
         namluUcu = namlu.transform;
 
         KurMermiEfektleri();
+
+        // NavMeshAgent bileşeni ayarla (Siper arkasındaki oyuncuyu takip ve dolaşma)
+        navAgent = GetComponent<UnityEngine.AI.NavMeshAgent>();
+        if (navAgent == null)
+        {
+            navAgent = gameObject.AddComponent<UnityEngine.AI.NavMeshAgent>();
+        }
+        navAgent.speed = 3.6f;
+        navAgent.stoppingDistance = 5.0f;
+        navAgent.acceleration = 12.0f;
+        navAgent.angularSpeed = 260.0f;
+
+        if (animator != null && animator.runtimeAnimatorController != null)
+        {
+            foreach (var p in animator.parameters)
+            {
+                if (p.name == "IsRunning") { hasIsRunningParam = true; break; }
+            }
+        }
     }
 
     void Start()
@@ -147,6 +178,13 @@ public class DusmanKontrol : MonoBehaviour
     void Update()
     {
         if (oldu) return;
+
+        // Oyuncunun bu düşmanı görüp görmediğini kontrol et (duvar vb. arkasındaysa can barı gizlensin)
+        if (Time.time >= sonGorusKontrolZamani + GORUS_KONTROL_ARALIGI)
+        {
+            sonGorusKontrolZamani = Time.time;
+            oyuncuBeniGoruyorMu = OyuncuDusmaniGoruyorMu();
+        }
 
         // En uygun hedefi belirle (Oyuncu veya Müttefik Asker)
         HedefSec();
@@ -490,8 +528,8 @@ public class DusmanKontrol : MonoBehaviour
 
     void OnGUI()
     {
-        // Öldüyse can barı çizilmez
-        if (oldu) return;
+        // Öldüyse veya oyuncu düşmanı doğrudan görmüyorsa (ör. duvar/engel arkasındaysa) can barı çizilmez
+        if (oldu || !oyuncuBeniGoruyorMu) return;
 
         Camera cam = Camera.main;
         if (cam == null) return;
@@ -575,5 +613,80 @@ public class DusmanKontrol : MonoBehaviour
         GUI.Label(new Rect(solX, ustY, genislik, yukseklik), canYazisi, canMetniStili);
 
         GUI.color = eskiRenk;
+    }
+
+    /// <summary>
+    /// Kamera/Oyuncu ile düşman arasında duvar veya katı engel olup olmadığını Raycast ile kontrol eder.
+    /// Düşman duvar arkasındaysa false döner.
+    /// </summary>
+    private bool OyuncuDusmaniGoruyorMu()
+    {
+        Camera cam = Camera.main;
+        if (cam == null) return false;
+
+        Vector3 camPos = cam.transform.position;
+
+        // 1. Düşmanın kafa konumu
+        Vector3 kafaKonumu = transform.position + Vector3.up * 1.6f;
+
+        // 2. Kameranın önünde mi kontrol et
+        Vector3 ekranNoktasi = cam.WorldToScreenPoint(kafaKonumu);
+        if (ekranNoktasi.z <= 0.1f) return false;
+
+        // Ekran sınırları içinde mi?
+        if (ekranNoktasi.x < -60 || ekranNoktasi.x > Screen.width + 60 ||
+            ekranNoktasi.y < -60 || ekranNoktasi.y > Screen.height + 60)
+        {
+            return false;
+        }
+
+        // Mesafe kontrolü (50 metreden uzaktaysa can barı gösterme)
+        float mesafe = Vector3.Distance(camPos, kafaKonumu);
+        if (mesafe > 50f) return false;
+
+        // 3. Kafa veya Gövde noktalarından en az birini doğrudan görüyor muyuz? (Line of Sight)
+        Vector3 govdeKonumu = transform.position + Vector3.up * 0.9f;
+
+        return NoktaGorunurMu(camPos, kafaKonumu) || NoktaGorunurMu(camPos, govdeKonumu);
+    }
+
+    private bool NoktaGorunurMu(Vector3 baslangic, Vector3 hedef)
+    {
+        Vector3 yon = hedef - baslangic;
+        float mesafe = yon.magnitude;
+        if (mesafe <= 0.05f) return true;
+
+        RaycastHit[] hits = Physics.RaycastAll(baslangic, yon.normalized, mesafe, ~0, QueryTriggerInteraction.Ignore);
+        if (hits == null || hits.Length == 0) return true;
+
+        // En yakından en uzağa doğru sırala
+        System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+
+        foreach (var hit in hits)
+        {
+            // Eğer ışın doğrudan bu düşmana veya alt objesine çarptıysa görüş açıktır
+            if (hit.transform == transform || hit.transform.IsChildOf(transform))
+            {
+                return true;
+            }
+
+            // Kendi oyuncumuz ve yoldaş karakter görüşü engellemez (3. şahıs kamerada oyuncunun arkasında olabiliriz)
+            if (hit.transform.CompareTag("Player") ||
+                hit.transform.name.Contains("Companion") || hit.transform.name.Contains("Oyuncu") || hit.transform.name.Contains("Yardimci"))
+            {
+                continue;
+            }
+
+            // Diğer düşman karakterler de birbirlerinin görüşünü ve can barını engellemesin
+            if (hit.transform.GetComponent<DusmanKontrol>() != null || hit.transform.GetComponentInParent<DusmanKontrol>() != null)
+            {
+                continue;
+            }
+
+            // Başka herhangi bir katı cisme (Duvar, Engel, Kapı, Kutu vb.) çarptıysa görüş engellenmiştir
+            return false;
+        }
+
+        return true;
     }
 }

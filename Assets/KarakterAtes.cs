@@ -147,6 +147,9 @@ public class KarakterAtes : MonoBehaviour
 
     void Update()
     {
+        // Minigame açıkken ateş edilmez
+        if (Yazlab.Mekanikler.KapiBulmacaPaneli.MinigameAcik) return;
+
         if (AtesGirdisiVarMi() && Time.time >= sonrakiAtesZamani)
         {
             sonrakiAtesZamani = Time.time + atesAraligi;
@@ -446,8 +449,8 @@ public class KarakterAtes : MonoBehaviour
 
     void OnGUI()
     {
-        // 3. şahısta nişangah gizlidir; SADECE fare sağ tıkı ile 1. şahıs (First Person) moduna geçildiğinde görünür!
-        if (!nisangahGoster || !KameraTakip.IsFirstPerson) return;
+        // 3. şahısta ve minigame açıkken nişangah gizlidir; SADECE fare sağ tıkı ile 1. şahıs (First Person) moduna geçildiğinde görünür!
+        if (!nisangahGoster || !KameraTakip.IsFirstPerson || Yazlab.Mekanikler.KapiBulmacaPaneli.MinigameAcik) return;
 
         // Ekranın tam ortasında zarif 4 çizgili crosshair (+) çiz
         if (beyazTexture == null)

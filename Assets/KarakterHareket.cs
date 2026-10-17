@@ -91,6 +91,16 @@ public class KarakterHareket : MonoBehaviour
 
     void Update()
     {
+        // Minigame açıkken karakter hareket etmez, yerinde sabit durur
+        if (Yazlab.Mekanikler.KapiBulmacaPaneli.MinigameAcik)
+        {
+            if (animator != null && hasIsRunningParam)
+            {
+                animator.SetBool(IsRunningHash, false);
+            }
+            return;
+        }
+
         Vector2 input = KlavyeGirdisiAl();
         bool zipla = ZiplamaGirdisiAl();
 
