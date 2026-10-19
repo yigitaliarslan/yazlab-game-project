@@ -281,13 +281,13 @@ namespace Yazlab.Editor
 
             for (int b = 0; b < basamakSayisi; b++)
             {
-                float by = (b + 1) * basamakYukseklik;
+                float basamakY = (b + 1) * basamakYukseklik;
                 float bz = baslangicZ + b * basamakDerinlik;
                 GameObject basamak = GameObject.CreatePrimitive(PrimitiveType.Cube);
                 basamak.name = $"Basamak_{b + 1}";
                 basamak.transform.SetParent(merdivenGrup.transform);
-                basamak.transform.position = new Vector3(0f, by / 2f, bz);
-                basamak.transform.localScale = new Vector3(basamakGenislik, by, basamakDerinlik);
+                basamak.transform.position = new Vector3(0f, basamakY / 2f, bz);
+                basamak.transform.localScale = new Vector3(basamakGenislik, basamakY, basamakDerinlik);
                 basamak.GetComponent<MeshRenderer>().sharedMaterial = matKoyuTas;
             }
 
