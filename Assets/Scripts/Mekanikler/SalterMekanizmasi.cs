@@ -32,7 +32,7 @@ namespace Yazlab.Mekanikler
         [SerializeField] private Color pasifRenk = Color.red;
 
         [Header("Olaylar (Events)")]
-        public UnityEvent onSalterIndirildi;
+        public UnityEvent onSalterIndirildi = new UnityEvent();
 
         private bool aktifMi = false;
 

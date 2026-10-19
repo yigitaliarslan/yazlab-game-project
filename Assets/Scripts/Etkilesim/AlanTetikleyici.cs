@@ -15,8 +15,8 @@ namespace Yazlab.Etkilesim
         [SerializeField] private bool sadeceBirKereTetikle = true;
 
         [Header("Olaylar")]
-        public UnityEvent onAlanaGirildi;
-        public UnityEvent onAlandanCikildi;
+        public UnityEvent onAlanaGirildi = new UnityEvent();
+        public UnityEvent onAlandanCikildi = new UnityEvent();
 
         private bool tetiklendiMi = false;
 

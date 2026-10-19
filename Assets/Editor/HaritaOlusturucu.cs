@@ -248,13 +248,6 @@ namespace Yazlab.Editor
             soSalter.FindProperty("tetiklemeYontemi").enumValueIndex = 1; // AlanaGirmece
             soSalter.ApplyModifiedProperties();
 
-            // Şalter tetiklendiğinde taret tehdit ışığını söndür/yeşile çevir
-            salterMek.onSalterIndirildi.AddListener(() =>
-            {
-                if (taretIsikRend != null) taretIsikRend.material.color = matYesilAktif.color;
-                Debug.Log("[Operasyon] Taretin güç kaynağı kesildi! Savunma sistemi devre dışı.");
-            });
-
             // ==========================================
             // 5. BÖLGE 3: YARI YIKIK MERKEZ KULE, MERDİVENLER & RÜŞVETÇİ NPC MUHAFIZ
             // ==========================================
@@ -355,10 +348,20 @@ namespace Yazlab.Editor
             soBy.ApplyModifiedProperties();
 
             // NPC alanına girildiğinde yöneticide durumu güncelle
-            UnityEditor.Events.UnityEventTools.AddPersistentListener(npcTetikleyici.onAlanaGirildi, by.NpcEtkilesimBaslat);
+            if (npcTetikleyici != null)
+            {
+                if (npcTetikleyici.onAlanaGirildi == null) npcTetikleyici.onAlanaGirildi = new UnityEngine.Events.UnityEvent();
+                UnityEditor.Events.UnityEventTools.AddPersistentListener(npcTetikleyici.onAlanaGirildi, by.NpcEtkilesimBaslat);
+                EditorUtility.SetDirty(npcTetikleyici);
+            }
 
             // Çıkış tetikleyicisini oyunu tamamlamaya bağla
-            UnityEditor.Events.UnityEventTools.AddPersistentListener(cikisTetikleyici.onAlanaGirildi, by.OyunuTamamla);
+            if (cikisTetikleyici != null)
+            {
+                if (cikisTetikleyici.onAlanaGirildi == null) cikisTetikleyici.onAlanaGirildi = new UnityEngine.Events.UnityEvent();
+                UnityEditor.Events.UnityEventTools.AddPersistentListener(cikisTetikleyici.onAlanaGirildi, by.OyunuTamamla);
+                EditorUtility.SetDirty(cikisTetikleyici);
+            }
 
             // ==========================================
             // 7. KARAKTERLER & 3. ŞAHIS KAMERA KURULUMU

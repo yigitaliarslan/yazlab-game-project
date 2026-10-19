@@ -30,8 +30,8 @@ namespace Yazlab.Mekanikler
         [SerializeField] private bool baslangictaAcik = false;
 
         [Header("Etkinlikler (Events)")]
-        public UnityEvent onKapiAcildi;
-        public UnityEvent onKapiKapandi;
+        public UnityEvent onKapiAcildi = new UnityEvent();
+        public UnityEvent onKapiKapandi = new UnityEvent();
 
         private Vector3 kapaliPozisyon;
         private Vector3 acikPozisyon;
