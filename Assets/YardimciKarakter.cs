@@ -184,7 +184,8 @@ public class YardimciKarakter : MonoBehaviour
             {
                 // Görüş çizgisi kontrolü (arada engel var mı?)
                 Vector3 goz = transform.position + Vector3.up * 1.3f;
-                Vector3 hedefGovde = d.transform.position + Vector3.up * 1.0f;
+                float hedefYukseklik = (d is Yazlab.Mekanikler.TaretKontrol) ? 2.8f : 1.0f;
+                Vector3 hedefGovde = d.transform.position + Vector3.up * hedefYukseklik;
                 RaycastHit hit;
                 if (Physics.Raycast(goz, (hedefGovde - goz).normalized, out hit, atesMenzili))
                 {
@@ -219,7 +220,8 @@ public class YardimciKarakter : MonoBehaviour
 
         // 3. Namlu Konumu
         Vector3 baslangic = namluNoktasi != null ? namluNoktasi.position : (transform.position + Vector3.up * 1.2f + transform.forward * 0.8f);
-        Vector3 hedefNokta = hedef.transform.position + Vector3.up * 1.0f + Random.insideUnitSphere * 0.15f;
+        float hedefYukseklik = (hedef is Yazlab.Mekanikler.TaretKontrol) ? 2.8f : 1.0f;
+        Vector3 hedefNokta = hedef.transform.position + Vector3.up * hedefYukseklik + Random.insideUnitSphere * 0.15f;
 
         // 4. Efektler
         StartCoroutine(NamluFlasiParla(baslangic));

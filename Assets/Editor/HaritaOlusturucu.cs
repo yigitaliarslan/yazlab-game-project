@@ -313,8 +313,8 @@ namespace Yazlab.Editor
 
             // Vurulabilir Collider
             BoxCollider taretCol = taretKulesi.AddComponent<BoxCollider>();
-            taretCol.center = new Vector3(0f, 3.2f, 0f);
-            taretCol.size = new Vector3(2.6f, 2.4f, 2.6f);
+            taretCol.center = new Vector3(0f, 2.2f, 0f);
+            taretCol.size = new Vector3(3.6f, 4.4f, 3.6f);
 
             // Taret Yapay Zeka ve Can Bileşeni (TaretKontrol)
             TaretKontrol tk = taretKulesi.AddComponent<TaretKontrol>();
