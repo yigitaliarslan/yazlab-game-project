@@ -105,7 +105,7 @@ namespace Yazlab.Mekanikler
         private void LosAydinlatmayiAyarla()
         {
             // Sahnede Directional Light'ı (Güneş) bul
-            Light[] isiklar = Object.FindObjectsByType<Light>(FindObjectsSortMode.None);
+            Light[] isiklar = Object.FindObjectsByType<Light>();
             foreach (var l in isiklar)
             {
                 if (l.type == LightType.Directional)
@@ -718,7 +718,7 @@ namespace Yazlab.Mekanikler
             {
                 GameObject konsol = new GameObject("ElektrikSalterKonsolu");
                 // 1. Kapının hemen sağ önünde oyuncunun görebileceği konum (Z = 13.8, X = 3.6)
-                konsol.transform.position = new Vector3(3.6f, 0f, 13.8f);
+                konsol.transform.position = new Vector3(-3.2f, 0f, -1.8f);
                 konsol.transform.rotation = Quaternion.Euler(0f, 180f, 0f);
 
                 KapiBulmacaPaneli panel = konsol.AddComponent<KapiBulmacaPaneli>();

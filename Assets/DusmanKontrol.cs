@@ -59,8 +59,8 @@ public class DusmanKontrol : MonoBehaviour
     public float canBariYukseklik = 12f;
 
     // Özel Değişkenler
-    private Transform oyuncuHedef;
-    private OyuncuCani oyuncuCaniBileseni;
+    protected Transform oyuncuHedef;
+    protected OyuncuCani oyuncuCaniBileseni;
     private Animator animator;
     private AudioSource audioSource;
     private LineRenderer mermiIziRenderer;
@@ -69,9 +69,9 @@ public class DusmanKontrol : MonoBehaviour
     private Transform namluUcu;
     private CapsuleCollider col;
 
-    private float sonrakiAtesZamani = 0f;
-    private bool oldu = false;
-    private float sonHasarZamani = 0f;
+    protected float sonrakiAtesZamani = 0f;
+    protected bool oldu = false;
+    protected float sonHasarZamani = 0f;
 
     private Texture2D beyazDokusu;
     private GUIStyle canMetniStili;
@@ -84,14 +84,11 @@ public class DusmanKontrol : MonoBehaviour
 
     // NavMesh Takip & Siper Arkası Nişan Alma
     private UnityEngine.AI.NavMeshAgent navAgent;
-    private Vector3 sonHedefVurusNoktasi;
-    private float sonHedefGormeZamani = -10f;
-    private static readonly int IsRunningHash = Animator.StringToHash("IsRunning");
-    private bool hasIsRunningParam = false;
+
 
     public bool IsDead => oldu;
 
-    void Awake()
+    protected virtual void Awake()
     {
         maksimumCan = 140f;
         mevcutCan = maksimumCan;
@@ -137,16 +134,10 @@ public class DusmanKontrol : MonoBehaviour
         navAgent.acceleration = 12.0f;
         navAgent.angularSpeed = 260.0f;
 
-        if (animator != null && animator.runtimeAnimatorController != null)
-        {
-            foreach (var p in animator.parameters)
-            {
-                if (p.name == "IsRunning") { hasIsRunningParam = true; break; }
-            }
-        }
+
     }
 
-    void Start()
+    protected virtual void Start()
     {
         HedefiBul();
         RengiUygula();
@@ -173,9 +164,9 @@ public class DusmanKontrol : MonoBehaviour
         }
     }
 
-    private Transform aktifHedef;
+    protected Transform aktifHedef;
 
-    void Update()
+    protected virtual void Update()
     {
         if (oldu) return;
 
@@ -315,7 +306,7 @@ public class DusmanKontrol : MonoBehaviour
     /// <summary>
     /// Oyuncunun mermisi düşmana çarptığında KarakterAtes tarafından çağrılır.
     /// </summary>
-    public void HasarAl(float miktar)
+    public virtual void HasarAl(float miktar)
     {
         if (oldu) return;
 
@@ -351,7 +342,7 @@ public class DusmanKontrol : MonoBehaviour
     /// <summary>
     /// Düşman öldüğünde tetiklenen prosedürel yere yığılma ve kaybolma animasyonu.
     /// </summary>
-    private void Olum()
+    protected virtual void Olum()
     {
         if (oldu) return;
         oldu = true;
@@ -526,7 +517,7 @@ public class DusmanKontrol : MonoBehaviour
         }
     }
 
-    void OnGUI()
+    protected virtual void OnGUI()
     {
         // Öldüyse veya oyuncu düşmanı doğrudan görmüyorsa (ör. duvar/engel arkasındaysa) can barı çizilmez
         if (oldu || !oyuncuBeniGoruyorMu) return;

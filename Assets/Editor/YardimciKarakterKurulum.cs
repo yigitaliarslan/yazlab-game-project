@@ -7,14 +7,20 @@ public class YardimciKarakterKurulum
 {
     static YardimciKarakterKurulum()
     {
-        EditorApplication.delayCall += Yapilandir;
+        if (!Application.isBatchMode)
+        {
+            EditorApplication.delayCall += Yapilandir;
+        }
     }
 
     [MenuItem("Tools/Yardımcı Askeri ve Sistemleri Güncelle")]
     public static void YapilandirMenu()
     {
         Yapilandir();
-        EditorUtility.DisplayDialog("Başarılı", "Müttefik asker karakteri (düşmanlara ateş eden takım arkadaşı) hazırlandı!", "Tamam");
+        if (!Application.isBatchMode)
+        {
+            EditorUtility.DisplayDialog("Başarılı", "Müttefik asker karakteri (düşmanlara ateş eden takım arkadaşı) hazırlandı!", "Tamam");
+        }
     }
 
     public static void Yapilandir()
@@ -98,13 +104,33 @@ public class YardimciKarakterKurulum
                 if (cc != null) Object.DestroyImmediate(cc);
 
                 yk = instance.AddComponent<YardimciKarakter>();
+                yk.maksimumCan = 100f;
+                yk.mevcutCan = 100f;
+                yk.atesMenzili = 30f;
+                yk.atesAraligi = 0.9f;
+                yk.atesHasari = 20f;
                 yk.donusModu = YardimciKarakter.DonusModu.OyuncuyaBak;
-                yk.donusHizi = 8.0f;
 
                 KarakterHareket oyuncu = Object.FindAnyObjectByType<KarakterHareket>();
                 if (oyuncu != null)
                 {
                     yk.hedef = oyuncu.transform;
+                }
+
+                CapsuleCollider col = instance.GetComponent<CapsuleCollider>();
+                if (col == null)
+                {
+                    col = instance.AddComponent<CapsuleCollider>();
+                    col.height = 1.8f;
+                    col.radius = 0.38f;
+                    col.center = new Vector3(0f, 0.9f, 0f);
+                }
+
+                Animator anim = instance.GetComponent<Animator>();
+                if (anim != null && animCtrl != null)
+                {
+                    anim.runtimeAnimatorController = animCtrl;
+                    anim.cullingMode = AnimatorCullingMode.AlwaysAnimate;
                 }
 
                 if (companionMat != null)
@@ -113,54 +139,29 @@ public class YardimciKarakterKurulum
                     if (smr != null)
                     {
                         smr.sharedMaterial = companionMat;
-                        EditorUtility.SetDirty(smr);
                     }
                 }
-
-                if (animCtrl != null)
-                {
-                    Animator anim = instance.GetComponent<Animator>();
-                    if (anim != null) anim.runtimeAnimatorController = animCtrl;
-                }
-
-                Undo.RegisterCreatedObjectUndo(instance, "Yardimci Karakter Olusturuldu");
-                EditorUtility.SetDirty(instance);
+            }
+        }
+        else
+        {
+            // Mevcut yardımcı askerin hedefini oyuncuya bağla
+            KarakterHareket oyuncu = Object.FindAnyObjectByType<KarakterHareket>();
+            if (oyuncu != null)
+            {
+                yk.hedef = oyuncu.transform;
+                EditorUtility.SetDirty(yk);
             }
         }
 
-        // 3. Ana Oyuncu için Ateş Etme Bileşeni (KarakterAtes)
-        KarakterHareket oyuncuKh = Object.FindAnyObjectByType<KarakterHareket>();
-        if (oyuncuKh != null)
+        // 3. Sahneyi Kaydet
+        if (!Application.isPlaying && !Application.isBatchMode)
         {
-            KarakterAtes ates = oyuncuKh.GetComponent<KarakterAtes>();
-            if (ates == null)
+            var aktifSahne = EditorSceneManager.GetActiveScene();
+            if (aktifSahne.IsValid())
             {
-                ates = oyuncuKh.gameObject.AddComponent<KarakterAtes>();
-            }
-            if (Camera.main != null)
-            {
-                ates.kamera = Camera.main.transform;
-            }
-            ates.namluOfset3P = new Vector3(0.22f, 1.20f, 0.95f);
-            ates.namluOfset1P = new Vector3(0.20f, -0.32f, 0.55f);
-            EditorUtility.SetDirty(oyuncuKh.gameObject);
-        }
-
-        // 4. Ajan Hedefini Doğrula
-        if (yk != null && oyuncuKh != null)
-        {
-            yk.hedef = oyuncuKh.transform;
-            EditorUtility.SetDirty(yk);
-        }
-
-        // Sahneyi kaydet
-        if (!Application.isPlaying)
-        {
-            var activeScene = EditorSceneManager.GetActiveScene();
-            if (activeScene.IsValid())
-            {
-                EditorSceneManager.MarkSceneDirty(activeScene);
-                EditorSceneManager.SaveScene(activeScene);
+                EditorSceneManager.MarkSceneDirty(aktifSahne);
+                EditorSceneManager.SaveScene(aktifSahne);
             }
         }
     }

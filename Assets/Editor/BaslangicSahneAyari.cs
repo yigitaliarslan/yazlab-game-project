@@ -15,11 +15,16 @@ namespace Yazlab.Editor
 
         static BaslangicSahneAyari()
         {
-            EditorApplication.delayCall += Ayarla;
+            if (!Application.isBatchMode)
+            {
+                EditorApplication.delayCall += Ayarla;
+            }
         }
 
         private static void Ayarla()
         {
+            if (Application.isBatchMode) return;
+
             // 1. PlayMode başlangıç kısıtlamasını kaldır (böylece asıl sahnemiz kamera ile birlikte çalışır)
             EditorSceneManager.playModeStartScene = null;
 

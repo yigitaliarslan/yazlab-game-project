@@ -11,7 +11,7 @@ namespace Yazlab.Editor
 {
     /// <summary>
     /// Taktiksel İstihbarat Operasyonu senaryosuna uygun yuvarlak kale / şato
-    /// yıkıntısı haritasını (surlar, siperler, merdivenler, taret, jeneratör,
+    /// yıkıntısı haritasını (surlar, siperler, şalter konsolu, savunma tareti,
     /// NPC kulesi ve çıkış kapısı) otomatik oluşturan ve NavMesh bake eden editör aracı.
     /// </summary>
     public class HaritaOlusturucu : EditorWindow
@@ -19,13 +19,13 @@ namespace Yazlab.Editor
         [MenuItem("Tools/YazLab/1. Haritayı Sıfırdan Oluştur (Yuvarlak Kale Seviyesi)")]
         public static void HaritayiKur()
         {
-            if (!EditorUtility.DisplayDialog("Taktiksel İstihbarat Haritası", 
+            if (!Application.isBatchMode && !EditorUtility.DisplayDialog("Taktiksel İstihbarat Haritası", 
                 "Taktiksel İstihbarat Operasyonu senaryosuna uygun Yuvarlak Kale & Yıkıntı Haritası inşa edilecek:\n\n" +
                 "• Yuvarlak Dış Surlar ve Yıkık Kuleler\n" +
-                "• Siper Hendekleri, Kum Torbaları ve Sandıklar\n" +
-                "• Fiziksel Engel: Kilitli Depo + Taret Kulesi + Yoldaşın Gizli Yan Yolu + Güç Jeneratörü\n" +
-                "• Sosyal Engel: Yarı Yıkık Kule, Merdivenler, Rüşvetçi NPC Muhafız Odası ve Çıkış Kapısı\n" +
-                "• Otomatik Karakter & 3. Şahıs Kamera Kurulumu\n" +
+                "• Siper Hendekleri, Kum Torbaları, Sandıklar ve İlk Siperdeki Elektrik Şalter Konsolu\n" +
+                "• Fiziksel Engel: Kilitli Depo Kapısı + Kapı Arkasında Canlı & Ateş Eden Otomatik Savunma Tareti\n" +
+                "• Sosyal Engel: Yarı Yıkık Kule, 8 Kademeli Taş Merdivenler, Rüşvetçi NPC Muhafız Odası ve Çıkış Kapısı\n" +
+                "• Otomatik Karakterler (Oyuncu, Müttefik Yoldaş Asker, NPC Muhafız) & 3. Şahıs Kamera Kurulumu\n" +
                 "• Otomatik NavMesh Taraması (Bake)\n\n" +
                 "Devam edilsin mi?", 
                 "Evet, Oluştur", "İptal"))
@@ -33,12 +33,84 @@ namespace Yazlab.Editor
                 return;
             }
 
+            HaritayiKurInternal();
+
+            if (!Application.isBatchMode)
+            {
+                EditorUtility.DisplayDialog("Operasyon Haritası Hazır!", 
+                    "Taktiksel İstihbarat Operasyonu Yuvarlak Kale Haritası başarıyla inşa edildi!\n\n" +
+                    "✓ Yuvarlak dış taş surlar ve yıkık burçlar yerleştirildi.\n" +
+                    "✓ İlk siperin yanına Elektrik Şalter Konsolu yerleştirildi.\n" +
+                    "✓ Kilitli Depo Kapısının ardında aktif, çift namlulu Otomatik Savunma Tareti konuşlandırıldı.\n" +
+                    "✓ Şalter açıldığında kapı açılır ve taret hedefe kilitlenip ateş eder.\n" +
+                    "✓ Kuzeydeki yarı yıkık kule, kademeli taş merdivenler ve 2. kat platformu inşa edildi.\n" +
+                    "✓ Rüşvetçi NPC Muhafız odası, çıkış kapısı ve tetikleyiciler hazırlandı.\n" +
+                    "✓ Oyuncu, Yoldaş ve NPC Muhafız yerleştirildi, animatör ve 3. şahıs kamera bağlandı.\n" +
+                    "✓ NavMesh tüm zemin, siperler ve merdivenler için başarıyla Bake edildi!\n\n" +
+                    "Şimdi Play (▶) tuşuna basarak taktiksel operasyona başlayabilirsiniz!", "Harika!");
+            }
+        }
+
+        [MenuItem("Tools/YazLab/2. Karakterleri ve Animasyonları Sahneye Ekle (Otomatik)")]
+        public static void KarakterleriSahneyeKurMenu()
+        {
+            KarakterleriSahneyeKur();
+            var scene = EditorSceneManager.GetActiveScene();
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+
+            if (!Application.isBatchMode)
+            {
+                EditorUtility.DisplayDialog("Başarılı", 
+                    "Oyuncu, Yoldaş ve NPC Muhafız karakterleri animasyonlarıyla birlikte sahneye eklendi ve 3. şahıs kamera bağlandı!\n\nŞimdi Play (▶) tuşuna basıp test edebilirsiniz.", 
+                    "Tamam");
+            }
+        }
+
+        [MenuItem("Tools/YazLab/3. Her İki Sahneyi de Tam Otomatik İnşa Et ve NavMesh Bake Et")]
+        public static void HerIkiSahneyiOtomatikInsaEt()
+        {
+            string[] sahneler = new string[] {
+                "Assets/Scenes/SampleScene.unity",
+                "Assets/Scenes/OyunSeviyesi.unity"
+            };
+
+            foreach (string sahneYolu in sahneler)
+            {
+                Debug.Log($"[YazLab] Sahne açılıyor ve harita oluşturuluyor: {sahneYolu}");
+                var scene = EditorSceneManager.OpenScene(sahneYolu, OpenSceneMode.Single);
+                HaritayiKurInternal();
+                EditorSceneManager.MarkSceneDirty(scene);
+                EditorSceneManager.SaveScene(scene);
+                Debug.Log($"[YazLab] Sahne başarıyla güncellendi ve kaydedildi: {sahneYolu}");
+            }
+        }
+
+        public static void HaritayiKurInternal()
+        {
             // Eski harita kökü varsa temizle
             GameObject eskiHarita = GameObject.Find("--- HARITA_SEVIYESI ---");
             if (eskiHarita != null)
             {
                 DestroyImmediate(eskiHarita);
             }
+
+            // Sahnedeki eski düşman askerlerini ve konsol kalıntılarını temizle
+            GameObject d1 = GameObject.Find("DusmanAsker_1");
+            if (d1 != null) DestroyImmediate(d1);
+            GameObject d2 = GameObject.Find("DusmanAsker_2");
+            if (d2 != null) DestroyImmediate(d2);
+
+            foreach (var d in Object.FindObjectsByType<DusmanKontrol>(FindObjectsInactive.Include))
+            {
+                if (d != null && d.gameObject != null && !(d is TaretKontrol))
+                {
+                    DestroyImmediate(d.gameObject);
+                }
+            }
+            GameObject eskiKonsol = GameObject.Find("ElektrikSalterKonsolu");
+            if (eskiKonsol != null) DestroyImmediate(eskiKonsol);
+
             GameObject haritaKok = new GameObject("--- HARITA_SEVIYESI ---");
             Undo.RegisterCreatedObjectUndo(haritaKok, "Harita Olusturuldu");
 
@@ -170,37 +242,96 @@ namespace Yazlab.Editor
 
             KapiKontrol engelKapiKontrol = engelKapiObj.AddComponent<KapiKontrol>();
 
-            // --- OTOMATİK TARET KULESİ (SENARYO GEREKSİNİMİ) ---
+            // --- ELEKTRİK BULMACA KONSOLU (İLK SİPER ALANINDA - SPAWN YANI) ---
+            // Oyuncu doğduğu anda hemen önündeki sol siperin dibinde şalter konsolu yer alır
+            GameObject konsolObj = new GameObject("ElektrikSalterKonsolu");
+            konsolObj.transform.SetParent(bolge1.transform);
+            konsolObj.transform.position = new Vector3(-3.0f, 0f, -1.5f);
+            konsolObj.transform.rotation = Quaternion.Euler(0f, 180f, 0f);
+            KapiBulmacaPaneli bulmacaPaneli = konsolObj.AddComponent<KapiBulmacaPaneli>();
+            bulmacaPaneli.bagliKapi = engelKapiKontrol;
+
+            // --- OTOMATİK SAVUNMA TARETİ (KAPI ARKASINDAKİ DÜŞMAN TARET) ---
             GameObject taretKulesi = new GameObject("Otomatik_Taret_Kulesi");
             taretKulesi.transform.SetParent(bolge2.transform);
             taretKulesi.transform.position = new Vector3(0f, 0f, 16.5f);
 
             // Taret Kaidesi (Yükseltilmiş taş platform)
-            KutuOlustur("Taret_Kaide", new Vector3(0f, 1.5f, 16.5f), new Vector3(3f, 3f, 3f), matKoyuTas, taretKulesi.transform);
+            KutuOlustur("Taret_Kaide", new Vector3(0f, 1.5f, 16.5f), new Vector3(3.2f, 3f, 3.2f), matKoyuTas, taretKulesi.transform);
+
+            // Dönen ve Eğilen Taret Kule Başı
+            GameObject kuleBasi = new GameObject("Taret_KuleBasi");
+            kuleBasi.transform.SetParent(taretKulesi.transform);
+            kuleBasi.transform.position = new Vector3(0f, 3.2f, 16.5f);
 
             // Taret Gövdesi (Metal kubbe)
             GameObject taretGovde = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             taretGovde.name = "Taret_Govdesi";
-            taretGovde.transform.SetParent(taretKulesi.transform);
-            taretGovde.transform.position = new Vector3(0f, 3.4f, 16.5f);
-            taretGovde.transform.localScale = new Vector3(1.8f, 0.5f, 1.8f);
+            taretGovde.transform.SetParent(kuleBasi.transform);
+            taretGovde.transform.localPosition = new Vector3(0f, 0.2f, 0f);
+            taretGovde.transform.localScale = new Vector3(2.0f, 0.5f, 2.0f);
             taretGovde.GetComponent<MeshRenderer>().sharedMaterial = matPasliMetal;
 
-            // Çift Namlu
-            KutuOlustur("Taret_Namlu1", new Vector3(-0.35f, 3.4f, 14.8f), new Vector3(0.2f, 0.2f, 2.2f), matPasliMetal, taretKulesi.transform);
-            KutuOlustur("Taret_Namlu2", new Vector3(0.35f, 3.4f, 14.8f), new Vector3(0.2f, 0.2f, 2.2f), matPasliMetal, taretKulesi.transform);
+            // Çift Namlu (Geri tepme animasyonu için)
+            GameObject namlu1 = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            namlu1.name = "Taret_Namlu1";
+            namlu1.transform.SetParent(kuleBasi.transform);
+            namlu1.transform.localPosition = new Vector3(-0.45f, 0.2f, 1.3f);
+            namlu1.transform.localScale = new Vector3(0.24f, 0.24f, 2.2f);
+            namlu1.GetComponent<MeshRenderer>().sharedMaterial = matPasliMetal;
+
+            GameObject namlu2 = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            namlu2.name = "Taret_Namlu2";
+            namlu2.transform.SetParent(kuleBasi.transform);
+            namlu2.transform.localPosition = new Vector3(0.45f, 0.2f, 1.3f);
+            namlu2.transform.localScale = new Vector3(0.24f, 0.24f, 2.2f);
+            namlu2.GetComponent<MeshRenderer>().sharedMaterial = matPasliMetal;
+
+            // Namlu Uçları
+            GameObject ucu1 = new GameObject("NamluUcu");
+            ucu1.transform.SetParent(namlu1.transform);
+            ucu1.transform.localPosition = new Vector3(0f, 0f, 1.15f);
+
+            GameObject ucu2 = new GameObject("NamluUcu");
+            ucu2.transform.SetParent(namlu2.transform);
+            ucu2.transform.localPosition = new Vector3(0f, 0f, 1.15f);
 
             // Taret Kırmızı Tehdit Sensör Işığı
             GameObject taretIsik = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             taretIsik.name = "Taret_TehditIsigi";
-            taretIsik.transform.SetParent(taretKulesi.transform);
-            taretIsik.transform.position = new Vector3(0f, 3.9f, 16.5f);
+            taretIsik.transform.SetParent(kuleBasi.transform);
+            taretIsik.transform.localPosition = new Vector3(0f, 0.75f, 0f);
             taretIsik.transform.localScale = new Vector3(0.6f, 0.6f, 0.6f);
             MeshRenderer taretIsikRend = taretIsik.GetComponent<MeshRenderer>();
             taretIsikRend.sharedMaterial = matKirmiziTehlike;
 
+            Light pointLight = taretIsik.AddComponent<Light>();
+            pointLight.type = LightType.Point;
+            pointLight.color = Color.red;
+            pointLight.range = 10f;
+            pointLight.intensity = 2.5f;
+
+            // Vurulabilir Collider
+            BoxCollider taretCol = taretKulesi.AddComponent<BoxCollider>();
+            taretCol.center = new Vector3(0f, 3.2f, 0f);
+            taretCol.size = new Vector3(2.6f, 2.4f, 2.6f);
+
+            // Taret Yapay Zeka ve Can Bileşeni (TaretKontrol)
+            TaretKontrol tk = taretKulesi.AddComponent<TaretKontrol>();
+            tk.kuleBasi = kuleBasi.transform;
+            tk.namluSol = namlu1.transform;
+            tk.namluSag = namlu2.transform;
+            tk.namluUcuSol = ucu1.transform;
+            tk.namluUcuSag = ucu2.transform;
+            tk.sensorIsikRenderer = taretIsikRend;
+            tk.sensorPointLight = pointLight;
+            tk.maksimumCan = 200f;
+            tk.mevcutCan = 200f;
+            tk.atesHasari = 9f;
+            tk.atesAraligi = 0.42f;
+            tk.recoilMiktari = 0.35f;
+
             // --- YOLDAŞIN GİZLİ YAN YOLU (DOĞU SURLARI BOYUNCA) ---
-            // Doğu tarafında (X = 18 - 22) siperlerin ve yıkık duvarların arkasından jeneratöre giden gizli patika
             GameObject yanYol = new GameObject("Yoldas_Gizli_Yan_Yolu");
             yanYol.transform.SetParent(bolge2.transform);
 
@@ -224,7 +355,7 @@ namespace Yazlab.Editor
             salterKol.transform.localScale = new Vector3(0.2f, 0.6f, 0.2f);
             salterKol.GetComponent<MeshRenderer>().sharedMaterial = matAhsap;
 
-            // Durum Gösterge Işığı (Kırmızıdan yeşile döner)
+            // Durum Gösterge Işığı
             GameObject durumIsigi = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             durumIsigi.name = "Jenerator_DurumIsigi";
             durumIsigi.transform.SetParent(jeneratorObj.transform);
@@ -377,37 +508,13 @@ namespace Yazlab.Editor
             var activeScene = EditorSceneManager.GetActiveScene();
             EditorSceneManager.MarkSceneDirty(activeScene);
             EditorSceneManager.SaveScene(activeScene);
-
-            EditorUtility.DisplayDialog("Operasyon Haritası Hazır!", 
-                "Taktiksel İstihbarat Operasyonu Yuvarlak Kale Haritası başarıyla inşa edildi!\n\n" +
-                "✓ Yuvarlak dış taş surlar ve yıkık burçlar yerleştirildi.\n" +
-                "✓ Güney giriş kapısı, siper hendekleri ve kum torbaları kuruldu.\n" +
-                "✓ Kilitli Depo Kapısı ve Tehdit Tareti avluya yerleştirildi.\n" +
-                "✓ Doğu surları boyunca Yoldaşın Gizli Yan Yolu ve Jeneratör Şalteri bağlandı.\n" +
-                "✓ Kuzeydeki yarı yıkık kule, kademeli taş merdivenler ve 2. kat platformu inşa edildi.\n" +
-                "✓ Rüşvetçi NPC Muhafız odası, çıkış kapısı ve tetikleyiciler hazırlandı.\n" +
-                "✓ Oyuncu, Yoldaş ve NPC Muhafız yerleştirildi, animatör ve 3. şahıs kamera bağlandı.\n" +
-                "✓ NavMesh tüm zemin, siperler ve merdivenler için başarıyla Bake edildi!\n\n" +
-                "Şimdi Play (▶) tuşuna basarak taktiksel operasyona başlayabilirsiniz!", "Harika!");
-        }
-
-        [MenuItem("Tools/YazLab/2. Karakterleri ve Animasyonları Sahneye Ekle (Otomatik)")]
-        public static void KarakterleriSahneyeKurMenu()
-        {
-            KarakterleriSahneyeKur();
-            var scene = EditorSceneManager.GetActiveScene();
-            EditorSceneManager.MarkSceneDirty(scene);
-            EditorSceneManager.SaveScene(scene);
-
-            EditorUtility.DisplayDialog("Başarılı", 
-                "Oyuncu, Yoldaş ve NPC Muhafız karakterleri animasyonlarıyla birlikte sahneye eklendi ve 3. şahıs kamera bağlandı!\n\nŞimdi Play (▶) tuşuna basıp test edebilirsiniz.", 
-                "Tamam");
         }
 
         public static void KarakterleriSahneyeKur()
         {
             GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/ToonSoldiers_WW2_demo/ToonSoldier_WW2_demo_Prefab.prefab");
             RuntimeAnimatorController animCtrl = AssetDatabase.LoadAssetAtPath<RuntimeAnimatorController>("Assets/ToonSoldiers_WW2_demo/KarakterAnimator.controller");
+            Material companionMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/ToonSoldiers_WW2_demo/model/Materials/US_soldier_companion.mat");
 
             if (prefab == null || animCtrl == null)
             {
@@ -460,6 +567,22 @@ namespace Yazlab.Editor
                 }
             }
 
+            // Oyuncunun silah ve can barı bileşenlerini güvenceye al
+            if (oyuncuObj.GetComponent<KarakterAtes>() == null)
+            {
+                KarakterAtes ka = oyuncuObj.AddComponent<KarakterAtes>();
+                ka.seriAtes = true;
+                ka.atesAraligi = 0.2f;
+                ka.menzil = 100f;
+                ka.vurusKuvveti = 250f;
+            }
+            if (oyuncuObj.GetComponent<OyuncuCani>() == null)
+            {
+                OyuncuCani oc = oyuncuObj.AddComponent<OyuncuCani>();
+                oc.maksimumCan = 100f;
+                oc.mevcutCan = 100f;
+            }
+
             // 2. YOLDAŞ KARAKTER (TAKIM ARKADAŞI / ARAMA KURTARMA) - Oyuncunun yanında
             Vector3 yoldasBaslangic = new Vector3(2.2f, 0.05f, -5.0f);
             YardimciKarakter yoldas = Object.FindAnyObjectByType<YardimciKarakter>();
@@ -495,6 +618,12 @@ namespace Yazlab.Editor
                     anim.cullingMode = AnimatorCullingMode.AlwaysAnimate;
                 }
 
+                if (companionMat != null)
+                {
+                    SkinnedMeshRenderer smr = yoldasObj.GetComponentInChildren<SkinnedMeshRenderer>();
+                    if (smr != null) smr.sharedMaterial = companionMat;
+                }
+
                 Undo.RegisterCreatedObjectUndo(yoldasObj, "Yoldas Olusturuldu");
             }
             else
@@ -507,9 +636,14 @@ namespace Yazlab.Editor
                     anim.runtimeAnimatorController = animCtrl;
                     anim.cullingMode = AnimatorCullingMode.AlwaysAnimate;
                 }
+                if (companionMat != null)
+                {
+                    SkinnedMeshRenderer smr = yoldas.GetComponentInChildren<SkinnedMeshRenderer>();
+                    if (smr != null) smr.sharedMaterial = companionMat;
+                }
             }
 
-            // 3. RÜŞVETÇİ NPC MUHAFIZ (Kule 2. Kat Platformunda, Z = 38, Y = 2.4)
+            // 3. RÜŞVETÇİ NPC MUHAFIZ (Kule 2. Kat Platformunda, Z = 38, Y = 2.45)
             Vector3 npcKonum = new Vector3(0f, 2.45f, 38.0f);
             GameObject npcMuhafiz = GameObject.Find("NPC_Muhafiz");
             if (npcMuhafiz == null)
@@ -552,7 +686,13 @@ namespace Yazlab.Editor
                 }
             }
 
-            // 4. ANA KAMERA (3. ŞAHIS KAMERA TAKİBİ)
+            // 4. ESKİ DÜŞMAN ASKERLERİNİ KALDIR (Kullanıcı Talebi)
+            GameObject d1 = GameObject.Find("DusmanAsker_1");
+            if (d1 != null) Object.DestroyImmediate(d1);
+            GameObject d2 = GameObject.Find("DusmanAsker_2");
+            if (d2 != null) Object.DestroyImmediate(d2);
+
+            // 5. ANA KAMERA (3. ŞAHIS KAMERA TAKİBİ)
             Camera mainCam = Camera.main;
             if (mainCam != null)
             {
@@ -570,6 +710,7 @@ namespace Yazlab.Editor
                 kt.donusHizi = 12.0f;
                 kt.minPitch = -20f;
                 kt.maxPitch = 60f;
+                kt.sagTiklaBirinciSahis = true;
 
                 oyuncuHareket.kamera = mainCam.transform;
 
