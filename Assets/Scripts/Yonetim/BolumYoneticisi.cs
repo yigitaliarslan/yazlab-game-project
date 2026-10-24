@@ -23,9 +23,9 @@ namespace Yazlab.Yonetim
         [SerializeField] private KapiKontrol npsCikisKapisi;
 
         [Header("Olaylar")]
-        public UnityEvent<OyunDurumu> onDurumDegisti;
-        public UnityEvent onFizikselEngelAsildi;
-        public UnityEvent onOyunTamamlandi;
+        public UnityEvent<OyunDurumu> onDurumDegisti = new UnityEvent<OyunDurumu>();
+        public UnityEvent onFizikselEngelAsildi = new UnityEvent();
+        public UnityEvent onOyunTamamlandi = new UnityEvent();
 
         public OyunDurumu MevcutDurum => mevcutDurum;
 
