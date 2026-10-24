@@ -23,12 +23,10 @@ namespace Yazlab.Mekanikler
 
     /// <summary>
     /// Kilitli kapının ardındaki avluda konuşlanan Otomatik Savunma Tareti.
-    /// Düşman askeri ile birebir aynı kurallarla çalışır:
-    /// - Canı vardır (200 HP). Oyuncu tüfeğiyle vurdukça üzerinde düşman askeriyle
-    ///   aynı stilde can barı görünür ve hasar aldıkça barı azalır / sarı parlar.
+    /// - Canı 380 HP'dir, tüfekle vuruldukça düşman askeri gibi üstünde kırmızı can barı azalır ve sarı parlar.
     /// - Hem oyuncuya hem de yan karaktere (yoldaşa) AYNI ANDA çift namlusuyla ateş eder.
-    /// - Çift namlulu geri tepme (recoil) animasyonu, mermi izleri, namlu alevleri ve hasar verir.
-    /// - İmha edildiğinde patlama ve baş eğme animasyonuyla devre dışı kalır.
+    /// - Taretin silah yüzü ve çift namlusu ateş ederken hedefe tam cepheden dönüktür.
+    /// - İmha edildiğinde (canı sıfırlandığında) patlama efektiyle sahneden tamamen yok olur (yok olsun isteği).
     /// </summary>
     public class TaretKontrol : DusmanKontrol
     {
@@ -38,16 +36,17 @@ namespace Yazlab.Mekanikler
         public Transform namluSag;
         public Transform namluUcuSol;
         public Transform namluUcuSag;
+        public Transform silahYuzuPlate;
         public MeshRenderer sensorIsikRenderer;
         public Light sensorPointLight;
 
         [Header("Geri Tepme (Recoil) Ayarları")]
         public float recoilMiktari = 0.35f;
-        public float recoilHizi = 9.0f;
+        public float recoilHizi = 10.0f;
 
         [Header("Çift Hedef & Eşzamanlı Ateş")]
-        public float hasarOyuncu = 8.0f;
-        public float hasarYardimci = 8.0f;
+        public float hasarOyuncu = 10.0f;
+        public float hasarYardimci = 10.0f;
 
         private Vector3 namluSolOrijinalLocalPos;
         private Vector3 namluSagOrijinalLocalPos;
@@ -68,32 +67,31 @@ namespace Yazlab.Mekanikler
         private GUIStyle taretBaslikStili;
         private GUIStyle taretCanStili;
 
-        // Takip Edilen Hedefler
+        // Takip Edilen Hedefler ve Kapı
         private YardimciKarakter yardimciHedef;
+        private KapiKontrol kapiKontrolBileseni;
         private bool oyuncuGorunurMu = false;
         private bool yardimciGorunurMu = false;
-        private bool oyuncuKameraBeniGoruyorMu = false;
-        private float sonKameraKontrolZamani = 0f;
 
         protected override void Awake()
         {
-            maksimumCan = 200f;
+            maksimumCan = 380f;
             mevcutCan = maksimumCan;
-            gorusMenzili = 50f;
-            atesAraligi = 0.55f;
-            atesHasari = 8f;
-            donusHizi = 5.5f;
+            gorusMenzili = 55f;
+            atesAraligi = 0.36f; // Seri ve agresif çift atış
+            atesHasari = 10f;
+            donusHizi = 8.5f;   // Çok daha hızlı hedefe kilitlenme
             canBariYukseklikOfseti = 1.15f;
-            canBariGenislik = 125f;
-            canBariYukseklik = 12f;
+            canBariGenislik = 140f;
+            canBariYukseklik = 13f;
 
-            // Parça referanslarını bul ve hiyerarşiyi düzenle
+            // Parça referanslarını ve silah yüzünü güvenceye al
             OtomatikParcalariBul();
 
             if (namluSol != null) namluSolOrijinalLocalPos = namluSol.localPosition;
             if (namluSag != null) namluSagOrijinalLocalPos = namluSag.localPosition;
 
-            // Vurulabilir Ana Collider: Tüm kuleyi (kaide + baş + namlular) kapsasın
+            // Vurulabilir Ana Collider
             taretCollider = GetComponent<Collider>();
             if (taretCollider == null)
             {
@@ -103,7 +101,7 @@ namespace Yazlab.Mekanikler
                 taretCollider = box;
             }
 
-            // Alt parçalara da HasarHedefi ekle (mermi kaideye veya namluya çarparsa da hasar alsın)
+            // Alt parçalara da hasar iletici ekle
             ParcalaraHasarIleticiEkle();
 
             // Ses Kaynağı ve Prosedürel Sesler
@@ -124,19 +122,49 @@ namespace Yazlab.Mekanikler
 
         protected override void Start()
         {
-            // Oyuncuyu bul
-            KarakterHareket p = Object.FindAnyObjectByType<KarakterHareket>();
-            if (p != null)
-            {
-                oyuncuHedef = p.transform;
-                oyuncuCaniBileseni = p.GetComponent<OyuncuCani>();
-            }
-
-            // Yardımcı Yan Karakteri bul
-            yardimciHedef = YardimciKarakter.Instance != null ? YardimciKarakter.Instance : Object.FindAnyObjectByType<YardimciKarakter>();
+            HedefleriBulVeAyarla();
 
             // Başlangıçta sensör ışığını kırmızı hazır bekleme durumuna al
             DurumIsiginiAyarla(new Color(0.85f, 0.15f, 0.10f), 1.5f);
+        }
+
+        private void HedefleriBulVeAyarla()
+        {
+            // Oyuncuyu bul
+            if (oyuncuHedef == null || oyuncuCaniBileseni == null)
+            {
+                KarakterHareket kh = Object.FindAnyObjectByType<KarakterHareket>();
+                if (kh != null)
+                {
+                    oyuncuHedef = kh.transform;
+                    oyuncuCaniBileseni = kh.GetComponent<OyuncuCani>() ?? kh.gameObject.AddComponent<OyuncuCani>();
+                }
+                else
+                {
+                    GameObject pObj = GameObject.FindWithTag("Player");
+                    if (pObj != null)
+                    {
+                        oyuncuHedef = pObj.transform;
+                        oyuncuCaniBileseni = pObj.GetComponent<OyuncuCani>() ?? pObj.AddComponent<OyuncuCani>();
+                    }
+                }
+            }
+
+            // Yardımcı Yan Karakteri bul
+            if (yardimciHedef == null)
+            {
+                yardimciHedef = YardimciKarakter.Instance != null ? YardimciKarakter.Instance : Object.FindAnyObjectByType<YardimciKarakter>();
+            }
+
+            // 1. Kapıyı (FizikselEngelKapisi) bul
+            if (kapiKontrolBileseni == null)
+            {
+                GameObject kapiObj = GameObject.Find("FizikselEngelKapisi");
+                if (kapiObj != null)
+                {
+                    kapiKontrolBileseni = kapiObj.GetComponent<KapiKontrol>();
+                }
+            }
         }
 
         private void ParcalaraHasarIleticiEkle()
@@ -176,16 +204,56 @@ namespace Yazlab.Mekanikler
                 kuleBasi = kb;
             }
 
+            // Zırhlı Silah Yüzü Plakası (Görsel silah cephesi)
+            if (silahYuzuPlate == null && kuleBasi != null)
+            {
+                Transform sy = kuleBasi.Find("Taret_SilahYuzu");
+                if (sy == null)
+                {
+                    GameObject syObj = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                    syObj.name = "Taret_SilahYuzu";
+                    syObj.transform.SetParent(kuleBasi);
+                    syObj.transform.localPosition = new Vector3(0f, 0.15f, 0.75f);
+                    syObj.transform.localRotation = Quaternion.identity;
+                    syObj.transform.localScale = new Vector3(1.5f, 0.55f, 0.45f);
+
+                    Material matMetal = new Material(Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard"));
+                    matMetal.color = new Color(0.18f, 0.18f, 0.20f);
+                    syObj.GetComponent<MeshRenderer>().sharedMaterial = matMetal;
+                    sy = syObj.transform;
+                }
+                silahYuzuPlate = sy;
+            }
+
+            // Namlu 1 (Sol Namlu): Ön cepheye (Z = +1.25) doğru hizala
             if (namluSol == null && kuleBasi != null)
             {
                 Transform n1 = kuleBasi.Find("Taret_Namlu1");
                 if (n1 != null) namluSol = n1;
             }
 
+            // Namlu 2 (Sağ Namlu): Ön cepheye (Z = +1.25) doğru hizala
             if (namluSag == null && kuleBasi != null)
             {
                 Transform n2 = kuleBasi.Find("Taret_Namlu2");
                 if (n2 != null) namluSag = n2;
+            }
+
+            // Namluların yerel konumlarını kesin olarak ön cepheye (+Z) kilitle
+            if (namluSol != null)
+            {
+                namluSol.localPosition = new Vector3(-0.45f, 0.15f, 1.25f);
+                namluSol.localRotation = Quaternion.identity;
+                namluSol.localScale = new Vector3(0.24f, 0.24f, 2.2f);
+                namluSolOrijinalLocalPos = namluSol.localPosition;
+            }
+
+            if (namluSag != null)
+            {
+                namluSag.localPosition = new Vector3(0.45f, 0.15f, 1.25f);
+                namluSag.localRotation = Quaternion.identity;
+                namluSag.localScale = new Vector3(0.24f, 0.24f, 2.2f);
+                namluSagOrijinalLocalPos = namluSag.localPosition;
             }
 
             if (sensorIsikRenderer == null && kuleBasi != null)
@@ -206,12 +274,12 @@ namespace Yazlab.Mekanikler
                     sensorPointLight = sensorIsikRenderer.gameObject.AddComponent<Light>();
                     sensorPointLight.type = LightType.Point;
                     sensorPointLight.color = Color.red;
-                    sensorPointLight.range = 10f;
-                    sensorPointLight.intensity = 2.5f;
+                    sensorPointLight.range = 12f;
+                    sensorPointLight.intensity = 3.0f;
                 }
             }
 
-            // Namlu uçları
+            // Namlu uçları (Ateş başlangıç noktaları)
             if (namluUcuSol == null && namluSol != null)
             {
                 namluUcuSol = namluSol.Find("NamluUcu");
@@ -220,6 +288,7 @@ namespace Yazlab.Mekanikler
                     GameObject u = new GameObject("NamluUcu");
                     u.transform.SetParent(namluSol);
                     u.transform.localPosition = new Vector3(0f, 0f, 1.15f);
+                    u.transform.localRotation = Quaternion.identity;
                     namluUcuSol = u.transform;
                 }
             }
@@ -232,6 +301,7 @@ namespace Yazlab.Mekanikler
                     GameObject u = new GameObject("NamluUcu");
                     u.transform.SetParent(namluSag);
                     u.transform.localPosition = new Vector3(0f, 0f, 1.15f);
+                    u.transform.localRotation = Quaternion.identity;
                     namluUcuSag = u.transform;
                 }
             }
@@ -241,92 +311,76 @@ namespace Yazlab.Mekanikler
         {
             if (oldu) return;
 
-            // Kamera görüş kontrolü (Can barı için periyodik kontrol)
-            if (Time.time >= sonKameraKontrolZamani + 0.04f)
-            {
-                sonKameraKontrolZamani = Time.time;
-                oyuncuKameraBeniGoruyorMu = OyuncuKameraBeniGoruyorMu();
-            }
-
             // Hedefleri Güncelle ve Görüş Hatlarını Kontrol Et
             HedefleriGuncelle();
 
-            // Geri Tepme Yaylanma Animasyonu (Her iki namlu da geriden orijinal yerine yumuşakça döner)
+            // Geri Tepme Yaylanma Animasyonu
             if (namluSol != null)
             {
                 namluSol.localPosition = Vector3.MoveTowards(namluSol.localPosition, namluSolOrijinalLocalPos, Time.deltaTime * recoilHizi);
+                namluSol.localRotation = Quaternion.identity;
             }
             if (namluSag != null)
             {
                 namluSag.localPosition = Vector3.MoveTowards(namluSag.localPosition, namluSagOrijinalLocalPos, Time.deltaTime * recoilHizi);
+                namluSag.localRotation = Quaternion.identity;
             }
 
-            Vector3 kuleGoz = kuleBasi != null ? kuleBasi.position : (transform.position + Vector3.up * 3.2f);
+            Transform donenGovde = kuleBasi != null ? kuleBasi : transform;
+            Vector3 kuleGoz = donenGovde.position + Vector3.up * 0.2f;
 
             // DURUM 1: HEM OYUNCU HEM DE YAN KARAKTER GÖRÜNÜYOR!
-            // Kullanıcı isteği: "hem beni hem yan karaktere aynı anda sıkacak ateş edecek bu taret"
+            // KULLANICI İSTEĞİ: Hem bana hem yan karaktere aynı anda sıkacak & silah yüzü bize doğru olacak
             if (oyuncuGorunurMu && yardimciGorunurMu)
             {
-                DurumIsiginiAyarla(new Color(1f, 0.05f, 0.05f), 3.5f);
+                DurumIsiginiAyarla(new Color(1f, 0.05f, 0.05f), 4.0f);
 
                 Vector3 hedefOyuncu = oyuncuHedef.position + Vector3.up * 1.1f;
                 Vector3 hedefYardimci = yardimciHedef.transform.position + Vector3.up * 1.1f;
 
-                // Kule başı ikisinin orta yönüne bakar
+                // Kule başı ve silah yüzü her iki hedefin tam ortasına kilitlenir
                 Vector3 yonOyuncu = (hedefOyuncu - kuleGoz).normalized;
                 Vector3 yonYardimci = (hedefYardimci - kuleGoz).normalized;
                 Vector3 ortaYon = (yonOyuncu + yonYardimci).normalized;
 
-                if (ortaYon.sqrMagnitude > 0.05f && kuleBasi != null)
+                if (ortaYon.sqrMagnitude > 0.01f)
                 {
                     Quaternion hedefRot = Quaternion.LookRotation(ortaYon);
-                    kuleBasi.rotation = Quaternion.Slerp(kuleBasi.rotation, hedefRot, Time.deltaTime * donusHizi);
+                    donenGovde.rotation = Quaternion.Slerp(donenGovde.rotation, hedefRot, Time.deltaTime * donusHizi);
                 }
 
-                // Sol namlu Oyuncuya, Sağ namlu Yan Karaktere nişan alır
-                if (namluSol != null)
-                {
-                    Vector3 yon = (hedefOyuncu - namluSol.position).normalized;
-                    if (yon.sqrMagnitude > 0.05f) namluSol.rotation = Quaternion.Slerp(namluSol.rotation, Quaternion.LookRotation(yon), Time.deltaTime * donusHizi * 1.5f);
-                }
-                if (namluSag != null)
-                {
-                    Vector3 yon = (hedefYardimci - namluSag.position).normalized;
-                    if (yon.sqrMagnitude > 0.05f) namluSag.rotation = Quaternion.Slerp(namluSag.rotation, Quaternion.LookRotation(yon), Time.deltaTime * donusHizi * 1.5f);
-                }
-
-                // Ateş Zamanı: AYNI ANDA İKİSİNE BİRDEN ATEŞ ET!
+                // Ateş Zamanı: AYNI ANDA İKİSİNE BİRDEN ÇİFT NAMLUYLA ATEŞ ET!
                 if (Time.time >= sonrakiAtesZamani)
                 {
-                    sonrakiAtesZamani = Time.time + atesAraligi + Random.Range(-0.04f, 0.05f);
+                    sonrakiAtesZamani = Time.time + atesAraligi + Random.Range(-0.02f, 0.03f);
                     AyniAndaCiftAtesEt(hedefOyuncu, hedefYardimci);
                 }
             }
             // DURUM 2: SADECE OYUNCU GÖRÜNÜYOR
             else if (oyuncuGorunurMu)
             {
-                DurumIsiginiAyarla(new Color(1f, 0.05f, 0.05f), 3.0f);
+                DurumIsiginiAyarla(new Color(1f, 0.05f, 0.05f), 3.5f);
                 Vector3 hedefOyuncu = oyuncuHedef.position + Vector3.up * 1.1f;
 
-                NisanalTekHedefe(hedefOyuncu, kuleGoz);
+                NisanalTekHedefe(hedefOyuncu, kuleGoz, donenGovde);
 
                 if (Time.time >= sonrakiAtesZamani)
                 {
-                    sonrakiAtesZamani = Time.time + atesAraligi + Random.Range(-0.04f, 0.05f);
+                    sonrakiAtesZamani = Time.time + atesAraligi + Random.Range(-0.02f, 0.03f);
                     TekHedefeAtesEt(hedefOyuncu, true);
                 }
             }
             // DURUM 3: SADECE YAN KARAKTER GÖRÜNÜYOR
             else if (yardimciGorunurMu)
             {
-                DurumIsiginiAyarla(new Color(1f, 0.05f, 0.05f), 3.0f);
+                DurumIsiginiAyarla(new Color(1f, 0.05f, 0.05f), 3.5f);
                 Vector3 hedefYardimci = yardimciHedef.transform.position + Vector3.up * 1.1f;
 
-                NisanalTekHedefe(hedefYardimci, kuleGoz);
+                NisanalTekHedefe(hedefYardimci, kuleGoz, donenGovde);
 
                 if (Time.time >= sonrakiAtesZamani)
                 {
-                    sonrakiAtesZamani = Time.time + atesAraligi + Random.Range(-0.04f, 0.05f);
+                    sonrakiAtesZamani = Time.time + atesAraligi + Random.Range(-0.02f, 0.03f);
                     TekHedefeAtesEt(hedefYardimci, false);
                 }
             }
@@ -334,41 +388,25 @@ namespace Yazlab.Mekanikler
             else
             {
                 DurumIsiginiAyarla(new Color(0.70f, 0.15f, 0.10f), 1.0f);
-                if (kuleBasi != null)
-                {
-                    // Bekleme modunda kapıya doğru (güney yönüne) baksın
-                    Quaternion beklemeRot = Quaternion.Euler(0f, 180f, 0f);
-                    kuleBasi.rotation = Quaternion.Slerp(kuleBasi.rotation, beklemeRot, Time.deltaTime * 2.0f);
-                }
+                // Bekleme modunda kapıya doğru (güney yönüne, Y=180) silah yüzü dönük dursun
+                Quaternion beklemeRot = Quaternion.Euler(0f, 180f, 0f);
+                donenGovde.rotation = Quaternion.Slerp(donenGovde.rotation, beklemeRot, Time.deltaTime * 3.0f);
             }
         }
 
-        private void NisanalTekHedefe(Vector3 hedefNokta, Vector3 kuleGoz)
+        private void NisanalTekHedefe(Vector3 hedefNokta, Vector3 kuleGoz, Transform donenGovde)
         {
             Vector3 yon = (hedefNokta - kuleGoz).normalized;
-            if (yon.sqrMagnitude > 0.05f && kuleBasi != null)
+            if (yon.sqrMagnitude > 0.01f)
             {
                 Quaternion hedefRot = Quaternion.LookRotation(yon);
-                kuleBasi.rotation = Quaternion.Slerp(kuleBasi.rotation, hedefRot, Time.deltaTime * donusHizi);
+                donenGovde.rotation = Quaternion.Slerp(donenGovde.rotation, hedefRot, Time.deltaTime * donusHizi);
             }
         }
 
         private void HedefleriGuncelle()
         {
-            if (oyuncuHedef == null)
-            {
-                KarakterHareket p = Object.FindAnyObjectByType<KarakterHareket>();
-                if (p != null)
-                {
-                    oyuncuHedef = p.transform;
-                    oyuncuCaniBileseni = p.GetComponent<OyuncuCani>();
-                }
-            }
-
-            if (yardimciHedef == null)
-            {
-                yardimciHedef = YardimciKarakter.Instance != null ? YardimciKarakter.Instance : Object.FindAnyObjectByType<YardimciKarakter>();
-            }
+            HedefleriBulVeAyarla();
 
             oyuncuGorunurMu = false;
             yardimciGorunurMu = false;
@@ -393,37 +431,99 @@ namespace Yazlab.Mekanikler
         }
 
         /// <summary>
-        /// Taretin hedefle (oyuncu veya yan karakter) arasındaki görüş çizgisini test eder.
-        /// Kapalı kapı (FizikselEngelKapisi) veya sur varsa görüş engellenir.
+        /// Taretin hedefle (oyuncu veya yan karakter) arasındaki görüş hattını kontrol eder.
+        /// Taretin kendi collider'larını atlar, kapalı kapı ve duvarları dikkate alır.
         /// </summary>
         private bool HedefeGorusVarMi(Transform hedef)
         {
             if (hedef == null) return false;
 
-            Vector3 goz = kuleBasi != null ? (kuleBasi.position + Vector3.up * 0.2f) : (transform.position + Vector3.up * 3.4f);
-
-            // Birden fazla noktadan test et (kafa, gövde, bacaklar) siper durumları için
-            Vector3[] kontrolNoktalari = new Vector3[]
+            // Kapı kontrolü: Eğer 1. kapı (FizikselEngelKapisi) sahnedeyse ve hala kapalıysa ateş etme
+            if (kapiKontrolBileseni == null)
             {
-                hedef.position + Vector3.up * 1.1f, // Gövde
-                hedef.position + Vector3.up * 1.6f, // Kafa
-                hedef.position + Vector3.up * 0.5f  // Siper altı
+                GameObject kapiObj = GameObject.Find("FizikselEngelKapisi");
+                if (kapiObj != null) kapiKontrolBileseni = kapiObj.GetComponent<KapiKontrol>();
+            }
+
+            if (kapiKontrolBileseni != null && !kapiKontrolBileseni.AcikMi)
+            {
+                return false;
+            }
+
+            Vector3 kuleMerkez = kuleBasi != null ? kuleBasi.position : (transform.position + Vector3.up * 3.2f);
+            Vector3 goz = kuleMerkez + Vector3.up * 0.35f;
+
+            // Hedef noktaları (kafa, göğüs, bel, bacaklar)
+            Vector3[] testNoktalari = new Vector3[]
+            {
+                hedef.position + Vector3.up * 1.55f, // Kafa
+                hedef.position + Vector3.up * 1.15f, // Göğüs
+                hedef.position + Vector3.up * 0.75f, // Karın/Bel
+                hedef.position + Vector3.up * 0.35f  // Bacaklar
             };
 
-            foreach (var nokta in kontrolNoktalari)
+            foreach (var nokta in testNoktalari)
             {
                 Vector3 dir = (nokta - goz);
                 float dist = dir.magnitude;
+                if (dist > gorusMenzili) continue;
 
-                RaycastHit hit;
-                if (Physics.Raycast(goz, dir.normalized, out hit, dist, ~0, QueryTriggerInteraction.Ignore))
+                RaycastHit[] hits = Physics.RaycastAll(goz, dir.normalized, dist, ~0, QueryTriggerInteraction.Ignore);
+                if (hits == null || hits.Length == 0)
                 {
-                    if (hit.transform == hedef || hit.transform.IsChildOf(hedef))
+                    // Yol boyunca hiçbir engel yok, görüş doğrudan açık!
+                    return true;
+                }
+
+                System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+
+                bool engelVar = false;
+                foreach (var hit in hits)
+                {
+                    if (hit.transform == null) continue;
+
+                    // 1. Taretin kendi parçalarını (kaide, gövde, namlular vb.) MUTLAKA YOK SAY!
+                    if (hit.transform == transform || hit.transform.IsChildOf(transform)) continue;
+
+                    // 2. Hedefe (Oyuncu veya Yan Karakter) ulaştıysak görüş KESİNLİKLE AÇIKTIR!
+                    bool hedefMi = (hit.transform == hedef || hit.transform.IsChildOf(hedef));
+                    if (!hedefMi)
+                    {
+                        if (hedef == oyuncuHedef)
+                        {
+                            hedefMi = hit.transform.CompareTag("Player") || hit.collider.GetComponentInParent<KarakterHareket>() != null;
+                        }
+                        else if (yardimciHedef != null && hedef == yardimciHedef.transform)
+                        {
+                            hedefMi = hit.collider.GetComponentInParent<YardimciKarakter>() != null;
+                        }
+                    }
+
+                    if (hedefMi)
                     {
                         return true;
                     }
+
+                    // 3. Eğer kapı açılmışsa yukarı kayan kapıyı atla
+                    if (kapiKontrolBileseni != null && (hit.transform == kapiKontrolBileseni.transform || hit.transform.IsChildOf(kapiKontrolBileseni.transform)))
+                    {
+                        if (kapiKontrolBileseni.AcikMi) continue;
+                    }
+
+                    // 4. Trigger olan collider'ları atla
+                    if (hit.collider != null && hit.collider.isTrigger) continue;
+
+                    // 5. Arada katı kalın bir duvar veya kapalı kapı var
+                    engelVar = true;
+                    break;
+                }
+
+                if (!engelVar)
+                {
+                    return true;
                 }
             }
+
             return false;
         }
 
@@ -435,68 +535,86 @@ namespace Yazlab.Mekanikler
             if (oldu) return;
 
             // 1. Sol Namlu -> OYUNCUYA ATEŞ EDER
-            Vector3 solUcu = namluUcuSol != null ? namluUcuSol.position : (namluSol != null ? namluSol.position + namluSol.forward : transform.position + Vector3.up * 3.2f);
+            Vector3 solUcu = namluUcuSol != null ? namluUcuSol.position : (namluSol != null ? namluSol.position + namluSol.forward * 1.1f : transform.position + Vector3.up * 3.2f);
             if (namluSol != null)
             {
                 namluSol.localPosition = namluSolOrijinalLocalPos - Vector3.forward * recoilMiktari;
             }
             StartCoroutine(NamluFlasi(namluFlasSol, solUcu));
-            StartCoroutine(TracerCiz(taretTracerSol, solUcu, hedefOyuncu + Random.insideUnitSphere * 0.2f));
+            StartCoroutine(TracerCiz(taretTracerSol, solUcu, hedefOyuncu + Random.insideUnitSphere * 0.15f));
 
             if (oyuncuCaniBileseni != null && !oyuncuCaniBileseni.IsDead)
             {
                 oyuncuCaniBileseni.HasarAl(hasarOyuncu);
             }
+            else if (oyuncuHedef != null)
+            {
+                oyuncuHedef.SendMessage("HasarAl", hasarOyuncu, SendMessageOptions.DontRequireReceiver);
+            }
 
             // 2. Sağ Namlu -> YAN KARAKTERE (YOLDAŞA) ATEŞ EDER
-            Vector3 sagUcu = namluUcuSag != null ? namluUcuSag.position : (namluSag != null ? namluSag.position + namluSag.forward : transform.position + Vector3.up * 3.2f);
+            Vector3 sagUcu = namluUcuSag != null ? namluUcuSag.position : (namluSag != null ? namluSag.position + namluSag.forward * 1.1f : transform.position + Vector3.up * 3.2f);
             if (namluSag != null)
             {
                 namluSag.localPosition = namluSagOrijinalLocalPos - Vector3.forward * recoilMiktari;
             }
             StartCoroutine(NamluFlasi(namluFlasSag, sagUcu));
-            StartCoroutine(TracerCiz(taretTracerSag, sagUcu, hedefYardimci + Random.insideUnitSphere * 0.2f));
+            StartCoroutine(TracerCiz(taretTracerSag, sagUcu, hedefYardimci + Random.insideUnitSphere * 0.15f));
 
             if (yardimciHedef != null && !yardimciHedef.IsDead)
             {
                 yardimciHedef.HasarAl(hasarYardimci);
             }
+            else if (yardimciHedef != null)
+            {
+                yardimciHedef.SendMessage("HasarAl", hasarYardimci, SendMessageOptions.DontRequireReceiver);
+            }
 
             // Çift Ateş Sesi
             if (taretAudio != null && sesAtes != null)
             {
-                taretAudio.pitch = Random.Range(0.94f, 1.06f);
+                taretAudio.pitch = Random.Range(0.95f, 1.05f);
                 taretAudio.PlayOneShot(sesAtes);
             }
         }
 
-        /// <summary>
-        /// Yalnızca bir hedef sahnede aktifse her iki namluyla o hedefe ateş eder.
-        /// </summary>
         private void TekHedefeAtesEt(Vector3 hedefNokta, bool oyuncuMu)
         {
             if (oldu) return;
 
-            // Her iki namluda da recoil
             if (namluSol != null) namluSol.localPosition = namluSolOrijinalLocalPos - Vector3.forward * recoilMiktari;
             if (namluSag != null) namluSag.localPosition = namluSagOrijinalLocalPos - Vector3.forward * recoilMiktari;
 
-            Vector3 solUcu = namluUcuSol != null ? namluUcuSol.position : transform.position + Vector3.up * 3.2f;
-            Vector3 sagUcu = namluUcuSag != null ? namluUcuSag.position : transform.position + Vector3.up * 3.2f;
+            Vector3 solUcu = namluUcuSol != null ? namluUcuSol.position : (namluSol != null ? namluSol.position + namluSol.forward * 1.1f : transform.position + Vector3.up * 3.2f);
+            Vector3 sagUcu = namluUcuSag != null ? namluUcuSag.position : (namluSag != null ? namluSag.position + namluSag.forward * 1.1f : transform.position + Vector3.up * 3.2f);
 
             StartCoroutine(NamluFlasi(namluFlasSol, solUcu));
             StartCoroutine(NamluFlasi(namluFlasSag, sagUcu));
 
-            StartCoroutine(TracerCiz(taretTracerSol, solUcu, hedefNokta + Random.insideUnitSphere * 0.25f));
-            StartCoroutine(TracerCiz(taretTracerSag, sagUcu, hedefNokta + Random.insideUnitSphere * 0.25f));
+            StartCoroutine(TracerCiz(taretTracerSol, solUcu, hedefNokta + Random.insideUnitSphere * 0.18f));
+            StartCoroutine(TracerCiz(taretTracerSag, sagUcu, hedefNokta + Random.insideUnitSphere * 0.18f));
 
-            if (oyuncuMu && oyuncuCaniBileseni != null && !oyuncuCaniBileseni.IsDead)
+            if (oyuncuMu)
             {
-                oyuncuCaniBileseni.HasarAl(atesHasari);
+                if (oyuncuCaniBileseni != null && !oyuncuCaniBileseni.IsDead)
+                {
+                    oyuncuCaniBileseni.HasarAl(atesHasari);
+                }
+                else if (oyuncuHedef != null)
+                {
+                    oyuncuHedef.SendMessage("HasarAl", atesHasari, SendMessageOptions.DontRequireReceiver);
+                }
             }
-            else if (!oyuncuMu && yardimciHedef != null && !yardimciHedef.IsDead)
+            else
             {
-                yardimciHedef.HasarAl(atesHasari);
+                if (yardimciHedef != null && !yardimciHedef.IsDead)
+                {
+                    yardimciHedef.HasarAl(atesHasari);
+                }
+                else if (yardimciHedef != null)
+                {
+                    yardimciHedef.SendMessage("HasarAl", atesHasari, SendMessageOptions.DontRequireReceiver);
+                }
             }
 
             if (taretAudio != null && sesAtes != null)
@@ -513,7 +631,7 @@ namespace Yazlab.Mekanikler
             mevcutCan -= miktar;
             sonHasarZamani = Time.time;
 
-            // Hasar flaşı
+            // Hasar anında sensör flaşı
             StartCoroutine(HasarSensörFlasi());
 
             if (mevcutCan <= 0f)
@@ -530,55 +648,71 @@ namespace Yazlab.Mekanikler
             if (!oldu) DurumIsiginiAyarla(new Color(1f, 0.05f, 0.05f), 3.0f);
         }
 
+        /// <summary>
+        /// KULLANICI İSTEĞİ: "tareti vurduğumuzda taret yok olsun"
+        /// Canı sıfırlandığında patlama sesi/ışığı oluşturup kendini sahneden tamamen yok eder (Destroy).
+        /// </summary>
         protected override void Olum()
         {
             if (oldu) return;
             oldu = true;
 
-            // Collider'ları devre dışı bırak
+            // 1. Tüm collider'ları anında kapat
             if (taretCollider != null) taretCollider.enabled = false;
             foreach (var c in GetComponentsInChildren<Collider>())
             {
                 c.enabled = false;
             }
 
-            // Patlama Sesi
-            if (taretAudio != null && sesPatlama != null)
+            // 2. Patlama Sesini dünya konumunda çal (Obje silinse bile ses kesilmez)
+            if (sesPatlama != null)
             {
-                taretAudio.pitch = 0.9f;
-                taretAudio.PlayOneShot(sesPatlama);
+                AudioSource.PlayClipAtPoint(sesPatlama, transform.position, 1.0f);
             }
 
-            // Sensör ışığını kapat
-            DurumIsiginiAyarla(new Color(0.1f, 0.1f, 0.1f), 0f);
+            // 3. Büyük Patlama Efekti (Işık ve enkaz parçaları oluştur)
+            UretPatlamaEfekti();
 
-            // Başını öne/yere doğru eğme (imha pozu)
-            StartCoroutine(ImhaAnimasyonu());
-
-            // Bölüm görevini tamamla
+            // 4. Bölüm Yöneticisini bilgilendir (Engel aşıldı görevi tamamlandı)
             BolumYoneticisi by = BolumYoneticisi.Ornek;
             if (by != null)
             {
                 by.FizikselEngeliAs();
             }
 
-            Debug.Log("[TaretKontrol] Savunma tareti başarıyla imha edildi!");
+            Debug.Log("[TaretKontrol] Savunma tareti başarıyla imha edildi ve tamamen yok edildi!");
+
+            // 5. Tareti sahneden tamamen yok et (yok olsun isteği)
+            Destroy(gameObject, 0.05f);
         }
 
-        private IEnumerator ImhaAnimasyonu()
+        private void UretPatlamaEfekti()
         {
-            if (kuleBasi == null) yield break;
+            Vector3 patlamaNoktasi = transform.position + Vector3.up * 2.5f;
 
-            Quaternion baslangicRot = kuleBasi.rotation;
-            Quaternion hedefRot = Quaternion.Euler(38f, kuleBasi.eulerAngles.y, -10f);
-            float sure = 0f;
+            // Anlık devasa patlama ışığı
+            GameObject isikObj = new GameObject("TaretPatlamaIsigi");
+            isikObj.transform.position = patlamaNoktasi;
+            Light patLight = isikObj.AddComponent<Light>();
+            patLight.type = LightType.Point;
+            patLight.range = 22f;
+            patLight.intensity = 8.0f;
+            patLight.color = new Color(1.0f, 0.55f, 0.15f);
+            Destroy(isikObj, 0.45f);
 
-            while (sure < 1.2f)
+            // Saçılan metal parçacıkları
+            for (int i = 0; i < 6; i++)
             {
-                sure += Time.deltaTime;
-                float t = Mathf.SmoothStep(0f, 1f, sure / 1.2f);
-                kuleBasi.rotation = Quaternion.Slerp(baslangicRot, hedefRot, t);
-                yield return null;
+                GameObject parcacik = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                parcacik.name = "TaretEnkaz";
+                parcacik.transform.position = patlamaNoktasi + Random.insideUnitSphere * 0.8f;
+                parcacik.transform.localScale = Vector3.one * Random.Range(0.2f, 0.4f);
+
+                Rigidbody rb = parcacik.AddComponent<Rigidbody>();
+                rb.mass = 2f;
+                rb.AddExplosionForce(450f, patlamaNoktasi, 8f);
+
+                Destroy(parcacik, 2.5f);
             }
         }
 
@@ -610,8 +744,8 @@ namespace Yazlab.Mekanikler
             GameObject solObj = new GameObject("TaretTracer_Sol");
             solObj.transform.SetParent(transform);
             taretTracerSol = solObj.AddComponent<LineRenderer>();
-            taretTracerSol.startWidth = 0.07f;
-            taretTracerSol.endWidth = 0.03f;
+            taretTracerSol.startWidth = 0.08f;
+            taretTracerSol.endWidth = 0.04f;
             taretTracerSol.positionCount = 2;
             taretTracerSol.material = mat;
             taretTracerSol.enabled = false;
@@ -620,8 +754,8 @@ namespace Yazlab.Mekanikler
             GameObject sagObj = new GameObject("TaretTracer_Sag");
             sagObj.transform.SetParent(transform);
             taretTracerSag = sagObj.AddComponent<LineRenderer>();
-            taretTracerSag.startWidth = 0.07f;
-            taretTracerSag.endWidth = 0.03f;
+            taretTracerSag.startWidth = 0.08f;
+            taretTracerSag.endWidth = 0.04f;
             taretTracerSag.positionCount = 2;
             taretTracerSag.material = mat;
             taretTracerSag.enabled = false;
@@ -652,7 +786,7 @@ namespace Yazlab.Mekanikler
             if (flas != null)
             {
                 flas.transform.position = pos;
-                flas.intensity = 4.0f;
+                flas.intensity = 4.5f;
                 flas.enabled = true;
                 yield return new WaitForSeconds(0.04f);
                 flas.intensity = 0f;
@@ -664,58 +798,13 @@ namespace Yazlab.Mekanikler
         {
             if (tracer != null)
             {
+                tracer.positionCount = 2;
                 tracer.SetPosition(0, baslangic);
                 tracer.SetPosition(1, bitis);
                 tracer.enabled = true;
-                yield return new WaitForSeconds(0.05f);
+                yield return new WaitForSeconds(0.06f);
                 tracer.enabled = false;
             }
-        }
-
-        /// <summary>
-        /// Kameranın (oyuncunun) tareti doğrudan görüp görmediğini kontrol eder.
-        /// Kapı kapalıyken veya arkasındayken can barı gizlenir; kapı açıldığında görünür.
-        /// </summary>
-        private bool OyuncuKameraBeniGoruyorMu()
-        {
-            Camera cam = Camera.main;
-            if (cam == null) return false;
-
-            Vector3 camPos = cam.transform.position;
-            Vector3 taretNoktasi = (kuleBasi != null ? kuleBasi.position : transform.position + Vector3.up * 3.2f) + Vector3.up * 0.4f;
-
-            // 1. Ekran önünde mi kontrol et
-            Vector3 ekranNoktasi = cam.WorldToScreenPoint(taretNoktasi);
-            if (ekranNoktasi.z <= 0.1f) return false;
-
-            if (ekranNoktasi.x < -80 || ekranNoktasi.x > Screen.width + 80 ||
-                ekranNoktasi.y < -80 || ekranNoktasi.y > Screen.height + 80)
-            {
-                return false;
-            }
-
-            // Mesafe kontrolü (60 metreden uzakta gizle)
-            float dist = Vector3.Distance(camPos, taretNoktasi);
-            if (dist > 60f) return false;
-
-            // 2. Raycast ile görüş kontrolü (Kapalı kapı veya kalın duvar var mı?)
-            Vector3 dir = (taretNoktasi - camPos);
-            RaycastHit[] hits = Physics.RaycastAll(camPos, dir.normalized, dist, ~0, QueryTriggerInteraction.Ignore);
-            if (hits == null || hits.Length == 0) return true;
-
-            System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
-
-            foreach (var hit in hits)
-            {
-                if (hit.transform == null) continue;
-                if (oyuncuHedef != null && (hit.transform == oyuncuHedef || hit.transform.IsChildOf(oyuncuHedef))) continue;
-                if (hit.transform == transform || hit.transform.IsChildOf(transform)) return true;
-
-                // Başka bir katı nesneye çarptıysa görüş engellidir
-                return false;
-            }
-
-            return true;
         }
 
         /// <summary>
@@ -723,8 +812,11 @@ namespace Yazlab.Mekanikler
         /// </summary>
         protected override void OnGUI()
         {
-            // Öldüyse veya kapalı kapı arkasındaysa çizme
-            if (oldu || !oyuncuKameraBeniGoruyorMu) return;
+            // Öldüyse çizme
+            if (oldu) return;
+
+            // Kapı henüz açılmadıysa can barını gizle
+            if (kapiKontrolBileseni != null && !kapiKontrolBileseni.AcikMi) return;
 
             Camera cam = Camera.main;
             if (cam == null) return;
@@ -733,6 +825,12 @@ namespace Yazlab.Mekanikler
             Vector3 dunyaKonumu = (kuleBasi != null ? kuleBasi.position : transform.position + Vector3.up * 3.2f) + Vector3.up * canBariYukseklikOfseti;
             Vector3 ekranNoktasi = cam.WorldToScreenPoint(dunyaKonumu);
             if (ekranNoktasi.z <= 0.1f) return;
+
+            if (ekranNoktasi.x < -80 || ekranNoktasi.x > Screen.width + 80 ||
+                ekranNoktasi.y < -80 || ekranNoktasi.y > Screen.height + 80)
+            {
+                return;
+            }
 
             float guiY = Screen.height - ekranNoktasi.y;
             float guiX = ekranNoktasi.x;
@@ -794,7 +892,7 @@ namespace Yazlab.Mekanikler
             GUI.color = Color.white;
             GUI.Label(new Rect(solX - 25, ustY - 16 * olcek, genislik + 50, 16 * olcek), "⚔ DÜŞMAN TARET", taretBaslikStili);
 
-            // 6. Can Miktarı Metni: "175 / 200" (Barın ortasında)
+            // 6. Can Miktarı Metni: "350 / 380" (Barın ortasında)
             if (taretCanStili == null)
             {
                 taretCanStili = new GUIStyle(GUI.skin.label)

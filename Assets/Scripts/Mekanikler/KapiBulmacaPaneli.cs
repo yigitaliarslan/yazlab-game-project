@@ -162,7 +162,7 @@ namespace Yazlab.Mekanikler
             // Panel açıkken ESC veya [E] tuşu ile kapatma
             else if (MinigameAcik)
             {
-                if (EscBasildiMi() || (EBasildiMi() && (Time.time - cozulmeZamani > 0.6f)))
+                if (EscBasildiMi() || EBasildiMi())
                 {
                     PaneliKapat();
                 }
@@ -425,26 +425,20 @@ namespace Yazlab.Mekanikler
             GUI.color = new Color(0.08f, 0.09f, 0.12f, 1f);
             GUI.DrawTexture(new Rect(panelX + 16 * olcek, altY, panelW - 32 * olcek, altH), texBeyaz);
 
+            if (!bulmacaCozuldu && hepsiAcik)
+            {
+                BulmacayiTamamla();
+                return;
+            }
+
             if (!bulmacaCozuldu)
             {
-                if (hepsiAcik)
+                // Büyük Şalter Butonu (Tıklandığı an şalter açılır ve menü anında kapanır)
+                GUI.color = new Color(0.18f, 0.85f, 0.35f, 1f);
+                string anaButonYazi = "⚡ ŞALTERİ AÇ & KAPIYI KALDIR (MENÜYÜ KAPAT)";
+                if (GUI.Button(new Rect(panelX + 24 * olcek, altY + 10 * olcek, panelW - 48 * olcek, altH - 20 * olcek), anaButonYazi))
                 {
-                    // 5 Şalterin hepsi AÇIK! Büyük Ana Şalter / Jeneratör Butonu
-                    GUI.color = new Color(0.15f, 0.85f, 0.35f, 1f);
-                    string anaButonYazi = "✔ TÜM DEVRELER BAĞLANDI! 1. KAPIYI VE GÜNEŞİ AÇMAK İÇİN TIKLAYIN!";
-                    if (GUI.Button(new Rect(panelX + 24 * olcek, altY + 10 * olcek, panelW - 48 * olcek, altH - 20 * olcek), anaButonYazi))
-                    {
-                        BulmacayiTamamla();
-                    }
-                }
-                else
-                {
-                    // Henüz hepsi açılmadı
-                    GUI.color = Color.white;
-                    durumStili.fontSize = Mathf.RoundToInt(15 * olcek);
-                    durumStili.fontStyle = FontStyle.Bold;
-                    durumStili.normal.textColor = new Color(1.0f, 0.78f, 0.20f);
-                    GUI.Label(new Rect(panelX + 20 * olcek, altY + 24 * olcek, panelW - 40 * olcek, 32 * olcek), "⚠ GÜÇ KESİNTİSİ: Kapıyı açmak ve elektriği geri getirmek için 5 sigortanın hepsini AÇIK yapın.", durumStili);
+                    BulmacayiTamamla();
                 }
             }
             else
@@ -490,8 +484,8 @@ namespace Yazlab.Mekanikler
                 by.FizikselEngeliAs();
             }
 
-            // 1.8 saniye sonra minigame panelini kapat
-            StartCoroutine(KapanisGecikmesi());
+            // KULLANICI İSTEĞİ: Şalter açıldığı an menü ekranı önümüzden hemen gitsin!
+            PaneliKapat();
         }
 
         /// <summary>
