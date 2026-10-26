@@ -6,8 +6,8 @@ using UnityEngine.InputSystem;
 
 /// <summary>
 /// Ana karakter için gelişmiş ateş etme kontrolcüsü.
-/// Fare sol tıkı veya 'F' / 'Ctrl' tuşları ile ateş eder.
-/// Namlu ışığı (Muzzle Flash), mermi izi (Bullet Tracer), crosshair ve ateş animasyonunu yönetir.
+/// Fare sol tıkı veya 'F' tuşu ile ateş eder (Sol Ctrl eğilme tuşu olduğu için ateş etmez).
+/// Namlu ışığı (Muzzle Flash), mermi izi (Bullet Tracer), hem 3. şahıs hem 1. şahıs nişangahı (crosshair) ve ateş animasyonunu yönetir.
 /// </summary>
 public class KarakterAtes : MonoBehaviour
 {
@@ -46,7 +46,7 @@ public class KarakterAtes : MonoBehaviour
     public bool nisangahGoster = true;
 
     [Tooltip("Nişangah rengi.")]
-    public Color nisangahRengi = new Color(1f, 1f, 1f, 0.85f);
+    public Color nisangahRengi = new Color(0.95f, 1f, 0.95f, 0.92f);
 
     [Tooltip("Mermi izi (Tracer) rengi.")]
     public Color mermiIziRengi = new Color(1f, 0.85f, 0.35f, 0.9f);
@@ -93,7 +93,6 @@ public class KarakterAtes : MonoBehaviour
             audioSource.spatialBlend = 0.5f;
         }
 
-        // Namlu noktasını ayarla (Karakterin gövdesi yerine elindeki tüfeğin namlu ucu)
         if (namluNoktasi == null)
         {
             GameObject namluObj = new GameObject("NamluNoktasi");
@@ -103,24 +102,15 @@ public class KarakterAtes : MonoBehaviour
             namluNoktasi = namluObj.transform;
         }
 
-        // Mermi izi (LineRenderer) oluştur
         KurLineRenderer();
-
-        // Namlu flaşı (Point Light ve Görsel Ateş Flaşı) oluştur
         KurNamluIsigi();
         KurNamluFlasi();
     }
 
-    /// <summary>
-    /// Ateş efektinin ve merminin çıkacağı gerçek namlu ucu konumunu döndürür.
-    /// Karakterin gövdesinden DEĞİL, hem 1. şahısta hem de 3. şahısta doğrudan tüfeğin namlu ucundan çıkar.
-    /// </summary>
     public Vector3 GetNamluKonumu()
     {
         if (KameraTakip.IsFirstPerson && kamera != null)
         {
-            // 1. Şahıs (Counter-Strike) Modu:
-            // Kamera açısına göre ekranın sağ-altındaki silahın namlu ucudur.
             return kamera.position
                 + (kamera.right * namluOfset1P.x)
                 + (kamera.up * namluOfset1P.y)
@@ -128,11 +118,10 @@ public class KarakterAtes : MonoBehaviour
         }
         else
         {
-            // 3. Şahıs Modu:
-            // Karakterin elindeki tüfeğin namlu ucudur.
+            float egilmeCarpani = KarakterHareket.EgiliyorMu ? 0.65f : 1.0f;
             return transform.position
                 + (transform.right * namluOfset3P.x)
-                + (transform.up * namluOfset3P.y)
+                + (transform.up * (namluOfset3P.y * egilmeCarpani))
                 + (transform.forward * namluOfset3P.z);
         }
     }
@@ -147,7 +136,6 @@ public class KarakterAtes : MonoBehaviour
 
     void Update()
     {
-        // Minigame açıkken ateş edilmez
         if (Yazlab.Mekanikler.KapiBulmacaPaneli.MinigameAcik) return;
 
         if (AtesGirdisiVarMi() && Time.time >= sonrakiAtesZamani)
@@ -159,7 +147,6 @@ public class KarakterAtes : MonoBehaviour
 
     void LateUpdate()
     {
-        // Namlu noktasının konumunu her karede silahın tam ucunda tut
         Vector3 namluPos = GetNamluKonumu();
         if (namluNoktasi != null)
         {
@@ -173,7 +160,8 @@ public class KarakterAtes : MonoBehaviour
 
     private bool AtesGirdisiVarMi()
     {
-        // 1. Yeni Input System
+        // NOT: Sol Ctrl ve C tuşları EĞİLME (Crouch) içindir, ateş etmez!
+        // Ateş yalnızca Sol Fare Tıkı veya F tuşu ile yapılır.
 #if ENABLE_INPUT_SYSTEM
         if (Mouse.current != null)
         {
@@ -184,22 +172,17 @@ public class KarakterAtes : MonoBehaviour
         if (Keyboard.current != null)
         {
             var kb = Keyboard.current;
-            bool tusBasildi = seriAtes 
-                ? (kb.fKey.isPressed || kb.leftCtrlKey.isPressed)
-                : (kb.fKey.wasPressedThisFrame || kb.leftCtrlKey.wasPressedThisFrame);
+            bool tusBasildi = seriAtes ? kb.fKey.isPressed : kb.fKey.wasPressedThisFrame;
             if (tusBasildi) return true;
         }
 #endif
 
-        // 2. Eski Input Manager (Fallback)
         try
         {
             bool fareBasildi = seriAtes ? Input.GetMouseButton(0) : Input.GetMouseButtonDown(0);
             if (fareBasildi) return true;
 
-            bool tusBasildi = seriAtes 
-                ? (Input.GetKey(KeyCode.F) || Input.GetKey(KeyCode.LeftControl))
-                : (Input.GetKeyDown(KeyCode.F) || Input.GetKeyDown(KeyCode.LeftControl));
+            bool tusBasildi = seriAtes ? Input.GetKey(KeyCode.F) : Input.GetKeyDown(KeyCode.F);
             if (tusBasildi) return true;
         }
         catch { }
@@ -209,7 +192,6 @@ public class KarakterAtes : MonoBehaviour
 
     public void AtesEt()
     {
-        // 1. Karakteri kameranın baktığı yatay yöne anında çevir
         if (KameraTakip.IsFirstPerson)
         {
             transform.rotation = Quaternion.Euler(0f, KameraTakip.CurrentYaw, 0f);
@@ -224,7 +206,6 @@ public class KarakterAtes : MonoBehaviour
             }
         }
 
-        // 2. Animasyonu tetikle
         if (animator != null)
         {
             if (hasShootTrigger)
@@ -234,13 +215,11 @@ public class KarakterAtes : MonoBehaviour
             animator.CrossFade("infantry_combat_shoot", 0.05f);
         }
 
-        // 3. Ses çal
         if (atesSesi != null && audioSource != null)
         {
             audioSource.PlayOneShot(atesSesi);
         }
 
-        // 4. Namlu flaşı ve alevi (Sarı ateş efekti - Tam silahın namlu ucunda)
         Vector3 baslangicNoktasi = GetNamluKonumu();
         if (namluNoktasi != null)
         {
@@ -249,7 +228,6 @@ public class KarakterAtes : MonoBehaviour
 
         StartCoroutine(NamluIsigiParla(baslangicNoktasi));
 
-        // 5. Nişan Raycast'i hesapla
         Vector3 hedefNokta;
 
         Ray kameraRay;
@@ -277,7 +255,6 @@ public class KarakterAtes : MonoBehaviour
 
         foreach (var h in hits)
         {
-            // Kendi karakterimizin collider'larını ve alt nesnelerini yok say (koşarken merminin kendimize çarpmasını engelle)
             if (h.collider != null && (h.collider.transform == transform || h.collider.transform.IsChildOf(transform)))
             {
                 continue;
@@ -295,14 +272,12 @@ public class KarakterAtes : MonoBehaviour
         {
             hedefNokta = hit.point;
 
-            // Vurulan nesneye fiziksel kuvvet uygula
             Rigidbody rb = hit.rigidbody;
             if (rb != null && !rb.isKinematic)
             {
                 rb.AddForceAtPosition(kameraRay.direction * vurusKuvveti, hit.point, ForceMode.Impulse);
             }
 
-            // Vurulan nesneye hasar mesajı ilet (Varsa)
             DusmanKontrol dusman = hit.collider.GetComponentInParent<DusmanKontrol>();
             if (dusman != null)
             {
@@ -313,7 +288,6 @@ public class KarakterAtes : MonoBehaviour
                 hit.collider.SendMessageUpwards("HasarAl", 25f, SendMessageOptions.DontRequireReceiver);
             }
 
-            // Çarpma efekti
             CarpmaEfektiGoster(hit.point, hit.normal);
         }
         else
@@ -321,7 +295,6 @@ public class KarakterAtes : MonoBehaviour
             hedefNokta = kameraRay.origin + (kameraRay.direction * menzil);
         }
 
-        // 6. Mermi izini (Tracer) çiz
         if (mermiIziRenderer != null)
         {
             StartCoroutine(MermiIziCiz(baslangicNoktasi, hedefNokta));
@@ -330,7 +303,6 @@ public class KarakterAtes : MonoBehaviour
 
     private void CarpmaEfektiGoster(Vector3 nokta, Vector3 normal)
     {
-        // Çarpma anında geçici küçük bir kıvılcım ışığı
         GameObject spark = new GameObject("MermiCarpma");
         spark.transform.position = nokta + normal * 0.05f;
         Light spLight = spark.AddComponent<Light>();
@@ -394,7 +366,6 @@ public class KarakterAtes : MonoBehaviour
         mermiIziRenderer.useWorldSpace = true;
         mermiIziRenderer.enabled = false;
 
-        // Materyal oluştur
         Material lineMat = new Material(Shader.Find("Sprites/Default") ?? Shader.Find("Universal Render Pipeline/Unlit"));
         lineMat.color = mermiIziRengi;
         mermiIziRenderer.material = lineMat;
@@ -436,23 +407,11 @@ public class KarakterAtes : MonoBehaviour
         namluFlasRenderer.endColor = new Color(1f, 0.6f, 0.1f, 0.1f);
     }
 
-    private Transform BulTransform(string isim, Transform kok)
-    {
-        if (kok.name == isim) return kok;
-        for (int i = 0; i < kok.childCount; i++)
-        {
-            Transform sonuc = BulTransform(isim, kok.GetChild(i));
-            if (sonuc != null) return sonuc;
-        }
-        return null;
-    }
-
     void OnGUI()
     {
-        // 3. şahısta ve minigame açıkken nişangah gizlidir; SADECE fare sağ tıkı ile 1. şahıs (First Person) moduna geçildiğinde görünür!
-        if (!nisangahGoster || !KameraTakip.IsFirstPerson || Yazlab.Mekanikler.KapiBulmacaPaneli.MinigameAcik) return;
+        // Hem 3. Şahısta (TPS) hem 1. Şahısta (FPS) nişangah her zaman görünür! Sadece bulmaca minigame açıkken gizlenir.
+        if (!nisangahGoster || Yazlab.Mekanikler.KapiBulmacaPaneli.MinigameAcik) return;
 
-        // Ekranın tam ortasında zarif 4 çizgili crosshair (+) çiz
         if (beyazTexture == null)
         {
             beyazTexture = new Texture2D(1, 1);
@@ -462,21 +421,26 @@ public class KarakterAtes : MonoBehaviour
 
         float centerX = Screen.width * 0.5f;
         float centerY = Screen.height * 0.5f;
-        float length = 8f;
+        float length = KameraTakip.IsFirstPerson ? 9f : 10f;
         float thickness = 2f;
-        float gap = 4f;
+        float gap = KameraTakip.IsFirstPerson ? 3.5f : 5.5f;
 
         Color eskiRenk = GUI.color;
-        GUI.color = nisangahRengi;
 
-        // Sol çizgi
+        // Koyu dış gölge (Her zeminde net görünmesi için)
+        GUI.color = new Color(0f, 0f, 0f, 0.65f);
+        GUI.DrawTexture(new Rect(centerX - gap - length - 1f, centerY - (thickness * 0.5f) - 1f, length + 2f, thickness + 2f), beyazTexture);
+        GUI.DrawTexture(new Rect(centerX + gap - 1f, centerY - (thickness * 0.5f) - 1f, length + 2f, thickness + 2f), beyazTexture);
+        GUI.DrawTexture(new Rect(centerX - (thickness * 0.5f) - 1f, centerY - gap - length - 1f, thickness + 2f, length + 2f), beyazTexture);
+        GUI.DrawTexture(new Rect(centerX - (thickness * 0.5f) - 1f, centerY + gap - 1f, thickness + 2f, length + 2f), beyazTexture);
+
+        // Ana nişangah çizgileri + merkez nokta
+        GUI.color = nisangahRengi;
         GUI.DrawTexture(new Rect(centerX - gap - length, centerY - (thickness * 0.5f), length, thickness), beyazTexture);
-        // Sağ çizgi
         GUI.DrawTexture(new Rect(centerX + gap, centerY - (thickness * 0.5f), length, thickness), beyazTexture);
-        // Üst çizgi
         GUI.DrawTexture(new Rect(centerX - (thickness * 0.5f), centerY - gap - length, thickness, length), beyazTexture);
-        // Alt çizgi
         GUI.DrawTexture(new Rect(centerX - (thickness * 0.5f), centerY + gap, thickness, length), beyazTexture);
+        GUI.DrawTexture(new Rect(centerX - 1f, centerY - 1f, 2f, 2f), beyazTexture);
 
         GUI.color = eskiRenk;
     }
