@@ -11,8 +11,21 @@ public class KarakterHareket : MonoBehaviour
     [Tooltip("Karakterin yürüme/koşma hızı.")]
     public float hiz = 5.0f;
 
+    [Tooltip("Eğilirken (Crouch) taktiksel ilerleme hızı.")]
+    public float egilmeHizi = 2.6f;
+
     [Tooltip("Karakterin bastığınız yöne dönme yumuşaklık hızı.")]
     public float donusHizi = 12.0f;
+
+    [Header("Eğilme (Crouch / Siper Gizliliği) Ayarları")]
+    [Tooltip("Normal ayakta duruş yüksekliği.")]
+    public float normalBoy = 1.8f;
+
+    [Tooltip("Eğildiğinde karakter kapsül yüksekliği (Alçak siperlerin arkasında gizlenmek için).")]
+    public float egilmeBoy = 0.95f;
+
+    [Tooltip("Eğilme/kalkma geçiş yumuşaklığı.")]
+    public float egilmeGecisHizi = 10.0f;
 
     [Header("Zıplama ve Yerçekimi")]
     [Tooltip("Space tuşuna basıldığında zıplama kuvveti.")]
@@ -25,11 +38,21 @@ public class KarakterHareket : MonoBehaviour
     [Tooltip("Hareket yönünün referans alacağı kamera (Boş bırakılırsa Main Camera kullanılır).")]
     public Transform kamera;
 
+    /// <summary>
+    /// Oyuncunun şu anda eğilip eğilmediğini tüm sistemlere (Kamera, Taret, Siper) bildirir.
+    /// </summary>
+    public static bool EgiliyorMu { get; private set; }
+
     private CharacterController controller;
     private Animator animator;
     private float dikeyHiz = 0f;
+    private bool egilmeToggle = false;
     private static readonly int IsRunningHash = Animator.StringToHash("IsRunning");
     private bool hasIsRunningParam = false;
+
+    private GUIStyle durusKutuStili;
+    private GUIStyle durusYaziStili;
+    private Texture2D durusArkaTex;
 
     void Awake()
     {
@@ -39,11 +62,12 @@ public class KarakterHareket : MonoBehaviour
             controller = gameObject.AddComponent<CharacterController>();
         }
 
-        controller.height = 1.8f;
+        controller.height = normalBoy;
         controller.radius = 0.35f;
-        controller.center = new Vector3(0f, 0.9f, 0f);
+        controller.center = new Vector3(0f, normalBoy * 0.5f, 0f);
         controller.stepOffset = 0.3f;
         controller.slopeLimit = 45f;
+        EgiliyorMu = false;
 
         animator = GetComponent<Animator>();
         if (animator == null)
@@ -103,6 +127,15 @@ public class KarakterHareket : MonoBehaviour
 
         Vector2 input = KlavyeGirdisiAl();
         bool zipla = ZiplamaGirdisiAl();
+        EgilmeGirdisiKontrolEt(zipla);
+
+        // Eğilme kapsül boyutu ve görsel ölçek yumuşak geçişi
+        float hedefBoy = EgiliyorMu ? egilmeBoy : normalBoy;
+        controller.height = Mathf.Lerp(controller.height, hedefBoy, Time.deltaTime * egilmeGecisHizi);
+        controller.center = new Vector3(0f, controller.height * 0.5f, 0f);
+
+        Vector3 hedefOlcek = EgiliyorMu ? new Vector3(1.04f, 0.62f, 1.04f) : Vector3.one;
+        transform.localScale = Vector3.Lerp(transform.localScale, hedefOlcek, Time.deltaTime * egilmeGecisHizi);
 
         // Kameranın baktığı açıya göre 3D hareket vektörü
         Vector3 ileri = kamera != null ? kamera.forward : Vector3.forward;
@@ -138,7 +171,7 @@ public class KarakterHareket : MonoBehaviour
         {
             dikeyHiz = -1f;
 
-            if (zipla)
+            if (zipla && !EgiliyorMu)
             {
                 dikeyHiz = ziplamaGucu;
             }
@@ -148,12 +181,57 @@ public class KarakterHareket : MonoBehaviour
             dikeyHiz -= yercekimi * Time.deltaTime;
         }
 
-        // Hareketi uygula
-        Vector3 toplamHareket = (hareketYonu * hiz) + (Vector3.up * dikeyHiz);
+        // Hareketi uygula (Eğilirken daha yavaş ve dikkatli ilerler)
+        float aktifHiz = EgiliyorMu ? egilmeHizi : hiz;
+        Vector3 toplamHareket = (hareketYonu * aktifHiz) + (Vector3.up * dikeyHiz);
         controller.Move(toplamHareket * Time.deltaTime);
 
         // Animasyon durumunu güncelle
         AnimasyonGuncelle(hareketEdiyor, controller.isGrounded);
+    }
+
+    private void EgilmeGirdisiKontrolEt(bool zipladi)
+    {
+        bool cBasildi = false;
+        bool ctrlBasili = false;
+
+#if ENABLE_INPUT_SYSTEM
+        if (Keyboard.current != null)
+        {
+            if (Keyboard.current.cKey.wasPressedThisFrame) cBasildi = true;
+            if (Keyboard.current.leftCtrlKey.isPressed) ctrlBasili = true;
+        }
+#endif
+
+        if (!cBasildi)
+        {
+            try
+            {
+                if (Input.GetKeyDown(KeyCode.C)) cBasildi = true;
+            }
+            catch { }
+        }
+
+        if (!ctrlBasili)
+        {
+            try
+            {
+                if (Input.GetKey(KeyCode.LeftControl)) ctrlBasili = true;
+            }
+            catch { }
+        }
+
+        if (cBasildi)
+        {
+            egilmeToggle = !egilmeToggle;
+        }
+
+        if (zipladi && EgiliyorMu)
+        {
+            egilmeToggle = false;
+        }
+
+        EgiliyorMu = egilmeToggle || ctrlBasili;
     }
 
     private Vector2 KlavyeGirdisiAl()
@@ -212,6 +290,7 @@ public class KarakterHareket : MonoBehaviour
     {
         if (animator == null) return;
 
+        animator.speed = EgiliyorMu ? 0.68f : 1.0f;
         bool animasyonKosu = kosuyor || !yerde;
 
         if (hasIsRunningParam)
@@ -227,5 +306,44 @@ public class KarakterHareket : MonoBehaviour
                 animator.CrossFade(hedefState, 0.2f);
             }
         }
+    }
+
+    private void OnGUI()
+    {
+        if (Yazlab.Mekanikler.KapiBulmacaPaneli.MinigameAcik) return;
+
+        if (durusArkaTex == null)
+        {
+            durusArkaTex = new Texture2D(1, 1);
+            durusArkaTex.SetPixel(0, 0, new Color(0.08f, 0.11f, 0.14f, 0.82f));
+            durusArkaTex.Apply();
+        }
+
+        if (durusKutuStili == null)
+        {
+            durusKutuStili = new GUIStyle(GUI.skin.box);
+            durusKutuStili.normal.background = durusArkaTex;
+        }
+
+        if (durusYaziStili == null)
+        {
+            durusYaziStili = new GUIStyle(GUI.skin.label);
+            durusYaziStili.fontSize = 13;
+            durusYaziStili.fontStyle = FontStyle.Bold;
+            durusYaziStili.alignment = TextAnchor.MiddleLeft;
+        }
+
+        Rect r = new Rect(18f, Screen.height - 46f, 340f, 30f);
+        GUI.Box(r, GUIContent.none, durusKutuStili);
+
+        durusYaziStili.normal.textColor = EgiliyorMu
+            ? new Color(0.30f, 0.95f, 0.55f)
+            : new Color(0.85f, 0.88f, 0.92f);
+
+        string metin = EgiliyorMu
+            ? "  [C / CTRL] DURUŞ: EĞİLDİ (SİPERDE GİZLİ)"
+            : "  [C / CTRL] DURUŞ: AYAKTA";
+
+        GUI.Label(r, metin, durusYaziStili);
     }
 }
