@@ -7,7 +7,7 @@ namespace Yazlab.Editor
     /// <summary>
     /// Kamera, oyuncu kontrolleri ve 3 bölümlü kale haritasının eksiksiz kurulu olduğu
     /// asıl oyun sahnesini (SampleScene) varsayılan yapar ve yeni harita bileşenleri
-    /// (Hendek, Asma Köprü, Kablo Odası, İç Kule) sahnede yoksa otomatik olarak inşa eder.
+    /// (Hendek, Asma Köprü, Kablo Odası, Yanları Kapalı Merdiven Holü) sahnede yoksa otomatik olarak inşa eder.
     /// </summary>
     [InitializeOnLoad]
     public static class BaslangicSahneAyari
@@ -54,12 +54,14 @@ namespace Yazlab.Editor
         {
             if (EditorApplication.isPlaying) return;
 
-            // Eğer sahnede yeni 3 bölümlü kale yapıları (Asma Köprü ve Kablo Odası) henüz oluşmamışsa otomatik inşa et!
-            if (GameObject.Find("Asma_Kopru_Sistemi") == null || GameObject.Find("Kablo_Ve_Salter_Odasi") == null)
+            // Sahnede güncel 3. bölüm Merdiven Holü veya Asma Köprü yoksa otomatik olarak güncel haritayı kur!
+            if (GameObject.Find("Asma_Kopru_Sistemi") == null ||
+                GameObject.Find("Kablo_Ve_Salter_Odasi") == null ||
+                GameObject.Find("MerdivenHolu_SolDuvar") == null)
             {
-                Debug.Log("[YazLab] Yeni 3 Bölümlü Kale Haritası (Hendek, Asma Köprü, Kablo Odası, İç Kule) otomatik inşa ediliyor...");
+                Debug.Log("[YazLab] Güncel 3 Bölümlü Kale Haritası (Kapalı Merdiven Holü & Düzeltmeler) otomatik inşa ediliyor...");
                 HaritaOlusturucu.HaritayiKurInternal();
-                Debug.Log("[YazLab] 3 Bölümlü Kale Haritası otomatik olarak oluşturuldu ve kaydedildi!");
+                Debug.Log("[YazLab] Güncel 3 Bölümlü Kale Haritası otomatik olarak oluşturuldu ve kaydedildi!");
             }
         }
     }
