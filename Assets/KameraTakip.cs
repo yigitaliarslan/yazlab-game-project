@@ -8,6 +8,7 @@ using UnityEngine.InputSystem;
 /// Normalde 3. Şahıs (Third Person) açısından karakteri takip eder.
 /// Fare sağ tıkına basıldığında yumuşakça 1. Şahıs (First Person / Nişan) moduna geçer ve silahı öne getirir.
 /// Sağ tık bırakıldığında tekrar 3. şahıs moduna döner.
+/// Eğilme (Crouch) durumunda göz seviyesini otomatik olarak siper hizasına indirir.
 /// </summary>
 public class KameraTakip : MonoBehaviour
 {
@@ -75,6 +76,7 @@ public class KameraTakip : MonoBehaviour
     private float yaw = 0f;
     private Camera cam;
     private float fpsGecis = 0f;
+    private float egilmeKameraOfseti = 0f;
 
     void Awake()
     {
@@ -122,6 +124,10 @@ public class KameraTakip : MonoBehaviour
 
         if (hedef == null) return;
 
+        // Eğilme (Crouch) yüksekliği yumuşak geçişi
+        float hedefEgikOfset = KarakterHareket.EgiliyorMu ? -0.68f : 0f;
+        egilmeKameraOfseti = Mathf.Lerp(egilmeKameraOfseti, hedefEgikOfset, Time.deltaTime * 11f);
+
         // Sağ tık kontrolü ile 1. Şahıs (Counter-Strike FPS) moduna geçiş
         bool sagTikBasili = sagTiklaBirinciSahis && SagTikGirdisiAl();
         IsFirstPerson = sagTikBasili;
@@ -134,23 +140,20 @@ public class KameraTakip : MonoBehaviour
 
         // Counter-Strike 1. Şahıs Kamera Konumu:
         // Karakterin dünya koordinatlarındaki anlık pozisyonunu ve yatay yönünü baz alır.
-        // Yüksekliği Counter-Strike göz seviyesine (1.82m) yükseltilmiştir.
         Vector3 yatayIleri = Quaternion.Euler(0f, yaw, 0f) * Vector3.forward;
         Vector3 yataySag = Quaternion.Euler(0f, yaw, 0f) * Vector3.right;
         Vector3 fpsKonum = hedef.position
-            + Vector3.up * birinciSahisOfset.y
+            + Vector3.up * (birinciSahisOfset.y + egilmeKameraOfseti)
             + (yatayIleri * birinciSahisOfset.z)
             + (yataySag * birinciSahisOfset.x);
 
         // 3. Şahıs Konum Hesabı:
-        Vector3 odakNoktasi = hedef.position + Vector3.up * bakisYuksekligi;
+        Vector3 odakNoktasi = hedef.position + Vector3.up * (bakisYuksekligi + egilmeKameraOfseti * 0.75f);
         Vector3 tpsKonum = odakNoktasi - (rotasyon * Vector3.forward * mesafe);
 
         if (fpsGecis >= 0.999f)
         {
             // === TAM 1. ŞAHIS (COUNTER-STRIKE) MODU ===
-            // Koşarken ve ateş ederken kamera ASLA geride kalmaz, kaymaz, gecikmeli lerp yapmaz!
-            // CS'deki gibi doğrudan karakterin göz seviyesine ve fare açısına kilitlenir.
             transform.position = fpsKonum;
             transform.rotation = rotasyon;
 
