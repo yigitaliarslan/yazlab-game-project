@@ -7,7 +7,7 @@ using UnityEngine.InputSystem;
 /// <summary>
 /// Ana karakter için gelişmiş ateş etme kontrolcüsü.
 /// Fare sol tıkı veya 'F' tuşu ile ateş eder (Sol Ctrl eğilme tuşu olduğu için ateş etmez).
-/// Namlu ışığı (Muzzle Flash), mermi izi (Bullet Tracer), hem 3. şahıs hem 1. şahıs nişangahı (crosshair) ve ateş animasyonunu yönetir.
+/// Namlu ışığı (Muzzle Flash), mermi izi (Bullet Tracer), dinamik hedef algılamalı taktiksel nişangah ve ateş animasyonunu yönetir.
 /// </summary>
 public class KarakterAtes : MonoBehaviour
 {
@@ -45,8 +45,11 @@ public class KarakterAtes : MonoBehaviour
     [Tooltip("Ekranın ortasında nişangah (crosshair) gösterilsin mi?")]
     public bool nisangahGoster = true;
 
-    [Tooltip("Nişangah rengi.")]
-    public Color nisangahRengi = new Color(0.95f, 1f, 0.95f, 0.92f);
+    [Tooltip("Normal nişangah rengi (Taktiksel Camgöbeği/Yeşil).")]
+    public Color nisangahRengi = new Color(0.25f, 1.0f, 0.65f, 0.90f);
+
+    [Tooltip("Düşman/Taret üzerine gelindiğinde nişangah rengi.")]
+    public Color hedefKilitRengi = new Color(1.0f, 0.22f, 0.20f, 0.95f);
 
     [Tooltip("Mermi izi (Tracer) rengi.")]
     public Color mermiIziRengi = new Color(1f, 0.85f, 0.35f, 0.9f);
@@ -61,6 +64,8 @@ public class KarakterAtes : MonoBehaviour
     private LineRenderer namluFlasRenderer;
     private Light namluIsigi;
     private float sonrakiAtesZamani = 0f;
+    private float sonAtesAni = -10f;
+    private bool hedefteDusmanVar = false;
     private static readonly int ShootHash = Animator.StringToHash("Shoot");
     private bool hasShootTrigger = false;
     private Texture2D beyazTexture;
@@ -138,10 +143,48 @@ public class KarakterAtes : MonoBehaviour
     {
         if (Yazlab.Mekanikler.KapiBulmacaPaneli.MinigameAcik) return;
 
+        HedefKilitKontrolEt();
+
         if (AtesGirdisiVarMi() && Time.time >= sonrakiAtesZamani)
         {
             sonrakiAtesZamani = Time.time + atesAraligi;
+            sonAtesAni = Time.time;
             AtesEt();
+        }
+    }
+
+    private void HedefKilitKontrolEt()
+    {
+        hedefteDusmanVar = false;
+        if (kamera == null) return;
+
+        Camera cam = kamera.GetComponent<Camera>();
+        Ray ray = cam != null
+            ? cam.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f))
+            : new Ray(kamera.position, kamera.forward);
+
+        RaycastHit[] hits = Physics.RaycastAll(ray, menzil, vurulabilirKatmanlar, QueryTriggerInteraction.Ignore);
+        float enYakin = float.MaxValue;
+        Collider enYakinCol = null;
+
+        foreach (var h in hits)
+        {
+            if (h.collider == null) continue;
+            if (h.transform == transform || h.transform.IsChildOf(transform)) continue;
+            if (h.distance < enYakin)
+            {
+                enYakin = h.distance;
+                enYakinCol = h.collider;
+            }
+        }
+
+        if (enYakinCol != null)
+        {
+            DusmanKontrol d = enYakinCol.GetComponentInParent<DusmanKontrol>();
+            if (d != null && !d.IsDead)
+            {
+                hedefteDusmanVar = true;
+            }
         }
     }
 
@@ -160,8 +203,6 @@ public class KarakterAtes : MonoBehaviour
 
     private bool AtesGirdisiVarMi()
     {
-        // NOT: Sol Ctrl ve C tuşları EĞİLME (Crouch) içindir, ateş etmez!
-        // Ateş yalnızca Sol Fare Tıkı veya F tuşu ile yapılır.
 #if ENABLE_INPUT_SYSTEM
         if (Mouse.current != null)
         {
@@ -409,7 +450,6 @@ public class KarakterAtes : MonoBehaviour
 
     void OnGUI()
     {
-        // Hem 3. Şahısta (TPS) hem 1. Şahısta (FPS) nişangah her zaman görünür! Sadece bulmaca minigame açıkken gizlenir.
         if (!nisangahGoster || Yazlab.Mekanikler.KapiBulmacaPaneli.MinigameAcik) return;
 
         if (beyazTexture == null)
@@ -421,25 +461,32 @@ public class KarakterAtes : MonoBehaviour
 
         float centerX = Screen.width * 0.5f;
         float centerY = Screen.height * 0.5f;
-        float length = KameraTakip.IsFirstPerson ? 9f : 10f;
-        float thickness = 2f;
-        float gap = KameraTakip.IsFirstPerson ? 3.5f : 5.5f;
+
+        // Ateş edildiğinde hafif geri tepme açılması (Dynamic Recoil Bloom)
+        float atesAcilma = Mathf.Clamp01(1f - (Time.time - sonAtesAni) * 6f) * 4.0f;
+        float length = KameraTakip.IsFirstPerson ? 6f : 7f;
+        float thickness = 1.5f;
+        float gap = (KameraTakip.IsFirstPerson ? 4f : 5.5f) + atesAcilma;
+
+        Color aktifRenk = hedefteDusmanVar
+            ? new Color(1.0f, 0.22f, 0.20f, 0.95f) // Düşman/Taret üstündeyken Kırmızı
+            : new Color(0.25f, 1.0f, 0.65f, 0.90f); // Normalde Taktiksel Yeşil/Camgöbeği
 
         Color eskiRenk = GUI.color;
 
-        // Koyu dış gölge (Her zeminde net görünmesi için)
-        GUI.color = new Color(0f, 0f, 0f, 0.65f);
-        GUI.DrawTexture(new Rect(centerX - gap - length - 1f, centerY - (thickness * 0.5f) - 1f, length + 2f, thickness + 2f), beyazTexture);
-        GUI.DrawTexture(new Rect(centerX + gap - 1f, centerY - (thickness * 0.5f) - 1f, length + 2f, thickness + 2f), beyazTexture);
-        GUI.DrawTexture(new Rect(centerX - (thickness * 0.5f) - 1f, centerY - gap - length - 1f, thickness + 2f, length + 2f), beyazTexture);
-        GUI.DrawTexture(new Rect(centerX - (thickness * 0.5f) - 1f, centerY + gap - 1f, thickness + 2f, length + 2f), beyazTexture);
+        // İnce kontrast gölgesi (Hedefi kapatmayan zarif dış hat)
+        GUI.color = new Color(0f, 0f, 0f, 0.55f);
+        GUI.DrawTexture(new Rect(centerX - gap - length - 1f, centerY - 1f, length + 2f, thickness + 1f), beyazTexture);
+        GUI.DrawTexture(new Rect(centerX + gap - 1f, centerY - 1f, length + 2f, thickness + 1f), beyazTexture);
+        GUI.DrawTexture(new Rect(centerX - 1f, centerY - gap - length - 1f, thickness + 1f, length + 2f), beyazTexture);
+        GUI.DrawTexture(new Rect(centerX - 1f, centerY + gap - 1f, thickness + 1f, length + 2f), beyazTexture);
 
-        // Ana nişangah çizgileri + merkez nokta
-        GUI.color = nisangahRengi;
-        GUI.DrawTexture(new Rect(centerX - gap - length, centerY - (thickness * 0.5f), length, thickness), beyazTexture);
-        GUI.DrawTexture(new Rect(centerX + gap, centerY - (thickness * 0.5f), length, thickness), beyazTexture);
-        GUI.DrawTexture(new Rect(centerX - (thickness * 0.5f), centerY - gap - length, thickness, length), beyazTexture);
-        GUI.DrawTexture(new Rect(centerX - (thickness * 0.5f), centerY + gap, thickness, length), beyazTexture);
+        // Zarif ince nişangah çizgileri + merkez nokta (Hedefi asla kapatmaz!)
+        GUI.color = aktifRenk;
+        GUI.DrawTexture(new Rect(centerX - gap - length, centerY - 0.5f, length, thickness), beyazTexture);
+        GUI.DrawTexture(new Rect(centerX + gap, centerY - 0.5f, length, thickness), beyazTexture);
+        GUI.DrawTexture(new Rect(centerX - 0.5f, centerY - gap - length, thickness, length), beyazTexture);
+        GUI.DrawTexture(new Rect(centerX - 0.5f, centerY + gap, thickness, length), beyazTexture);
         GUI.DrawTexture(new Rect(centerX - 1f, centerY - 1f, 2f, 2f), beyazTexture);
 
         GUI.color = eskiRenk;
