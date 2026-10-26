@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine.AI;
@@ -148,8 +148,8 @@ namespace Yazlab.Editor
             NavMeshSurface navSurface = anaZemin.AddComponent<NavMeshSurface>();
             navSurface.collectObjects = CollectObjects.All;
 
-            // ==========================================
-            // 2. YUVARLAK KALE SURLARI (24 SEGMENT)
+                        // ==========================================
+            // 2. YUVARLAK KALE SURLARI (24 SEGMENT - TAMAMEN KAPALI & MAZGALLI)
             // ==========================================
             GameObject surGrup = new GameObject("2_Yuvarlak_Kale_Surlari");
             surGrup.transform.SetParent(haritaKok.transform);
@@ -163,13 +163,22 @@ namespace Yazlab.Editor
                 float x = kaleMerkezi.x + Mathf.Sin(aciRad) * kaleYaricapi;
                 float z = kaleMerkezi.z + Mathf.Cos(aciRad) * kaleYaricapi;
 
-                // Güney giriş kapısı segmentini (açı ~ 180°) boş bırakıyoruz
-                if (i == 12) continue;
+                // Güney giriş kapısı segmentinde (i == 12) geçişi demir parmaklık ve yüksek kemerle tamamen kapatıyoruz
+                if (i == 12)
+                {
+                    GameObject guneyKapiDuvar = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                    guneyKapiDuvar.name = "GuneyDisSur_KapaliBariyer";
+                    guneyKapiDuvar.transform.SetParent(surGrup.transform);
+                    guneyKapiDuvar.transform.position = new Vector3(x, 4.0f, z);
+                    guneyKapiDuvar.transform.localScale = new Vector3(8.0f, 8.0f, 2.5f);
+                    guneyKapiDuvar.transform.rotation = Quaternion.Euler(0f, i * aciAdimi + 90f, 0f);
+                    guneyKapiDuvar.GetComponent<MeshRenderer>().sharedMaterial = matTasDuvar;
+                    continue;
+                }
 
-                // Bazı sur segmentlerini yıkık/alçak yapıyoruz (kale harabesi hissi)
                 bool yikikSegment = (i == 4 || i == 18);
-                float surYuksekligi = yikikSegment ? 2.5f : 6.0f;
-                Vector3 surScale = new Vector3(7.6f, surYuksekligi, 2.0f);
+                float surYuksekligi = yikikSegment ? 3.5f : 7.5f;
+                Vector3 surScale = new Vector3(7.6f, surYuksekligi, 2.2f);
                 Vector3 surPos = new Vector3(x, surYuksekligi / 2f, z);
 
                 GameObject surParcasi = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -179,17 +188,44 @@ namespace Yazlab.Editor
                 surParcasi.transform.rotation = Quaternion.Euler(0f, i * aciAdimi + 90f, 0f);
                 surParcasi.GetComponent<MeshRenderer>().sharedMaterial = matTasDuvar;
 
-                // Yıkık segmentlerin dibine moloz yığınları ekle
+                // Sur üstü savunma mazgalları (Crenellations) - Gerçekçi kale suru görünümü
+                if (!yikikSegment)
+                {
+                    for (int m = -2; m <= 2; m += 2)
+                    {
+                        GameObject mazgal = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                        mazgal.name = $"Mazgal_{i}_{m}";
+                        mazgal.transform.SetParent(surParcasi.transform);
+                        mazgal.transform.localPosition = new Vector3(m * 0.22f, 0.58f, 0f);
+                        mazgal.transform.localScale = new Vector3(0.18f, 0.18f, 0.95f);
+                        mazgal.GetComponent<MeshRenderer>().sharedMaterial = matTasDuvar;
+                    }
+                }
+
                 if (yikikSegment)
                 {
                     MolozYiginiOlustur($"Moloz_{i}", surPos - Vector3.up * 1f, matKoyuTas, surGrup.transform);
+                    // Dışarıya düşülmesin diye görünmez sınır bariyeri
+                    GameObject sinirEngel = new GameObject($"SinirKalkan_{i}");
+                    sinirEngel.transform.SetParent(surGrup.transform);
+                    sinirEngel.transform.position = surPos + Vector3.up * 3f;
+                    BoxCollider sc = sinirEngel.AddComponent<BoxCollider>();
+                    sc.size = new Vector3(8f, 10f, 3f);
                 }
             }
 
-            // Dış Köşe Gözetleme Burçları (Bastions)
-            BurcOlustur("KuzeyBurcu", new Vector3(0f, 0f, 48f), 4.5f, 8f, matTasDuvar, surGrup.transform);
-            BurcOlustur("DoguBurcu", new Vector3(27f, 0f, 20f), 4.0f, 7f, matTasDuvar, surGrup.transform);
-            BurcOlustur("BatiBurcu", new Vector3(-27f, 0f, 20f), 4.0f, 7f, matTasDuvar, surGrup.transform);
+            // Dış Köşe Gözetleme Burçları (Bastions) & Üstlerine Hareketli Dinamik Ekipmanlar
+            BurcOlustur("KuzeyBurcu", new Vector3(0f, 0f, 48f), 5.0f, 9f, matTasDuvar, surGrup.transform);
+            BurcOlustur("DoguBurcu", new Vector3(27f, 0f, 20f), 4.5f, 8f, matTasDuvar, surGrup.transform);
+            BurcOlustur("BatiBurcu", new Vector3(-27f, 0f, 20f), 4.5f, 8f, matTasDuvar, surGrup.transform);
+            BurcOlustur("GuneyGozetlemeBurcu", new Vector3(12f, 0f, -8f), 3.8f, 7.5f, matTasDuvar, surGrup.transform);
+
+            // Burçların Üstüne Hareketli Güvenlik Projektörleri ve Titreyen Meşaleler
+            ProjektorKulesiOlustur("KuzeyProjektoru", new Vector3(0f, 9.2f, 48f), 180f, surGrup.transform, matPasliMetal);
+            ProjektorKulesiOlustur("DoguProjektoru", new Vector3(27f, 8.2f, 20f), 270f, surGrup.transform, matPasliMetal);
+            MesaleOlustur("Mesale_BatiBurcu", new Vector3(-27f, 8.2f, 20f), surGrup.transform, matPasliMetal);
+            MesaleOlustur("Mesale_Giris_Sol", new Vector3(-4.5f, 5.0f, -6.5f), surGrup.transform, matPasliMetal);
+            MesaleOlustur("Mesale_Giris_Sag", new Vector3(4.5f, 5.0f, -6.5f), surGrup.transform, matPasliMetal);
 
             // ==========================================
             // 3. BÖLGE 1: GÜNEY GİRİŞ & SİPERLER (Z = -10 ile 10)
@@ -388,6 +424,10 @@ namespace Yazlab.Editor
             Vector3 kuleMerkez = new Vector3(0f, 0f, 34f);
 
             // Yarı Yıkık Kule Dış Duvarları (Arka tarafı yüksek, önü yıkık)
+                        // Kule Tepesi Radar ve Dalgalanan Bayrak Sistemi (Dinamik Harita)
+            RadarKulesiOlustur("MerkezKule_Radari", new Vector3(0f, 9.5f, 44f), bolge3.transform, matPasliMetal);
+            BayrakDiregiOlustur("MerkezKule_Sancagi", new Vector3(4f, 9.2f, 44f), bolge3.transform, matAhsap, matKirmiziTehlike);
+
             KutuOlustur("KuleDuvar_Arka", new Vector3(0f, 4.5f, 44f), new Vector3(18f, 9f, 2f), matTasDuvar, bolge3.transform);
             KutuOlustur("KuleDuvar_Sol", new Vector3(-8.5f, 4.0f, 35f), new Vector3(2f, 8f, 16f), matTasDuvar, bolge3.transform);
             KutuOlustur("KuleDuvar_Sag", new Vector3(8.5f, 4.0f, 35f), new Vector3(2f, 8f, 16f), matTasDuvar, bolge3.transform);
@@ -816,5 +856,109 @@ namespace Yazlab.Editor
             }
             return mat;
         }
-    }
+
+        private static void ProjektorKulesiOlustur(string isim, Vector3 pos, float rotY, Transform parent, Material matMetal)
+        {
+            GameObject kule = new GameObject(isim);
+            kule.transform.SetParent(parent);
+            kule.transform.position = pos;
+            kule.transform.rotation = Quaternion.Euler(0f, rotY, 0f);
+
+            GameObject fenerGovde = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            fenerGovde.name = "ProjektorGovde";
+            fenerGovde.transform.SetParent(kule.transform);
+            fenerGovde.transform.localPosition = Vector3.zero;
+            fenerGovde.transform.localScale = new Vector3(0.9f, 0.4f, 0.9f);
+            fenerGovde.GetComponent<MeshRenderer>().sharedMaterial = matMetal;
+
+            GameObject lamba = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            lamba.name = "Lens";
+            lamba.transform.SetParent(fenerGovde.transform);
+            lamba.transform.localPosition = new Vector3(0f, 0f, 0.5f);
+            lamba.transform.localScale = new Vector3(0.4f, 0.4f, 0.4f);
+
+            Light spot = lamba.AddComponent<Light>();
+            spot.type = LightType.Spot;
+            spot.color = new Color(1f, 0.95f, 0.8f);
+            spot.range = 28f;
+            spot.spotAngle = 45f;
+            spot.intensity = 3.5f;
+
+            kule.AddComponent<GuvenlikProjektoru>();
+        }
+
+        private static void MesaleOlustur(string isim, Vector3 pos, Transform parent, Material matMetal)
+        {
+            GameObject mesale = new GameObject(isim);
+            mesale.transform.SetParent(parent);
+            mesale.transform.position = pos;
+
+            GameObject cubuk = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            cubuk.name = "MesaleDemiri";
+            cubuk.transform.SetParent(mesale.transform);
+            cubuk.transform.localPosition = new Vector3(0f, 0.35f, 0f);
+            cubuk.transform.localScale = new Vector3(0.18f, 0.45f, 0.18f);
+            cubuk.GetComponent<MeshRenderer>().sharedMaterial = matMetal;
+
+            GameObject canak = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            canak.name = "AtesCanagi";
+            canak.transform.SetParent(mesale.transform);
+            canak.transform.localPosition = new Vector3(0f, 0.8f, 0f);
+            canak.transform.localScale = new Vector3(0.4f, 0.25f, 0.4f);
+
+            Light atesIsigi = canak.AddComponent<Light>();
+            atesIsigi.type = LightType.Point;
+            atesIsigi.color = new Color(1f, 0.55f, 0.15f);
+            atesIsigi.range = 9f;
+            atesIsigi.intensity = 2.0f;
+
+            mesale.AddComponent<IsikTitremesi>();
+        }
+
+        private static void RadarKulesiOlustur(string isim, Vector3 pos, Transform parent, Material matMetal)
+        {
+            GameObject radar = new GameObject(isim);
+            radar.transform.SetParent(parent);
+            radar.transform.position = pos;
+
+            GameObject direk = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            direk.name = "RadarDiregi";
+            direk.transform.SetParent(radar.transform);
+            direk.transform.localPosition = new Vector3(0f, 0.75f, 0f);
+            direk.transform.localScale = new Vector3(0.25f, 0.8f, 0.25f);
+            direk.GetComponent<MeshRenderer>().sharedMaterial = matMetal;
+
+            GameObject canak = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            canak.name = "RadarCanagi";
+            canak.transform.SetParent(radar.transform);
+            canak.transform.localPosition = new Vector3(0f, 1.6f, 0f);
+            canak.transform.localScale = new Vector3(1.8f, 0.15f, 0.6f);
+            canak.transform.localRotation = Quaternion.Euler(30f, 0f, 0f);
+            canak.GetComponent<MeshRenderer>().sharedMaterial = matMetal;
+
+            radar.AddComponent<RadarDonus>();
+        }
+
+        private static void BayrakDiregiOlustur(string isim, Vector3 pos, Transform parent, Material matAhsap, Material matKumas)
+        {
+            GameObject bayrakObj = new GameObject(isim);
+            bayrakObj.transform.SetParent(parent);
+            bayrakObj.transform.position = pos;
+
+            GameObject direk = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            direk.name = "Direk";
+            direk.transform.SetParent(bayrakObj.transform);
+            direk.transform.localPosition = new Vector3(0f, 1.8f, 0f);
+            direk.transform.localScale = new Vector3(0.12f, 1.8f, 0.12f);
+            direk.GetComponent<MeshRenderer>().sharedMaterial = matAhsap;
+
+            GameObject flama = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            flama.name = "Flama";
+            flama.transform.SetParent(bayrakObj.transform);
+            flama.transform.localPosition = new Vector3(0.85f, 3.0f, 0f);
+            flama.transform.localScale = new Vector3(1.5f, 0.9f, 0.05f);
+            flama.GetComponent<MeshRenderer>().sharedMaterial = matKumas;
+
+            flama.AddComponent<BayrakDalgalanma>();
+        }    }
 }
