@@ -15,7 +15,7 @@ public class KarakterHareket : MonoBehaviour
     public float egilmeHizi = 2.6f;
 
     [Tooltip("Karakterin bastığınız yöne dönme yumuşaklık hızı.")]
-    public float donusHizi = 12.0f;
+    public float donusHizi = 16.0f;
 
     [Header("Eğilme (Crouch / Siper Gizliliği) Ayarları")]
     [Tooltip("Normal ayakta duruş yüksekliği.")]
@@ -65,8 +65,8 @@ public class KarakterHareket : MonoBehaviour
         controller.height = normalBoy;
         controller.radius = 0.35f;
         controller.center = new Vector3(0f, normalBoy * 0.5f, 0f);
-        controller.stepOffset = 0.3f;
-        controller.slopeLimit = 45f;
+        controller.stepOffset = 0.38f;
+        controller.slopeLimit = 50f;
         EgiliyorMu = false;
 
         animator = GetComponent<Animator>();
@@ -87,13 +87,11 @@ public class KarakterHareket : MonoBehaviour
             }
         }
 
-        // Ateş etme bileşeni yoksa otomatik ekle
         if (GetComponent<KarakterAtes>() == null)
         {
             gameObject.AddComponent<KarakterAtes>();
         }
 
-        // Can ve sağlık barı bileşeni yoksa otomatik ekle
         if (GetComponent<OyuncuCani>() == null)
         {
             gameObject.AddComponent<OyuncuCani>();
@@ -111,11 +109,74 @@ public class KarakterHareket : MonoBehaviour
         {
             try { gameObject.tag = "Player"; } catch { }
         }
+
+        // Eğer sahnede eski merdiven korkulukları / yan boşlukları kalmışsa çalışma zamanında da koruma duvarlarını ve rampayı garantile
+        MerdivenBosluklariniGuvenliKapat();
+    }
+
+    private void MerdivenBosluklariniGuvenliKapat()
+    {
+        GameObject bolge3 = GameObject.Find("4_Bolum3_IcKaleKulesi_Ve_NpcOdasi") ?? GameObject.Find("5_Bolge3_YikikKule_Merdivenler_Ve_Npc");
+        if (bolge3 == null) return;
+
+        // Eski ince platform varsa altını doldur
+        Transform ustPlat = bolge3.transform.Find("Kule_IkinciKat_Platformu");
+        if (ustPlat != null && ustPlat.localScale.y < 1.5f)
+        {
+            ustPlat.position = new Vector3(0f, 1.1f, 36.5f);
+            ustPlat.localScale = new Vector3(16.5f, 2.2f, 15f);
+        }
+
+        // Merdivenin sol ve sağ yanlarındaki boşlukları kapat (Aşağı düşüp sıkışmayı %100 engeller)
+        if (GameObject.Find("MerdivenHolu_SolDuvar") == null)
+        {
+            Material mat = ustPlat != null ? ustPlat.GetComponent<MeshRenderer>()?.sharedMaterial : null;
+
+            GameObject solDuvar = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            solDuvar.name = "MerdivenHolu_SolDuvar";
+            solDuvar.transform.SetParent(bolge3.transform);
+            solDuvar.transform.position = new Vector3(-5.6f, 4.5f, 25.6f);
+            solDuvar.transform.localScale = new Vector3(5.2f, 9.0f, 7.2f);
+            if (mat != null) solDuvar.GetComponent<MeshRenderer>().sharedMaterial = mat;
+
+            GameObject sagDuvar = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            sagDuvar.name = "MerdivenHolu_SagDuvar";
+            sagDuvar.transform.SetParent(bolge3.transform);
+            sagDuvar.transform.position = new Vector3(5.6f, 4.5f, 25.6f);
+            sagDuvar.transform.localScale = new Vector3(5.2f, 9.0f, 7.2f);
+            if (mat != null) sagDuvar.GetComponent<MeshRenderer>().sharedMaterial = mat;
+
+            // Merdiven basamaklarını genişlet ve pürüzsüz rampa ekle
+            Transform merdivenGrup = bolge3.transform.Find("Tas_Merdivenler");
+            if (merdivenGrup != null)
+            {
+                Transform kSol = merdivenGrup.Find("Korkuluk_Sol");
+                if (kSol != null) Destroy(kSol.gameObject);
+                Transform kSag = merdivenGrup.Find("Korkuluk_Sag");
+                if (kSag != null) Destroy(kSag.gameObject);
+
+                for (int i = 0; i < merdivenGrup.childCount; i++)
+                {
+                    Transform b = merdivenGrup.GetChild(i);
+                    if (b.name.StartsWith("Basamak_"))
+                    {
+                        Vector3 s = b.localScale;
+                        b.localScale = new Vector3(6.0f, s.y, s.z);
+                    }
+                }
+
+                GameObject rampaObj = new GameObject("Merdiven_PuruzsuzRampa");
+                rampaObj.transform.SetParent(merdivenGrup);
+                rampaObj.transform.position = new Vector3(0f, 1.1f, 25.5f);
+                rampaObj.transform.rotation = Quaternion.Euler(-17.4f, 0f, 0f);
+                BoxCollider rampaCol = rampaObj.AddComponent<BoxCollider>();
+                rampaCol.size = new Vector3(6.0f, 0.15f, 7.4f);
+            }
+        }
     }
 
     void Update()
     {
-        // Minigame açıkken karakter hareket etmez, yerinde sabit durur
         if (Yazlab.Mekanikler.KapiBulmacaPaneli.MinigameAcik)
         {
             if (animator != null && hasIsRunningParam)
@@ -153,17 +214,17 @@ public class KarakterHareket : MonoBehaviour
 
         bool hareketEdiyor = hareketYonu.sqrMagnitude > 0.01f;
 
-        // Karakterin dönüş kontrolü:
+        // Taktiksel Nişancı Dönüş Kontrolü:
+        // Hem 1. Şahıs hem 3. Şahıs (Sağ Omuz Üstü) modunda karakter daima kameranın baktığı nişan yönüne (CurrentYaw) bakar!
+        // Böylece A/D ile sağa-sola yürürken (strafe) karakter yan dönüp ekranın ortasındaki nişangahın önünü ASLA kapatmaz!
+        Quaternion nisanRotasyonu = Quaternion.Euler(0f, KameraTakip.CurrentYaw, 0f);
         if (KameraTakip.IsFirstPerson)
         {
-            // 1. Şahıs modunda (Sağ tık basılıyken) karakter daima kameranın baktığı yatay yöne anında kilitlenir
-            transform.rotation = Quaternion.Euler(0f, KameraTakip.CurrentYaw, 0f);
+            transform.rotation = nisanRotasyonu;
         }
-        else if (hareketEdiyor)
+        else
         {
-            // 3. Şahıs modunda hareket ettiği yöne doğru yumuşakça dönsün
-            Quaternion hedefRotasyon = Quaternion.LookRotation(hareketYonu);
-            transform.rotation = Quaternion.Slerp(transform.rotation, hedefRotasyon, Time.deltaTime * donusHizi);
+            transform.rotation = Quaternion.Slerp(transform.rotation, nisanRotasyonu, Time.deltaTime * donusHizi);
         }
 
         // Zıplama ve yerçekimi kontrolü
@@ -181,12 +242,10 @@ public class KarakterHareket : MonoBehaviour
             dikeyHiz -= yercekimi * Time.deltaTime;
         }
 
-        // Hareketi uygula (Eğilirken daha yavaş ve dikkatli ilerler)
         float aktifHiz = EgiliyorMu ? egilmeHizi : hiz;
         Vector3 toplamHareket = (hareketYonu * aktifHiz) + (Vector3.up * dikeyHiz);
         controller.Move(toplamHareket * Time.deltaTime);
 
-        // Animasyon durumunu güncelle
         AnimasyonGuncelle(hareketEdiyor, controller.isGrounded);
     }
 
