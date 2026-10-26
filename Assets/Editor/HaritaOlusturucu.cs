@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine.AI;
@@ -10,9 +10,14 @@ using Yazlab.Etkilesim;
 namespace Yazlab.Editor
 {
     /// <summary>
-    /// Taktiksel İstihbarat Operasyonu senaryosuna uygun yuvarlak kale / şato
-    /// yıkıntısı haritasını (surlar, siperler, şalter konsolu, savunma tareti,
-    /// NPC kulesi ve çıkış kapısı) otomatik oluşturan ve NavMesh bake eden editör aracı.
+    /// Taktiksel İstihbarat Operasyonu senaryosuna uygun 3 Bölümlü & Ayrı Odalı Kale Haritası:
+    /// - 1. BÖLÜM (Kale Dışı & Hendek): Oyuncu ve Yardımcı Karakter kalenin dışında başlar.
+    ///   Kalenin önündeki derin su hendeğini (Moat) geçmek için Eşzamanlı 2 Anahtarlı Co-op mekanizmasıyla
+    ///   Askı Kapı (Asma Köprü) indirilir.
+    /// - 2. BÖLÜM (İç Avlu, Ayrı Kablo/Şalter Odası ve Taret Odası): Eğilme (C/Ctrl) siperleri,
+    ///   duvarlarla ayrılmış Elektrik & Kablo Kontrol Odası (KapiBulmacaPaneli) ve Kilitli Taret Odası.
+    /// - 3. BÖLÜM (Gerçek Çok Katlı İç Kule / Keep & LLM NPC Muhafız Odası): Taş merdivenler,
+    ///   köşe burçlu gerçek kule mimarisi, 2. kat muhafız odası ve çıkış kapısı.
     /// </summary>
     public class HaritaOlusturucu : EditorWindow
     {
@@ -21,18 +26,19 @@ namespace Yazlab.Editor
         {
             if (EditorApplication.isPlaying)
             {
-                EditorUtility.DisplayDialog("Uyari: Oyun Calisiyor!", "Oyun su anda Play modunda calisiyor! Lutfen once ustteki Play butonuna basarak oyunu durdurun, ardindan haritayi olusturun.", "Tamam");
+                EditorUtility.DisplayDialog("Uyari: Oyun Calisiyor!",
+                    "Oyun su anda Play modunda calisiyor! Lutfen once ustteki Play butonuna basarak oyunu durdurun, ardindan haritayi olusturun.",
+                    "Tamam");
                 return;
             }
-            if (!Application.isBatchMode && !EditorUtility.DisplayDialog("Taktiksel İstihbarat Haritası", 
-                "Taktiksel İstihbarat Operasyonu senaryosuna uygun Yuvarlak Kale & Yıkıntı Haritası inşa edilecek:\n\n" +
-                "• Yuvarlak Dış Surlar ve Yıkık Kuleler\n" +
-                "• Siper Hendekleri, Kum Torbaları, Sandıklar ve İlk Siperdeki Elektrik Şalter Konsolu\n" +
-                "• Fiziksel Engel: Kilitli Depo Kapısı + Kapı Arkasında Canlı & Ateş Eden Otomatik Savunma Tareti\n" +
-                "• Sosyal Engel: Yarı Yıkık Kule, 8 Kademeli Taş Merdivenler, Rüşvetçi NPC Muhafız Odası ve Çıkış Kapısı\n" +
-                "• Otomatik Karakterler (Oyuncu, Müttefik Yoldaş Asker, NPC Muhafız) & 3. Şahıs Kamera Kurulumu\n" +
-                "• Otomatik NavMesh Taraması (Bake)\n\n" +
-                "Devam edilsin mi?", 
+
+            if (!Application.isBatchMode && !EditorUtility.DisplayDialog("3 Bölümlü Taktiksel Kale Haritası",
+                "Taktiksel İstihbarat Operasyonu 3 Bölümlü Kale & Şato Haritası inşa edilecek:\n\n" +
+                "• 1. BÖLÜM (Kale Dışı & Hendek): Derin su hendeği, Askı Kapı (Asma Köprü) ve Yardımcı Karakterle Eşzamanlı 2 Anahtar Kurgusu ([G] + [E])\n" +
+                "• 2. BÖLÜM (Ayrı Odalar & Taret): Eğilme ([C]/[Ctrl]) siperleri, bağımsız Kablo & Şalter Odası ve Otomatik Savunma Tareti Odası\n" +
+                "• 3. BÖLÜM (Gerçek Kale Kulesi & NPC): Köşe sütunlu, mazgallı 2 katlı İç Kule, taş merdivenler ve LLM NPC Muhafız Odası\n" +
+                "• Prosedürel Örme Taş, Ahşap Kalas, Paslı Metal ve Su Kaplamaları\n\n" +
+                "Devam edilsin mi?",
                 "Evet, Oluştur", "İptal"))
             {
                 return;
@@ -42,23 +48,25 @@ namespace Yazlab.Editor
 
             if (!Application.isBatchMode)
             {
-                EditorUtility.DisplayDialog("Operasyon Haritası Hazır!", 
-                    "Taktiksel İstihbarat Operasyonu Yuvarlak Kale Haritası başarıyla inşa edildi!\n\n" +
-                    "✓ Yuvarlak dış taş surlar ve yıkık burçlar yerleştirildi.\n" +
-                    "✓ İlk siperin yanına Elektrik Şalter Konsolu yerleştirildi.\n" +
-                    "✓ Kilitli Depo Kapısının ardında aktif, çift namlulu Otomatik Savunma Tareti konuşlandırıldı.\n" +
-                    "✓ Şalter açıldığında kapı açılır ve taret hedefe kilitlenip ateş eder.\n" +
-                    "✓ Kuzeydeki yarı yıkık kule, kademeli taş merdivenler ve 2. kat platformu inşa edildi.\n" +
-                    "✓ Rüşvetçi NPC Muhafız odası, çıkış kapısı ve tetikleyiciler hazırlandı.\n" +
-                    "✓ Oyuncu, Yoldaş ve NPC Muhafız yerleştirildi, animatör ve 3. şahıs kamera bağlandı.\n" +
-                    "✓ NavMesh tüm zemin, siperler ve merdivenler için başarıyla Bake edildi!\n\n" +
-                    "Şimdi Play (▶) tuşuna basarak taktiksel operasyona başlayabilirsiniz!", "Harika!");
+                EditorUtility.DisplayDialog("3 Bölümlü Kale Haritası Hazır!",
+                    "3 Bölümlü Taktiksel Kale Haritası ve Prosedürel Kaplamalar başarıyla inşa edildi!\n\n" +
+                    "✓ 1. BÖLÜM: Kale dışı başlangıç alanı, Hendek (Moat), Eşzamanlı 2 Anahtar Sütunu ([G] + [E]) ve Askı Kapı (Asma Köprü) kuruldu.\n" +
+                    "✓ 2. BÖLÜM: Ayrı Kablo & Şalter Odası, Eğilme ([C]/[Ctrl]) siperleri ve Taret Savunma Odası birbirinden duvarlarla ayrıldı.\n" +
+                    "✓ 3. BÖLÜM: Çok katlı gerçek İç Kule (Keep), 8 basamaklı taş merdiven ve 2. kat NPC Muhafız Odası inşa edildi.\n" +
+                    "✓ Örme taş, ahşap kalas, paslı metal ve su kaplamaları tüm yüzeylere uygulandı.\n\n" +
+                    "Şimdi Play (▶) tuşuna basarak 1. Bölümden (Kale Dışından) operasyona başlayabilirsiniz!", "Harika!");
             }
         }
 
         [MenuItem("Tools/YazLab/2. Karakterleri ve Animasyonları Sahneye Ekle (Otomatik)")]
         public static void KarakterleriSahneyeKurMenu()
         {
+            if (EditorApplication.isPlaying)
+            {
+                EditorUtility.DisplayDialog("Uyari", "Lutfen once Play modunu durdurun.", "Tamam");
+                return;
+            }
+
             KarakterleriSahneyeKur();
             var scene = EditorSceneManager.GetActiveScene();
             EditorSceneManager.MarkSceneDirty(scene);
@@ -66,8 +74,8 @@ namespace Yazlab.Editor
 
             if (!Application.isBatchMode)
             {
-                EditorUtility.DisplayDialog("Başarılı", 
-                    "Oyuncu, Yoldaş ve NPC Muhafız karakterleri animasyonlarıyla birlikte sahneye eklendi ve 3. şahıs kamera bağlandı!\n\nŞimdi Play (▶) tuşuna basıp test edebilirsiniz.", 
+                EditorUtility.DisplayDialog("Başarılı",
+                    "Oyuncu, Yoldaş ve NPC Muhafız karakterleri animasyonlarıyla birlikte sahneye eklendi ve 3. şahıs kamera bağlandı!",
                     "Tamam");
             }
         }
@@ -75,6 +83,8 @@ namespace Yazlab.Editor
         [MenuItem("Tools/YazLab/3. Her İki Sahneyi de Tam Otomatik İnşa Et ve NavMesh Bake Et")]
         public static void HerIkiSahneyiOtomatikInsaEt()
         {
+            if (EditorApplication.isPlaying) return;
+
             string[] sahneler = new string[] {
                 "Assets/Scenes/SampleScene.unity",
                 "Assets/Scenes/OyunSeviyesi.unity"
@@ -100,7 +110,6 @@ namespace Yazlab.Editor
                 DestroyImmediate(eskiHarita);
             }
 
-            // Sahnedeki eski düşman askerlerini ve konsol kalıntılarını temizle
             GameObject d1 = GameObject.Find("DusmanAsker_1");
             if (d1 != null) DestroyImmediate(d1);
             GameObject d2 = GameObject.Find("DusmanAsker_2");
@@ -120,41 +129,172 @@ namespace Yazlab.Editor
             Undo.RegisterCreatedObjectUndo(haritaKok, "Harita Olusturuldu");
 
             // ==========================================
-            // MALZEMELER (GERÇEKÇİ KALE & SAVAŞ PALETİ)
+            // MALZEMELER & PROSEDÜREL KAPLAMALAR
             // ==========================================
             Material matToprak = YeniMateryal("Mat_ToprakZemin", new Color(0.36f, 0.31f, 0.24f));
-            Material matTasDuvar = YeniMateryal("Mat_TasDuvar", new Color(0.48f, 0.45f, 0.42f));
-            Material matKoyuTas = YeniMateryal("Mat_KoyuTas", new Color(0.30f, 0.28f, 0.26f));
+            Material matTasDuvar = YeniMateryal("Mat_TasDuvar", new Color(0.52f, 0.49f, 0.45f));
+            Material matKoyuTas = YeniMateryal("Mat_KoyuTas", new Color(0.34f, 0.32f, 0.30f));
             Material matKumTorbasi = YeniMateryal("Mat_KumTorbasi", new Color(0.62f, 0.56f, 0.42f));
-            Material matPasliMetal = YeniMateryal("Mat_PasliMetal", new Color(0.42f, 0.26f, 0.18f));
-            Material matAhsap = YeniMateryal("Mat_Ahsap", new Color(0.46f, 0.33f, 0.20f));
+            Material matPasliMetal = YeniMateryal("Mat_PasliMetal", new Color(0.42f, 0.27f, 0.19f));
+            Material matAhsap = YeniMateryal("Mat_Ahsap", new Color(0.48f, 0.34f, 0.20f));
             Material matAskeriVaril = YeniMateryal("Mat_AskeriVaril", new Color(0.25f, 0.32f, 0.24f));
             Material matNpcKapi = YeniMateryal("Mat_NpcKapi", new Color(0.20f, 0.38f, 0.58f));
             Material matKirmiziTehlike = YeniMateryal("Mat_KirmiziTehlike", new Color(0.85f, 0.15f, 0.10f));
             Material matYesilAktif = YeniMateryal("Mat_YesilAktif", new Color(0.15f, 0.85f, 0.25f));
+            Material matHendekSuyu = YeniMateryal("Mat_HendekSuyu", new Color(0.12f, 0.36f, 0.48f));
+            Material matSariKablo = YeniMateryal("Mat_SariKablo", new Color(0.95f, 0.78f, 0.15f));
 
             // ==========================================
-            // 1. ZEMİN & DÜNYA MERKEZİ
+            // 1. ZEMİN & BÖLÜM 1: KALE DIŞI, HENDEK VE ASKI KAPI (ASMA KÖPRÜ)
             // ==========================================
             Vector3 kaleMerkezi = new Vector3(0f, 0f, 20f);
             float kaleYaricapi = 28f;
 
-            GameObject zeminGrup = new GameObject("1_Zemin_Ve_Cevre");
+            GameObject zeminGrup = new GameObject("1_Bolum1_KaleDisi_Hendek_Ve_AsmaKopru");
             zeminGrup.transform.SetParent(haritaKok.transform);
 
-            // Ana Zemin (Genişlik: 70m, Uzunluk: 75m)
+            // Ana Zemin (Kale dışını da kapsayacak şekilde Z = -36'dan Z = +58'e uzanır)
             GameObject anaZemin = GameObject.CreatePrimitive(PrimitiveType.Cube);
             anaZemin.name = "AnaZemin_Toprak";
             anaZemin.transform.SetParent(zeminGrup.transform);
-            anaZemin.transform.position = new Vector3(0f, -0.5f, 20f);
-            anaZemin.transform.localScale = new Vector3(70f, 1f, 75f);
+            anaZemin.transform.position = new Vector3(0f, -0.5f, 12f);
+            anaZemin.transform.localScale = new Vector3(78f, 1f, 96f);
             anaZemin.GetComponent<MeshRenderer>().sharedMaterial = matToprak;
 
             NavMeshSurface navSurface = anaZemin.AddComponent<NavMeshSurface>();
             navSurface.collectObjects = CollectObjects.All;
 
-                        // ==========================================
-            // 2. YUVARLAK KALE SURLARI (24 SEGMENT - TAMAMEN KAPALI & MAZGALLI)
+            // Kale Dışı Başlangıç Alanı Çevre Duvarları (Oyuncu dışarıda doğduğunda harita dışına çıkmasın)
+            KutuOlustur("KaleDisi_SolKayalikDuvar", new Vector3(-16f, 2.5f, -19f), new Vector3(2.0f, 5.0f, 22f), matKoyuTas, zeminGrup.transform);
+            KutuOlustur("KaleDisi_SagKayalikDuvar", new Vector3(16f, 2.5f, -19f), new Vector3(2.0f, 5.0f, 22f), matKoyuTas, zeminGrup.transform);
+            KutuOlustur("KaleDisi_ArkaSinirDuvari", new Vector3(0f, 2.5f, -29f), new Vector3(34f, 5.0f, 2.0f), matKoyuTas, zeminGrup.transform);
+
+            // Kale Dışı Taktiksel Başlangıç Kampı Detayları (Sandıklar, Variller, Meşaleler)
+            SandikOlustur("DisKamp_Sandik1", new Vector3(-6.5f, 0.6f, -23f), new Vector3(1.4f, 1.2f, 1.4f), matAhsap, zeminGrup.transform);
+            VarilOlustur("DisKamp_Varil1", new Vector3(6.5f, 0.75f, -23f), matAskeriVaril, zeminGrup.transform);
+            MesaleOlustur("Mesale_DisKamp_Sol", new Vector3(-6.0f, 1.2f, -20f), zeminGrup.transform, matPasliMetal);
+            MesaleOlustur("Mesale_DisKamp_Sag", new Vector3(6.0f, 1.2f, -20f), zeminGrup.transform, matPasliMetal);
+
+            // --- KALE HENDEĞİ (MOAT - Z = -14.5 ile Z = -8.5 arası) ---
+            GameObject hendekGrup = new GameObject("Kale_Hendegi_Moat");
+            hendekGrup.transform.SetParent(zeminGrup.transform);
+
+            // Hendek Taş Kenar Борdürleri
+            KutuOlustur("Hendek_OnTasKenar", new Vector3(-9.5f, 0.18f, -14.8f), new Vector3(13f, 0.36f, 0.6f), matKoyuTas, hendekGrup.transform);
+            KutuOlustur("Hendek_OnTasKenar_Sag", new Vector3(9.5f, 0.18f, -14.8f), new Vector3(13f, 0.36f, 0.6f), matKoyuTas, hendekGrup.transform);
+
+            // Hendek Su Yüzeyi (Dalgalanan su)
+            GameObject hendekSu = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            hendekSu.name = "Hendek_Suyu";
+            hendekSu.transform.SetParent(hendekGrup.transform);
+            hendekSu.transform.position = new Vector3(0f, -0.02f, -11.6f);
+            hendekSu.transform.localScale = new Vector3(30f, 0.12f, 6.2f);
+            hendekSu.GetComponent<MeshRenderer>().sharedMaterial = matHendekSuyu;
+            hendekSu.AddComponent<HendekSuyuDalgalanma>();
+
+            // Köprü kapalıyken hendeğe düşülmesini / yürünmesini engelleyen görünmez bariyer
+            // (Askı kapı indiğinde AsmaKopruKontrol tarafından devre dışı bırakılır!)
+            GameObject hendekEngelObj = new GameObject("Hendek_Gecis_Engeli");
+            hendekEngelObj.transform.SetParent(hendekGrup.transform);
+            hendekEngelObj.transform.position = new Vector3(0f, 2.0f, -11.6f);
+            BoxCollider hendekOrtaEngel = hendekEngelObj.AddComponent<BoxCollider>();
+            hendekOrtaEngel.size = new Vector3(7.0f, 4.5f, 5.8f);
+
+            // Köprünün sol ve sağındaki açık hendek suyuna hiçbir zaman düşülmemesi için kalıcı yan su bariyerleri
+            GameObject solSuEngel = new GameObject("Hendek_SolSuSiniri");
+            solSuEngel.transform.SetParent(hendekGrup.transform);
+            solSuEngel.transform.position = new Vector3(-9.8f, 2.0f, -11.6f);
+            solSuEngel.AddComponent<BoxCollider>().size = new Vector3(12.5f, 4.5f, 6.2f);
+
+            GameObject sagSuEngel = new GameObject("Hendek_SagSuSiniri");
+            sagSuEngel.transform.SetParent(hendekGrup.transform);
+            sagSuEngel.transform.position = new Vector3(9.8f, 2.0f, -11.6f);
+            sagSuEngel.AddComponent<BoxCollider>().size = new Vector3(12.5f, 4.5f, 6.2f);
+
+            // --- ASKI KAPI / ASMA KÖPRÜ (DRAWBRIDGE - Z = -8.6) ---
+            GameObject asmaKopruKok = new GameObject("Asma_Kopru_Sistemi");
+            asmaKopruKok.transform.SetParent(zeminGrup.transform);
+            asmaKopruKok.transform.position = new Vector3(0f, 0.08f, -8.6f);
+
+            // Köprü Menteşesi (Pivot: Z = -8.6'da, açıkken -Z yönüne doğru hendeğin üstünü kapatır)
+            GameObject kopruMentese = new GameObject("Kopru_Mentese_Pivot");
+            kopruMentese.transform.SetParent(asmaKopruKok.transform);
+            kopruMentese.transform.localPosition = Vector3.zero;
+
+            // Ahşap Köprü Gövdesi (Uzunluk: 6.4m, Genişlik: 5.2m)
+            GameObject kopruGovde = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            kopruGovde.name = "AsmaKopru_AhsapGovde";
+            kopruGovde.transform.SetParent(kopruMentese.transform);
+            kopruGovde.transform.localPosition = new Vector3(0f, 0f, -3.2f);
+            kopruGovde.transform.localScale = new Vector3(5.2f, 0.28f, 6.4f);
+            kopruGovde.GetComponent<MeshRenderer>().sharedMaterial = matAhsap;
+
+            // Köprü Yan Demir Kuşakları ve Korkulukları
+            KutuOlustur("Kopru_SolDemirKusak", kopruMentese.transform.position + new Vector3(-2.45f, 0.25f, -3.2f), new Vector3(0.22f, 0.35f, 6.4f), matPasliMetal, kopruMentese.transform);
+            KutuOlustur("Kopru_SagDemirKusak", kopruMentese.transform.position + new Vector3(2.45f, 0.25f, -3.2f), new Vector3(0.22f, 0.35f, 6.4f), matPasliMetal, kopruMentese.transform);
+
+            // Zincir Makaraları (Giriş kulesi kirişinde)
+            GameObject solMakara = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            solMakara.name = "Sol_Zincir_Makarasi";
+            solMakara.transform.SetParent(asmaKopruKok.transform);
+            solMakara.transform.localPosition = new Vector3(-2.6f, 5.2f, -0.4f);
+            solMakara.transform.localRotation = Quaternion.Euler(0f, 0f, 90f);
+            solMakara.transform.localScale = new Vector3(0.8f, 0.3f, 0.8f);
+            solMakara.GetComponent<MeshRenderer>().sharedMaterial = matPasliMetal;
+
+            GameObject sagMakara = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            sagMakara.name = "Sag_Zincir_Makarasi";
+            sagMakara.transform.SetParent(asmaKopruKok.transform);
+            sagMakara.transform.localPosition = new Vector3(2.6f, 5.2f, -0.4f);
+            sagMakara.transform.localRotation = Quaternion.Euler(0f, 0f, 90f);
+            sagMakara.transform.localScale = new Vector3(0.8f, 0.3f, 0.8f);
+            sagMakara.GetComponent<MeshRenderer>().sharedMaterial = matPasliMetal;
+
+            AsmaKopruKontrol asmaKopruKontrol = asmaKopruKok.AddComponent<AsmaKopruKontrol>();
+            asmaKopruKontrol.kopruMentese = kopruMentese.transform;
+            asmaKopruKontrol.solMakara = solMakara.transform;
+            asmaKopruKontrol.sagMakara = sagMakara.transform;
+            asmaKopruKontrol.hendekGecisEngeli = hendekOrtaEngel;
+            asmaKopruKontrol.kapaliAciX = -78f;
+            asmaKopruKontrol.acikAciX = 0f;
+
+            // --- EŞZAMANLI 2 ANAHTARLI CO-OP KÖPRÜ KİLİDİ (SOL: OYUNCU [E], SAĞ: YARDIMCI KARAKTER [G]) ---
+            GameObject ciftAnahtarObj = new GameObject("Cift_Anahtarli_Kopru_Kilidi");
+            ciftAnahtarObj.transform.SetParent(zeminGrup.transform);
+
+            // Sol Anahtar Sütunu (X = -5.2, Z = -16.2)
+            GameObject solSutun = KutuOlustur("Sol_Anahtar_Sutunu", new Vector3(-5.2f, 0.9f, -16.2f), new Vector3(0.9f, 1.8f, 0.9f), matKoyuTas, ciftAnahtarObj.transform);
+            GameObject solKol = KutuOlustur("Sol_Anahtar_Kolu", new Vector3(-5.2f, 1.3f, -16.75f), new Vector3(0.18f, 0.65f, 0.18f), matPasliMetal, solSutun.transform);
+            GameObject solIsik = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            solIsik.name = "Sol_Anahtar_Isigi";
+            solIsik.transform.SetParent(solSutun.transform);
+            solIsik.transform.position = new Vector3(-5.2f, 2.0f, -16.2f);
+            solIsik.transform.localScale = new Vector3(0.38f, 0.38f, 0.38f);
+            MeshRenderer solIsikRend = solIsik.GetComponent<MeshRenderer>();
+            solIsikRend.sharedMaterial = new Material(matKirmiziTehlike);
+
+            // Sağ Anahtar Sütunu (X = +5.2, Z = -16.2)
+            GameObject sagSutun = KutuOlustur("Sag_Anahtar_Sutunu", new Vector3(5.2f, 0.9f, -16.2f), new Vector3(0.9f, 1.8f, 0.9f), matKoyuTas, ciftAnahtarObj.transform);
+            GameObject sagKol = KutuOlustur("Sag_Anahtar_Kolu", new Vector3(5.2f, 1.3f, -16.75f), new Vector3(0.18f, 0.65f, 0.18f), matPasliMetal, sagSutun.transform);
+            GameObject sagIsik = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            sagIsik.name = "Sag_Anahtar_Isigi";
+            sagIsik.transform.SetParent(sagSutun.transform);
+            sagIsik.transform.position = new Vector3(5.2f, 2.0f, -16.2f);
+            sagIsik.transform.localScale = new Vector3(0.38f, 0.38f, 0.38f);
+            MeshRenderer sagIsikRend = sagIsik.GetComponent<MeshRenderer>();
+            sagIsikRend.sharedMaterial = new Material(matKirmiziTehlike);
+
+            CiftAnahtarliKopruSistemi ciftAnahtarSistemi = ciftAnahtarObj.AddComponent<CiftAnahtarliKopruSistemi>();
+            ciftAnahtarSistemi.bagliKopru = asmaKopruKontrol;
+            ciftAnahtarSistemi.solAnahtarSutunu = solSutun.transform;
+            ciftAnahtarSistemi.sagAnahtarSutunu = sagSutun.transform;
+            ciftAnahtarSistemi.solAnahtarKolu = solKol.transform;
+            ciftAnahtarSistemi.sagAnahtarKolu = sagKol.transform;
+            ciftAnahtarSistemi.solIsikRenderer = solIsikRend;
+            ciftAnahtarSistemi.sagIsikRenderer = sagIsikRend;
+
+            // ==========================================
+            // 2. YUVARLAK KALE DIŞ SURLARI & GÜNEY GİRİŞ KULESİ (GATEHOUSE)
             // ==========================================
             GameObject surGrup = new GameObject("2_Yuvarlak_Kale_Surlari");
             surGrup.transform.SetParent(haritaKok.transform);
@@ -164,112 +304,99 @@ namespace Yazlab.Editor
 
             for (int i = 0; i < segmentSayisi; i++)
             {
+                // Güney Giriş Kapısı (i == 12, Z = -8) Asma Köprü geçidi için açıktır; iki yanına ikiz giriş burcu dikilir!
+                if (i == 12) continue;
+
                 float aciRad = i * aciAdimi * Mathf.Deg2Rad;
                 float x = kaleMerkezi.x + Mathf.Sin(aciRad) * kaleYaricapi;
                 float z = kaleMerkezi.z + Mathf.Cos(aciRad) * kaleYaricapi;
 
-                // Güney giriş kapısı segmentinde (i == 12) geçişi demir parmaklık ve yüksek kemerle tamamen kapatıyoruz
-                if (i == 12)
-                {
-                    GameObject guneyKapiDuvar = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                    guneyKapiDuvar.name = "GuneyDisSur_KapaliBariyer";
-                    guneyKapiDuvar.transform.SetParent(surGrup.transform);
-                    guneyKapiDuvar.transform.position = new Vector3(x, 4.0f, z);
-                    guneyKapiDuvar.transform.localScale = new Vector3(8.0f, 8.0f, 2.5f);
-                    guneyKapiDuvar.transform.rotation = Quaternion.Euler(0f, i * aciAdimi + 90f, 0f);
-                    guneyKapiDuvar.GetComponent<MeshRenderer>().sharedMaterial = matTasDuvar;
-                    continue;
-                }
-
-                bool yikikSegment = (i == 4 || i == 18);
-                float surYuksekligi = yikikSegment ? 3.5f : 7.5f;
-                Vector3 surScale = new Vector3(7.6f, surYuksekligi, 2.2f);
+                float surYuksekligi = 8.0f;
+                Vector3 surScale = new Vector3(7.6f, surYuksekligi, 2.4f);
                 Vector3 surPos = new Vector3(x, surYuksekligi / 2f, z);
 
                 GameObject surParcasi = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                surParcasi.name = $"SurSegment_{i}" + (yikikSegment ? "_Yikik" : "");
+                surParcasi.name = $"SurSegment_{i}";
                 surParcasi.transform.SetParent(surGrup.transform);
                 surParcasi.transform.position = surPos;
+                surParcasi.transform.localScale = surScale;
                 surParcasi.transform.rotation = Quaternion.Euler(0f, i * aciAdimi + 90f, 0f);
                 surParcasi.GetComponent<MeshRenderer>().sharedMaterial = matTasDuvar;
 
-                // Sur üstü savunma mazgalları (Crenellations) - Gerçekçi kale suru görünümü
-                if (!yikikSegment)
+                // Sur üstü savunma mazgalları (Crenellations)
+                for (int m = -2; m <= 2; m += 2)
                 {
-                    for (int m = -2; m <= 2; m += 2)
-                    {
-                        GameObject mazgal = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                        mazgal.name = $"Mazgal_{i}_{m}";
-                        mazgal.transform.SetParent(surParcasi.transform);
-                        mazgal.transform.localPosition = new Vector3(m * 0.22f, 0.58f, 0f);
-                        mazgal.transform.localScale = new Vector3(0.18f, 0.18f, 0.95f);
-                        mazgal.GetComponent<MeshRenderer>().sharedMaterial = matTasDuvar;
-                    }
-                }
-
-                if (yikikSegment)
-                {
-                    MolozYiginiOlustur($"Moloz_{i}", surPos - Vector3.up * 1f, matKoyuTas, surGrup.transform);
-                    // Dışarıya düşülmesin diye görünmez sınır bariyeri
-                    GameObject sinirEngel = new GameObject($"SinirKalkan_{i}");
-                    sinirEngel.transform.SetParent(surGrup.transform);
-                    sinirEngel.transform.position = surPos + Vector3.up * 3f;
-                    BoxCollider sc = sinirEngel.AddComponent<BoxCollider>();
-                    sc.size = new Vector3(8f, 10f, 3f);
+                    GameObject mazgal = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                    mazgal.name = $"Mazgal_{i}_{m}";
+                    mazgal.transform.SetParent(surParcasi.transform);
+                    mazgal.transform.localPosition = new Vector3(m * 0.22f, 0.58f, 0f);
+                    mazgal.transform.localScale = new Vector3(0.18f, 0.18f, 0.95f);
+                    mazgal.GetComponent<MeshRenderer>().sharedMaterial = matKoyuTas;
                 }
             }
 
-            // Dış Köşe Gözetleme Burçları (Bastions) & Üstlerine Hareketli Dinamik Ekipmanlar
-            BurcOlustur("KuzeyBurcu", new Vector3(0f, 0f, 48f), 5.0f, 9f, matTasDuvar, surGrup.transform);
-            BurcOlustur("DoguBurcu", new Vector3(27f, 0f, 20f), 4.5f, 8f, matTasDuvar, surGrup.transform);
-            BurcOlustur("BatiBurcu", new Vector3(-27f, 0f, 20f), 4.5f, 8f, matTasDuvar, surGrup.transform);
-            BurcOlustur("GuneyGozetlemeBurcu", new Vector3(12f, 0f, -8f), 3.8f, 7.5f, matTasDuvar, surGrup.transform);
+            // Güney Ana Giriş İkiz Kuleleri (Gatehouse Towers) ve Üst Kemeri
+            BurcOlustur("GuneyGirisKulesi_Sol", new Vector3(-4.6f, 0f, -8.2f), 2.4f, 10.5f, matKoyuTas, surGrup.transform);
+            BurcOlustur("GuneyGirisKulesi_Sag", new Vector3(4.6f, 0f, -8.2f), 2.4f, 10.5f, matKoyuTas, surGrup.transform);
+            KutuOlustur("GuneyGiris_UstKemer", new Vector3(0f, 7.2f, -8.2f), new Vector3(9.2f, 3.2f, 3.0f), matTasDuvar, surGrup.transform);
+            BayrakDiregiOlustur("GirisKulesi_SolSancak", new Vector3(-4.6f, 10.5f, -8.2f), surGrup.transform, matAhsap, matKirmiziTehlike);
+            BayrakDiregiOlustur("GirisKulesi_SagSancak", new Vector3(4.6f, 10.5f, -8.2f), surGrup.transform, matAhsap, matKirmiziTehlike);
 
-            // Burçların Üstüne Hareketli Güvenlik Projektörleri ve Titreyen Meşaleler
-            ProjektorKulesiOlustur("KuzeyProjektoru", new Vector3(0f, 9.2f, 48f), 180f, surGrup.transform, matPasliMetal);
-            ProjektorKulesiOlustur("DoguProjektoru", new Vector3(27f, 8.2f, 20f), 270f, surGrup.transform, matPasliMetal);
-            MesaleOlustur("Mesale_BatiBurcu", new Vector3(-27f, 8.2f, 20f), surGrup.transform, matPasliMetal);
-            MesaleOlustur("Mesale_Giris_Sol", new Vector3(-4.5f, 5.0f, -6.5f), surGrup.transform, matPasliMetal);
-            MesaleOlustur("Mesale_Giris_Sag", new Vector3(4.5f, 5.0f, -6.5f), surGrup.transform, matPasliMetal);
+            // Dış Köşe Gözetleme Burçları & Dinamik Ekipmanlar
+            BurcOlustur("KuzeyBurcu", new Vector3(0f, 0f, 48f), 5.0f, 10f, matKoyuTas, surGrup.transform);
+            BurcOlustur("DoguBurcu", new Vector3(27f, 0f, 20f), 4.5f, 9f, matKoyuTas, surGrup.transform);
+            BurcOlustur("BatiBurcu", new Vector3(-27f, 0f, 20f), 4.5f, 9f, matKoyuTas, surGrup.transform);
 
-            // ==========================================
-            // 3. BÖLGE 1: GÜNEY GİRİŞ & SİPERLER (Z = -10 ile 10)
-            // ==========================================
-            GameObject bolge1 = new GameObject("3_Bolge1_Giris_Ve_Siperler");
-            bolge1.transform.SetParent(haritaKok.transform);
-
-            // Büyük Taş Giriş Kemeri Sütunları
-            KutuOlustur("GirisKapisi_SolSutun", new Vector3(-4.0f, 3.5f, -8f), new Vector3(2.0f, 7.0f, 2.5f), matTasDuvar, bolge1.transform);
-            KutuOlustur("GirisKapisi_SagSutun", new Vector3(4.0f, 3.5f, -8f), new Vector3(2.0f, 7.0f, 2.5f), matTasDuvar, bolge1.transform);
-            KutuOlustur("GirisKapisi_Kiris", new Vector3(0f, 6.5f, -8f), new Vector3(10.0f, 1.5f, 2.5f), matTasDuvar, bolge1.transform);
-
-            // Taktiksel Siper Duvarları (Zikzak hatlar)
-            KutuOlustur("Siper_Sol_1", new Vector3(-5.5f, 0.75f, -2f), new Vector3(4.0f, 1.5f, 0.8f), matTasDuvar, bolge1.transform);
-            KutuOlustur("Siper_Sag_1", new Vector3(5.0f, 0.75f, 0f), new Vector3(4.5f, 1.5f, 0.8f), matTasDuvar, bolge1.transform);
-            KutuOlustur("Siper_Orta_2", new Vector3(-1.0f, 0.75f, 5f), new Vector3(5.0f, 1.5f, 0.8f), matTasDuvar, bolge1.transform);
-
-            // Kum Torbası Barikatları
-            KumTorbasiSirasi("KumTorbasi_Sol", new Vector3(-5.5f, 0.4f, -1.2f), 4, matKumTorbasi, bolge1.transform);
-            KumTorbasiSirasi("KumTorbasi_Sag", new Vector3(5.0f, 0.4f, 0.8f), 4, matKumTorbasi, bolge1.transform);
-            KumTorbasiSirasi("KumTorbasi_Orta", new Vector3(-1.0f, 0.4f, 5.8f), 5, matKumTorbasi, bolge1.transform);
-
-            // Ahşap Sandıklar ve Askeri Variller
-            SandikOlustur("Sandik_1", new Vector3(-7.5f, 0.6f, -2.5f), new Vector3(1.3f, 1.2f, 1.3f), matAhsap, bolge1.transform);
-            SandikOlustur("Sandik_2", new Vector3(-7.5f, 0.5f, -1.2f), new Vector3(1.1f, 1.0f, 1.1f), matAhsap, bolge1.transform);
-            VarilOlustur("Varil_1", new Vector3(7.2f, 0.75f, 0.5f), matAskeriVaril, bolge1.transform);
-            VarilOlustur("Varil_2", new Vector3(7.8f, 0.75f, 1.2f), matAskeriVaril, bolge1.transform);
+            ProjektorKulesiOlustur("KuzeyProjektoru", new Vector3(0f, 10.2f, 48f), 180f, surGrup.transform, matPasliMetal);
+            ProjektorKulesiOlustur("DoguProjektoru", new Vector3(27f, 9.2f, 20f), 270f, surGrup.transform, matPasliMetal);
+            MesaleOlustur("Mesale_BatiBurcu", new Vector3(-27f, 9.2f, 20f), surGrup.transform, matPasliMetal);
+            MesaleOlustur("Mesale_Giris_Sol", new Vector3(-3.2f, 4.2f, -9.8f), surGrup.transform, matPasliMetal);
+            MesaleOlustur("Mesale_Giris_Sag", new Vector3(3.2f, 4.2f, -9.8f), surGrup.transform, matPasliMetal);
 
             // ==========================================
-            // 4. BÖLGE 2: FİZİKSEL ENGEL - KİLİTLİ DEPO, TARET & GÜÇ JENERATÖRÜ (Z = 12 ile 22)
+            // 3. BÖLÜM 2 (ODA 1 & ODA 2): İÇ AVLU, BAĞIMSIZ KABLO ODASI VE TARET ODASI
             // ==========================================
-            GameObject bolge2 = new GameObject("4_Bolge2_Depo_Taret_Ve_Jenerator");
+            GameObject bolge2 = new GameObject("3_Bolum2_Avlu_KabloOdasi_Ve_TaretOdasi");
             bolge2.transform.SetParent(haritaKok.transform);
 
-            // İç Avlu Bölme Duvarı
-            KutuOlustur("DepoDuvar_Sol", new Vector3(-11.5f, 2.5f, 14f), new Vector3(17f, 5f, 1.5f), matTasDuvar, bolge2.transform);
-            KutuOlustur("DepoDuvar_Sag", new Vector3(10.5f, 2.5f, 14f), new Vector3(13f, 5f, 1.5f), matTasDuvar, bolge2.transform);
+            // --- ODA 1: SİPERLİ GİRİŞ AVLUSU (Eğilme [C]/[Ctrl] ile tam gizlilik sağlayan 1.25m siperler) ---
+            KutuOlustur("Siper_Sol_1", new Vector3(-4.5f, 0.62f, -2.0f), new Vector3(4.2f, 1.25f, 0.9f), matKoyuTas, bolge2.transform);
+            KutuOlustur("Siper_Sag_1", new Vector3(4.8f, 0.62f, 0.5f), new Vector3(4.5f, 1.25f, 0.9f), matKoyuTas, bolge2.transform);
+            KutuOlustur("Siper_Orta_2", new Vector3(-0.5f, 0.62f, 5.5f), new Vector3(5.2f, 1.25f, 0.9f), matKoyuTas, bolge2.transform);
+            KutuOlustur("Siper_Ileri_Sol", new Vector3(-5.0f, 0.62f, 9.5f), new Vector3(4.0f, 1.25f, 0.9f), matKoyuTas, bolge2.transform);
+            KutuOlustur("Siper_Ileri_Sag", new Vector3(5.0f, 0.62f, 9.5f), new Vector3(4.0f, 1.25f, 0.9f), matKoyuTas, bolge2.transform);
 
-            // Kilitli Depo Kapısı (Otomatik yukarı kayan paslı çelik kapı)
+            KumTorbasiSirasi("KumTorbasi_Sol", new Vector3(-6.0f, 0.4f, -1.2f), 4, matKumTorbasi, bolge2.transform);
+            KumTorbasiSirasi("KumTorbasi_Sag", new Vector3(3.5f, 0.4f, 1.3f), 4, matKumTorbasi, bolge2.transform);
+            KumTorbasiSirasi("KumTorbasi_Orta", new Vector3(-2.2f, 0.4f, 6.3f), 5, matKumTorbasi, bolge2.transform);
+
+            // --- BAĞIMSIZ KABLO & ŞALTER ODASI (Sol Avluda Duvarlarla ve Çatıyla Ayrılmış Oda: X = -17 ile -8, Z = -1 ile +9) ---
+            GameObject kabloOdasi = new GameObject("Kablo_Ve_Salter_Odasi");
+            kabloOdasi.transform.SetParent(bolge2.transform);
+
+            KutuOlustur("KabloOdasi_ArkaDuvar", new Vector3(-16.5f, 2.2f, 4.0f), new Vector3(0.8f, 4.4f, 10.0f), matTasDuvar, kabloOdasi.transform);
+            KutuOlustur("KabloOdasi_GuneyDuvar", new Vector3(-12.5f, 2.2f, -0.8f), new Vector3(8.5f, 4.4f, 0.8f), matTasDuvar, kabloOdasi.transform);
+            KutuOlustur("KabloOdasi_KuzeyDuvar", new Vector3(-12.5f, 2.2f, 8.8f), new Vector3(8.5f, 4.4f, 0.8f), matTasDuvar, kabloOdasi.transform);
+            // Doğu ön cephe duvarları (Ortada 3.2m genişliğinde oda giriş kapısı boşluğu bırakır)
+            KutuOlustur("KabloOdasi_OnDuvar_Alt", new Vector3(-8.5f, 2.2f, 0.8f), new Vector3(0.8f, 4.4f, 3.2f), matTasDuvar, kabloOdasi.transform);
+            KutuOlustur("KabloOdasi_OnDuvar_Ust", new Vector3(-8.5f, 2.2f, 7.2f), new Vector3(0.8f, 4.4f, 3.2f), matTasDuvar, kabloOdasi.transform);
+            KutuOlustur("KabloOdasi_KapiKirisi", new Vector3(-8.5f, 3.8f, 4.0f), new Vector3(0.9f, 1.2f, 3.4f), matKoyuTas, kabloOdasi.transform);
+            KutuOlustur("KabloOdasi_Tavan", new Vector3(-12.5f, 4.5f, 4.0f), new Vector3(8.8f, 0.4f, 10.2f), matKoyuTas, kabloOdasi.transform);
+
+            // Oda içi aydınlatma
+            MesaleOlustur("KabloOdasi_IcLamba", new Vector3(-15.5f, 2.6f, 4.0f), kabloOdasi.transform, matPasliMetal);
+
+            // Kablo Odasından Kilitli Taret Kapısına Uzanan Görsel Güç Kablosu Hatları
+            KutuOlustur("GucKablosu_1", new Vector3(-12.0f, 0.08f, 4.0f), new Vector3(6.5f, 0.12f, 0.18f), matSariKablo, kabloOdasi.transform);
+            KutuOlustur("GucKablosu_2", new Vector3(-8.8f, 0.08f, 9.0f), new Vector3(0.18f, 0.12f, 10.0f), matSariKablo, kabloOdasi.transform);
+            KutuOlustur("GucKablosu_3", new Vector3(-4.4f, 0.08f, 13.8f), new Vector3(9.0f, 0.12f, 0.18f), matSariKablo, kabloOdasi.transform);
+
+            // --- ODA 2 (TARET ODASI) İLE ODA 1 ARASINDAKİ BÖLME DUVARI VE KİLİTLİ KAPI (Z = 14) ---
+            KutuOlustur("DepoDuvar_Sol", new Vector3(-14.5f, 3.0f, 14f), new Vector3(23f, 6.0f, 1.5f), matTasDuvar, bolge2.transform);
+            KutuOlustur("DepoDuvar_Sag", new Vector3(11.5f, 3.0f, 14f), new Vector3(17f, 6.0f, 1.5f), matTasDuvar, bolge2.transform);
+            KutuOlustur("DepoKapi_UstKemer", new Vector3(0f, 5.0f, 14f), new Vector3(6.4f, 2.0f, 1.7f), matKoyuTas, bolge2.transform);
+
+            // Kilitli Taret Odası Kapısı
             GameObject engelKapiObj = GameObject.CreatePrimitive(PrimitiveType.Cube);
             engelKapiObj.name = "FizikselEngelKapisi";
             engelKapiObj.transform.SetParent(bolge2.transform);
@@ -283,29 +410,25 @@ namespace Yazlab.Editor
 
             KapiKontrol engelKapiKontrol = engelKapiObj.AddComponent<KapiKontrol>();
 
-            // --- ELEKTRİK BULMACA KONSOLU (İLK SİPER ALANINDA - SPAWN YANI) ---
-            // Oyuncu doğduğu anda hemen önündeki sol siperin dibinde şalter konsolu yer alır
+            // --- ELEKTRİK & KABLO BULMACA KONSOLU (Kablo Odasının İçinde: X = -14.2, Z = 4.0) ---
             GameObject konsolObj = new GameObject("ElektrikSalterKonsolu");
-            konsolObj.transform.SetParent(bolge1.transform);
-            konsolObj.transform.position = new Vector3(-3.0f, 0f, -1.5f);
-            konsolObj.transform.rotation = Quaternion.Euler(0f, 180f, 0f);
+            konsolObj.transform.SetParent(kabloOdasi.transform);
+            konsolObj.transform.position = new Vector3(-14.2f, 0f, 4.0f);
+            konsolObj.transform.rotation = Quaternion.Euler(0f, 90f, 0f);
             KapiBulmacaPaneli bulmacaPaneli = konsolObj.AddComponent<KapiBulmacaPaneli>();
             bulmacaPaneli.bagliKapi = engelKapiKontrol;
 
-            // --- OTOMATİK SAVUNMA TARETİ (KAPI ARKASINDAKİ DÜŞMAN TARET) ---
+            // --- OTOMATİK SAVUNMA TARETİ (TARET ODASINDA, Z = 17.5) ---
             GameObject taretKulesi = new GameObject("Otomatik_Taret_Kulesi");
             taretKulesi.transform.SetParent(bolge2.transform);
-            taretKulesi.transform.position = new Vector3(0f, 0f, 16.5f);
+            taretKulesi.transform.position = new Vector3(0f, 0f, 17.5f);
 
-            // Taret Kaidesi (Yükseltilmiş taş platform)
-            KutuOlustur("Taret_Kaide", new Vector3(0f, 1.5f, 16.5f), new Vector3(3.2f, 3f, 3.2f), matKoyuTas, taretKulesi.transform);
+            KutuOlustur("Taret_Kaide", new Vector3(0f, 1.5f, 17.5f), new Vector3(3.2f, 3f, 3.2f), matKoyuTas, taretKulesi.transform);
 
-            // Dönen ve Eğilen Taret Kule Başı
             GameObject kuleBasi = new GameObject("Taret_KuleBasi");
             kuleBasi.transform.SetParent(taretKulesi.transform);
-            kuleBasi.transform.position = new Vector3(0f, 3.2f, 16.5f);
+            kuleBasi.transform.position = new Vector3(0f, 3.2f, 17.5f);
 
-            // Taret Gövdesi (Metal kubbe)
             GameObject taretGovde = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             taretGovde.name = "Taret_Govdesi";
             taretGovde.transform.SetParent(kuleBasi.transform);
@@ -313,7 +436,6 @@ namespace Yazlab.Editor
             taretGovde.transform.localScale = new Vector3(2.0f, 0.5f, 2.0f);
             taretGovde.GetComponent<MeshRenderer>().sharedMaterial = matPasliMetal;
 
-            // Çift Namlu (Geri tepme animasyonu için)
             GameObject namlu1 = GameObject.CreatePrimitive(PrimitiveType.Cube);
             namlu1.name = "Taret_Namlu1";
             namlu1.transform.SetParent(kuleBasi.transform);
@@ -328,7 +450,6 @@ namespace Yazlab.Editor
             namlu2.transform.localScale = new Vector3(0.24f, 0.24f, 2.2f);
             namlu2.GetComponent<MeshRenderer>().sharedMaterial = matPasliMetal;
 
-            // Namlu Uçları
             GameObject ucu1 = new GameObject("NamluUcu");
             ucu1.transform.SetParent(namlu1.transform);
             ucu1.transform.localPosition = new Vector3(0f, 0f, 1.15f);
@@ -337,7 +458,6 @@ namespace Yazlab.Editor
             ucu2.transform.SetParent(namlu2.transform);
             ucu2.transform.localPosition = new Vector3(0f, 0f, 1.15f);
 
-            // Taret Kırmızı Tehdit Sensör Işığı
             GameObject taretIsik = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             taretIsik.name = "Taret_TehditIsigi";
             taretIsik.transform.SetParent(kuleBasi.transform);
@@ -352,12 +472,10 @@ namespace Yazlab.Editor
             pointLight.range = 10f;
             pointLight.intensity = 2.5f;
 
-            // Vurulabilir Collider
             BoxCollider taretCol = taretKulesi.AddComponent<BoxCollider>();
             taretCol.center = new Vector3(0f, 2.2f, 0f);
             taretCol.size = new Vector3(3.6f, 4.4f, 3.6f);
 
-            // Taret Yapay Zeka ve Can Bileşeni (TaretKontrol)
             TaretKontrol tk = taretKulesi.AddComponent<TaretKontrol>();
             tk.kuleBasi = kuleBasi.transform;
             tk.namluSol = namlu1.transform;
@@ -372,23 +490,19 @@ namespace Yazlab.Editor
             tk.atesAraligi = 0.42f;
             tk.recoilMiktari = 0.35f;
 
-            // --- YOLDAŞIN GİZLİ YAN YOLU (DOĞU SURLARI BOYUNCA) ---
+            // --- DOĞU SURLARI BOYUNCA GİZLİ YAN KORİDOR VE YEDEK JENERATÖR ODASI ---
             GameObject yanYol = new GameObject("Yoldas_Gizli_Yan_Yolu");
             yanYol.transform.SetParent(bolge2.transform);
 
-            KutuOlustur("YanYol_SiperDuvar1", new Vector3(18.5f, 1.2f, 9f), new Vector3(1.2f, 2.4f, 8f), matTasDuvar, yanYol.transform);
-            KutuOlustur("YanYol_SiperDuvar2", new Vector3(19f, 1.2f, 17f), new Vector3(1.2f, 2.4f, 6f), matTasDuvar, yanYol.transform);
-            KumTorbasiSirasi("YanYol_KumTorbasi", new Vector3(16.5f, 0.4f, 13f), 4, matKumTorbasi, yanYol.transform);
+            KutuOlustur("YanYol_SiperDuvar1", new Vector3(17.5f, 1.2f, 9f), new Vector3(1.2f, 2.4f, 8f), matTasDuvar, yanYol.transform);
+            KutuOlustur("YanYol_SiperDuvar2", new Vector3(18f, 1.2f, 17f), new Vector3(1.2f, 2.4f, 6f), matTasDuvar, yanYol.transform);
 
-            // --- GÜÇ KAYNAĞI / JENERATÖR & ŞALTER (DOĞU AVLU, Z = 20, X = 19) ---
             GameObject jeneratorObj = new GameObject("Jenerator_Ve_GucKaynagi");
             jeneratorObj.transform.SetParent(bolge2.transform);
             jeneratorObj.transform.position = new Vector3(19.0f, 0f, 20.5f);
 
-            // Jeneratör Gövdesi
             KutuOlustur("Jenerator_Kabin", new Vector3(19.0f, 1.0f, 20.5f), new Vector3(2.2f, 2.0f, 1.6f), matPasliMetal, jeneratorObj.transform);
 
-            // Şalter Kolu
             GameObject salterKol = GameObject.CreatePrimitive(PrimitiveType.Cube);
             salterKol.name = "Salter_Kol";
             salterKol.transform.SetParent(jeneratorObj.transform);
@@ -396,7 +510,6 @@ namespace Yazlab.Editor
             salterKol.transform.localScale = new Vector3(0.2f, 0.6f, 0.2f);
             salterKol.GetComponent<MeshRenderer>().sharedMaterial = matAhsap;
 
-            // Durum Gösterge Işığı
             GameObject durumIsigi = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             durumIsigi.name = "Jenerator_DurumIsigi";
             durumIsigi.transform.SetParent(jeneratorObj.transform);
@@ -405,7 +518,6 @@ namespace Yazlab.Editor
             MeshRenderer durumIsikRend = durumIsigi.GetComponent<MeshRenderer>();
             durumIsikRend.sharedMaterial = matKirmiziTehlike;
 
-            // Şalter Mekanizması Scripti ve Tetikleyicisi
             SphereCollider salterCol = jeneratorObj.AddComponent<SphereCollider>();
             salterCol.isTrigger = true;
             salterCol.radius = 2.2f;
@@ -417,40 +529,63 @@ namespace Yazlab.Editor
             soSalter.FindProperty("durumIsigi").objectReferenceValue = durumIsikRend;
             soSalter.FindProperty("aktifRenk").colorValue = matYesilAktif.color;
             soSalter.FindProperty("pasifRenk").colorValue = matKirmiziTehlike.color;
-            soSalter.FindProperty("tetiklemeYontemi").enumValueIndex = 1; // AlanaGirmece
+            soSalter.FindProperty("tetiklemeYontemi").enumValueIndex = 1;
             soSalter.ApplyModifiedProperties();
 
             // ==========================================
-            // 5. BÖLGE 3: YARI YIKIK MERKEZ KULE, MERDİVENLER & RÜŞVETÇİ NPC MUHAFIZ
+            // 4. BÖLÜM 3 (ODA 3): GERÇEK ÇOK KATLI İÇ KALE KULESİ (KEEP), MERDİVENLER VE NPC ODASI
             // ==========================================
-            GameObject bolge3 = new GameObject("5_Bolge3_YikikKule_Merdivenler_Ve_Npc");
+            GameObject bolge3 = new GameObject("4_Bolum3_IcKaleKulesi_Ve_NpcOdasi");
             bolge3.transform.SetParent(haritaKok.transform);
 
-            Vector3 kuleMerkez = new Vector3(0f, 0f, 34f);
+            // Taret Odası ile İç Kuleyi Ayıran Kemerli Ön Cephe Duvarı (Z = 22.0)
+            KutuOlustur("IcKule_OnDuvar_Sol", new Vector3(-6.2f, 4.5f, 22.0f), new Vector3(6.5f, 9.0f, 1.4f), matTasDuvar, bolge3.transform);
+            KutuOlustur("IcKule_OnDuvar_Sag", new Vector3(6.2f, 4.5f, 22.0f), new Vector3(6.5f, 9.0f, 1.4f), matTasDuvar, bolge3.transform);
+            KutuOlustur("IcKule_OnGiris_UstKemer", new Vector3(0f, 7.2f, 22.0f), new Vector3(6.2f, 3.6f, 1.6f), matKoyuTas, bolge3.transform);
 
-            // Yarı Yıkık Kule Dış Duvarları (Arka tarafı yüksek, önü yıkık)
-                        // Kule Tepesi Radar ve Dalgalanan Bayrak Sistemi (Dinamik Harita)
-            RadarKulesiOlustur("MerkezKule_Radari", new Vector3(0f, 9.5f, 44f), bolge3.transform, matPasliMetal);
-            BayrakDiregiOlustur("MerkezKule_Sancagi", new Vector3(4f, 9.2f, 44f), bolge3.transform, matAhsap, matKirmiziTehlike);
+            // Gerçek Kule Mimarisi: 4 Köşe Silindirik Kule Burcu (Keep Corner Turrets)
+            BurcOlustur("IcKule_Burc_SolOn", new Vector3(-9.2f, 0f, 22.5f), 2.0f, 11.5f, matKoyuTas, bolge3.transform);
+            BurcOlustur("IcKule_Burc_SagOn", new Vector3(9.2f, 0f, 22.5f), 2.0f, 11.5f, matKoyuTas, bolge3.transform);
+            BurcOlustur("IcKule_Burc_SolArka", new Vector3(-9.2f, 0f, 44.0f), 2.2f, 12.5f, matKoyuTas, bolge3.transform);
+            BurcOlustur("IcKule_Burc_SagArka", new Vector3(9.2f, 0f, 44.0f), 2.2f, 12.5f, matKoyuTas, bolge3.transform);
 
-            KutuOlustur("KuleDuvar_Arka", new Vector3(0f, 4.5f, 44f), new Vector3(18f, 9f, 2f), matTasDuvar, bolge3.transform);
-            KutuOlustur("KuleDuvar_Sol", new Vector3(-8.5f, 4.0f, 35f), new Vector3(2f, 8f, 16f), matTasDuvar, bolge3.transform);
-            KutuOlustur("KuleDuvar_Sag", new Vector3(8.5f, 4.0f, 35f), new Vector3(2f, 8f, 16f), matTasDuvar, bolge3.transform);
+            // Kule Tepesi Radar ve Dalgalanan Sancak
+            RadarKulesiOlustur("MerkezKule_Radari", new Vector3(0f, 10.5f, 44f), bolge3.transform, matPasliMetal);
+            BayrakDiregiOlustur("MerkezKule_Sancagi", new Vector3(4.5f, 10.2f, 44f), bolge3.transform, matAhsap, matKirmiziTehlike);
 
-            // 2. Kat Gözetleme & Muhafız Platformu (Yükseklik = 2.4m)
+            // İç Kule Yan ve Arka Duvarları
+            KutuOlustur("KuleDuvar_Arka", new Vector3(0f, 5.0f, 44f), new Vector3(18f, 10f, 2f), matTasDuvar, bolge3.transform);
+            KutuOlustur("KuleDuvar_Sol", new Vector3(-8.8f, 4.8f, 33.2f), new Vector3(1.8f, 9.6f, 22f), matTasDuvar, bolge3.transform);
+            KutuOlustur("KuleDuvar_Sag", new Vector3(8.8f, 4.8f, 33.2f), new Vector3(1.8f, 9.6f, 22f), matTasDuvar, bolge3.transform);
+
+            // Kule Üst Çatı Kemerleri ve Mazgalları (Gerçek bina/şato hissi)
+            KutuOlustur("Kule_UstCatiKirisi_1", new Vector3(0f, 9.4f, 28f), new Vector3(18.5f, 0.8f, 1.5f), matKoyuTas, bolge3.transform);
+            KutuOlustur("Kule_UstCatiKirisi_2", new Vector3(0f, 9.4f, 34f), new Vector3(18.5f, 0.8f, 1.5f), matKoyuTas, bolge3.transform);
+            KutuOlustur("Kule_UstCatiKirisi_3", new Vector3(0f, 9.4f, 40f), new Vector3(18.5f, 0.8f, 1.5f), matKoyuTas, bolge3.transform);
+
+            // 2. Kat Gözetleme & Muhafız Odası Platformu (Yükseklik = 2.2m)
             GameObject ustPlatform = GameObject.CreatePrimitive(PrimitiveType.Cube);
             ustPlatform.name = "Kule_IkinciKat_Platformu";
             ustPlatform.transform.SetParent(bolge3.transform);
-            ustPlatform.transform.position = new Vector3(0f, 2.2f, 36f);
-            ustPlatform.transform.localScale = new Vector3(15f, 0.4f, 14f);
+            ustPlatform.transform.position = new Vector3(0f, 2.2f, 36.5f);
+            ustPlatform.transform.localScale = new Vector3(16.5f, 0.4f, 15f);
             ustPlatform.GetComponent<MeshRenderer>().sharedMaterial = matKoyuTas;
 
-            // Kademeli Taş Merdivenler (Z = 22'den Z = 29'a, Yükseklik = 0'dan 2.2m'ye)
+            // 2. Kat Oda Bölme Duvarları ve Kemerli Kapısı (Merdiven sahanlığı ile NPC odasını ayırır)
+            KutuOlustur("NpcOdasi_BolmeDuvar_Sol", new Vector3(-5.5f, 4.8f, 30.5f), new Vector3(6.0f, 5.0f, 0.9f), matTasDuvar, bolge3.transform);
+            KutuOlustur("NpcOdasi_BolmeDuvar_Sag", new Vector3(5.5f, 4.8f, 30.5f), new Vector3(6.0f, 5.0f, 0.9f), matTasDuvar, bolge3.transform);
+            KutuOlustur("NpcOdasi_KapiKirisi", new Vector3(0f, 6.6f, 30.5f), new Vector3(5.2f, 1.4f, 1.1f), matKoyuTas, bolge3.transform);
+
+            // Kule İçi Meşaleler
+            MesaleOlustur("Kule_IcMesale_Sol", new Vector3(-7.4f, 4.8f, 35f), bolge3.transform, matPasliMetal);
+            MesaleOlustur("Kule_IcMesale_Sag", new Vector3(7.4f, 4.8f, 35f), bolge3.transform, matPasliMetal);
+
+            // Kademeli Taş Merdivenler (Z = 22.5'ten Z = 29.3'e, Yükseklik = 0'dan 2.2m'ye)
             GameObject merdivenGrup = new GameObject("Tas_Merdivenler");
             merdivenGrup.transform.SetParent(bolge3.transform);
 
             int basamakSayisi = 8;
-            float basamakYukseklik = 2.2f / basamakSayisi; // ~0.275m (NavMesh için kusursuz)
+            float basamakYukseklik = 2.2f / basamakSayisi;
             float basamakDerinlik = 0.85f;
             float basamakGenislik = 5.0f;
             float baslangicZ = 22.5f;
@@ -467,15 +602,14 @@ namespace Yazlab.Editor
                 basamak.GetComponent<MeshRenderer>().sharedMaterial = matKoyuTas;
             }
 
-            // Merdiven Korkulukları
             KutuOlustur("Korkuluk_Sol", new Vector3(-2.6f, 1.6f, 25.5f), new Vector3(0.3f, 1.2f, 7.0f), matAhsap, merdivenGrup.transform);
             KutuOlustur("Korkuluk_Sag", new Vector3(2.6f, 1.6f, 25.5f), new Vector3(0.3f, 1.2f, 7.0f), matAhsap, merdivenGrup.transform);
 
-            // Muhafız Barikatı / Nöbetçi Masası
-            KutuOlustur("NobetciMasasi", new Vector3(2.0f, 2.8f, 38.5f), new Vector3(2.4f, 0.8f, 1.0f), matAhsap, bolge3.transform);
-            VarilOlustur("NobetciVarili", new Vector3(3.8f, 3.1f, 38.5f), matAskeriVaril, bolge3.transform);
+            // Muhafız Nöbetçi Masası & Varil
+            KutuOlustur("NobetciMasasi", new Vector3(2.2f, 2.8f, 38.5f), new Vector3(2.4f, 0.8f, 1.0f), matAhsap, bolge3.transform);
+            VarilOlustur("NobetciVarili", new Vector3(4.0f, 3.1f, 38.5f), matAskeriVaril, bolge3.transform);
 
-            // Büyük Çıkış Kapısı (Ollama LLM NPC'nin koruduğu son kapı / asansör geçidi)
+            // Büyük Çıkış Kapısı (Ollama LLM NPC'nin koruduğu son kapı)
             GameObject npcKapiObj = GameObject.CreatePrimitive(PrimitiveType.Cube);
             npcKapiObj.name = "NpcCikisKapisi";
             npcKapiObj.transform.SetParent(bolge3.transform);
@@ -489,7 +623,7 @@ namespace Yazlab.Editor
 
             KapiKontrol npcKapiKontrol = npcKapiObj.AddComponent<KapiKontrol>();
 
-            // NPC Etkileşim Alanı (Muhafız masasının önü)
+            // NPC Etkileşim Alanı
             GameObject npcTriggerObj = new GameObject("NPC_EtkilesimAlani");
             npcTriggerObj.transform.SetParent(bolge3.transform);
             npcTriggerObj.transform.position = new Vector3(0f, 2.5f, 36.5f);
@@ -498,7 +632,7 @@ namespace Yazlab.Editor
             npcTriggerCol.radius = 4.5f;
             AlanTetikleyici npcTetikleyici = npcTriggerObj.AddComponent<AlanTetikleyici>();
 
-            // Bölüm Sonu Zafer Tetikleyicisi (Çıkış kapısının hemen arkası, Z = 46.5)
+            // Bölüm Sonu Zafer Tetikleyicisi
             GameObject cikisAlani = new GameObject("BolumSonu_Tetikleyici");
             cikisAlani.transform.SetParent(bolge3.transform);
             cikisAlani.transform.position = new Vector3(0f, 3.5f, 46.5f);
@@ -508,7 +642,7 @@ namespace Yazlab.Editor
             AlanTetikleyici cikisTetikleyici = cikisAlani.AddComponent<AlanTetikleyici>();
 
             // ==========================================
-            // 6. BÖLÜM YÖNETİCİSİ (BOLUM YONETICISI)
+            // 5. BÖLÜM YÖNETİCİSİ (BOLUM YONETICISI)
             // ==========================================
             GameObject yoneticiObj = GameObject.Find("BolumYoneticisi");
             if (yoneticiObj == null) yoneticiObj = new GameObject("BolumYoneticisi");
@@ -523,7 +657,6 @@ namespace Yazlab.Editor
             soBy.FindProperty("npsCikisKapisi").objectReferenceValue = npcKapiKontrol;
             soBy.ApplyModifiedProperties();
 
-            // NPC alanına girildiğinde yöneticide durumu güncelle
             if (npcTetikleyici != null)
             {
                 if (npcTetikleyici.onAlanaGirildi == null) npcTetikleyici.onAlanaGirildi = new UnityEngine.Events.UnityEvent();
@@ -531,7 +664,6 @@ namespace Yazlab.Editor
                 EditorUtility.SetDirty(npcTetikleyici);
             }
 
-            // Çıkış tetikleyicisini oyunu tamamlamaya bağla
             if (cikisTetikleyici != null)
             {
                 if (cikisTetikleyici.onAlanaGirildi == null) cikisTetikleyici.onAlanaGirildi = new UnityEngine.Events.UnityEvent();
@@ -540,16 +672,20 @@ namespace Yazlab.Editor
             }
 
             // ==========================================
-            // 7. KARAKTERLER & 3. ŞAHIS KAMERA KURULUMU
+            // 6. PROSEDÜREL DOKULARI HEMEN UYGULA
+            // ==========================================
+            ProsedurelDokuUretici.SahnedekiMateryalleriKapla();
+
+            // ==========================================
+            // 7. KARAKTERLER & KAMERA KURULUMU (1. BÖLÜM: KALE DIŞINDAN BAŞLAR!)
             // ==========================================
             KarakterleriSahneyeKur();
 
             // ==========================================
-            // 8. NAVMESH SURFACE BAKE (OTOMATİK TARAMA)
+            // 8. NAVMESH SURFACE BAKE
             // ==========================================
             navSurface.BuildNavMesh();
 
-            // Sahneyi kaydet
             if (!EditorApplication.isPlaying)
             {
                 var activeScene = EditorSceneManager.GetActiveScene();
@@ -573,8 +709,8 @@ namespace Yazlab.Editor
                 return;
             }
 
-            // 1. OYUNCU (İSTİHBARAT AJANI / PİYADE) - Güney Girişinde (Z = -5)
-            Vector3 oyuncuBaslangic = new Vector3(0f, 0.05f, -5.0f);
+            // 1. OYUNCU (Kalenin Dışında, Hendeğin Önünde Başlar: Z = -21.5)
+            Vector3 oyuncuBaslangic = new Vector3(-1.5f, 0.05f, -21.5f);
             KarakterHareket oyuncuHareket = Object.FindAnyObjectByType<KarakterHareket>();
             GameObject oyuncuObj;
             if (oyuncuHareket == null)
@@ -593,6 +729,7 @@ namespace Yazlab.Editor
 
                 oyuncuHareket = oyuncuObj.AddComponent<KarakterHareket>();
                 oyuncuHareket.hiz = 5.5f;
+                oyuncuHareket.egilmeHizi = 2.6f;
                 oyuncuHareket.donusHizi = 12f;
                 oyuncuHareket.ziplamaGucu = 6.5f;
 
@@ -610,6 +747,7 @@ namespace Yazlab.Editor
                 oyuncuObj = oyuncuHareket.gameObject;
                 oyuncuObj.tag = "Player";
                 oyuncuObj.transform.position = oyuncuBaslangic;
+                oyuncuObj.transform.rotation = Quaternion.identity;
                 Animator anim = oyuncuObj.GetComponent<Animator>();
                 if (anim != null)
                 {
@@ -618,7 +756,6 @@ namespace Yazlab.Editor
                 }
             }
 
-            // Oyuncunun silah ve can barı bileşenlerini güvenceye al
             if (oyuncuObj.GetComponent<KarakterAtes>() == null)
             {
                 KarakterAtes ka = oyuncuObj.AddComponent<KarakterAtes>();
@@ -634,8 +771,8 @@ namespace Yazlab.Editor
                 oc.mevcutCan = 100f;
             }
 
-            // 2. YOLDAŞ KARAKTER (TAKIM ARKADAŞI / ARAMA KURTARMA) - Oyuncunun yanında
-            Vector3 yoldasBaslangic = new Vector3(2.2f, 0.05f, -5.0f);
+            // 2. YOLDAŞ KARAKTER (Kalenin Dışında, Oyuncunun Yanında Başlar: Z = -21.5)
+            Vector3 yoldasBaslangic = new Vector3(2.0f, 0.05f, -21.5f);
             YardimciKarakter yoldas = Object.FindAnyObjectByType<YardimciKarakter>();
             if (yoldas == null)
             {
@@ -680,6 +817,7 @@ namespace Yazlab.Editor
             else
             {
                 yoldas.transform.position = yoldasBaslangic;
+                yoldas.transform.rotation = Quaternion.identity;
                 yoldas.hedef = oyuncuObj.transform;
                 Animator anim = yoldas.GetComponent<Animator>();
                 if (anim != null)
@@ -702,7 +840,7 @@ namespace Yazlab.Editor
                 npcMuhafiz = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
                 npcMuhafiz.name = "NPC_Muhafiz";
                 npcMuhafiz.transform.position = npcKonum;
-                npcMuhafiz.transform.rotation = Quaternion.Euler(0f, 180f, 0f); // Merdivenden gelen oyuncuya doğru bakar
+                npcMuhafiz.transform.rotation = Quaternion.Euler(0f, 180f, 0f);
 
                 KarakterHareket kh = npcMuhafiz.GetComponent<KarakterHareket>();
                 if (kh != null) Object.DestroyImmediate(kh);
@@ -737,13 +875,7 @@ namespace Yazlab.Editor
                 }
             }
 
-            // 4. ESKİ DÜŞMAN ASKERLERİNİ KALDIR (Kullanıcı Talebi)
-            GameObject d1 = GameObject.Find("DusmanAsker_1");
-            if (d1 != null) Object.DestroyImmediate(d1);
-            GameObject d2 = GameObject.Find("DusmanAsker_2");
-            if (d2 != null) Object.DestroyImmediate(d2);
-
-            // 5. ANA KAMERA (3. ŞAHIS KAMERA TAKİBİ)
+            // 4. ANA KAMERA (3. ŞAHIS & SAĞ TIK 1. ŞAHIS KAMERA TAKİBİ)
             Camera mainCam = Camera.main;
             if (mainCam != null)
             {
@@ -821,24 +953,6 @@ namespace Yazlab.Editor
             varil.transform.localScale = new Vector3(0.8f, 0.75f, 0.8f);
             varil.GetComponent<MeshRenderer>().sharedMaterial = mat;
             return varil;
-        }
-
-        private static void MolozYiginiOlustur(string isim, Vector3 pos, Material mat, Transform parent)
-        {
-            GameObject molozGrup = new GameObject(isim);
-            molozGrup.transform.SetParent(parent);
-            molozGrup.transform.position = pos;
-
-            for (int k = 0; k < 4; k++)
-            {
-                GameObject tas = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                tas.name = $"Tas_{k + 1}";
-                tas.transform.SetParent(molozGrup.transform);
-                tas.transform.position = pos + new Vector3((k - 1.5f) * 0.7f, 0.3f, (k % 2 - 0.5f) * 0.7f);
-                tas.transform.localScale = new Vector3(0.7f, 0.5f, 0.6f);
-                tas.transform.rotation = Quaternion.Euler(15f * k, 30f * k, 10f * k);
-                tas.GetComponent<MeshRenderer>().sharedMaterial = mat;
-            }
         }
 
         private static Material YeniMateryal(string isim, Color renk)
@@ -971,5 +1085,6 @@ namespace Yazlab.Editor
             flama.GetComponent<MeshRenderer>().sharedMaterial = matKumas;
 
             flama.AddComponent<BayrakDalgalanma>();
-        }    }
+        }
+    }
 }
