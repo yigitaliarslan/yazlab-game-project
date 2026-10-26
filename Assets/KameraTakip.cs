@@ -4,11 +4,13 @@ using UnityEngine.InputSystem;
 #endif
 
 /// <summary>
-/// Hibrit Kamera Kontrolcüsü:
-/// Normalde 3. Şahıs (Third Person) açısından karakteri takip eder.
-/// Fare sağ tıkına basıldığında yumuşakça 1. Şahıs (First Person / Nişan) moduna geçer ve silahı öne getirir.
-/// Sağ tık bırakıldığında tekrar 3. şahıs moduna döner.
-/// Eğilme (Crouch) durumunda göz seviyesini otomatik olarak siper hizasına indirir.
+/// Hibrit Taktiksel Kamera Kontrolcüsü:
+/// - 3. Şahıs (Third Person) modunda "Sağ Omuz Üstü" (Over-the-Shoulder) açısıyla takip eder.
+///   Böylece karakter ekranın sol-alt kısmında konumlanır, ekranın tam ortasındaki nişangah (crosshair)
+///   asla karakterin sırtına/koluna denk gelmez ve hedef her zaman net görünür!
+/// - Duvar çarpışma koruması (Camera Collision) sayesinde dar odalarda duvarların içine girmez.
+/// - Fare sağ tıkına basıldığında yumuşakça 1. Şahıs (First Person / Nişan) moduna geçer.
+/// - Eğilme (Crouch) durumunda göz seviyesini otomatik olarak siper hizasına indirir.
 /// </summary>
 public class KameraTakip : MonoBehaviour
 {
@@ -16,63 +18,53 @@ public class KameraTakip : MonoBehaviour
     [Tooltip("Kameranın takip edeceği ana oyuncu. Boş bırakılırsa sahnede otomatik bulunur.")]
     public Transform hedef;
 
-    [Header("3. Şahıs Kamera Ayarları")]
+    [Header("3. Şahıs (Sağ Omuz Üstü / Over-The-Shoulder) Kamera Ayarları")]
     [Tooltip("3. şahısta kameranın karaktere olan mesafesi.")]
-    public float mesafe = 4.5f;
+    public float mesafe = 3.5f;
 
-    [Tooltip("Kameranın karakterin hangi yüksekliğine odaklanacağı.")]
-    public float bakisYuksekligi = 1.50f;
+    [Tooltip("Kameranın karakterin hangi yüksekliğine odaklanacağı (Baş/Omuz üstü hizası).")]
+    public float bakisYuksekligi = 1.74f;
+
+    [Tooltip("Kameranın sağ omuz dışına yatay kaydırma miktarı (Nişangahın karakterin üstüne binmemesi için).")]
+    public float omuzSagOfset = 0.72f;
 
     [Tooltip("Fare ile kamerayı döndürme hassasiyeti.")]
     public float fareHassasiyeti = 2.0f;
 
     [Tooltip("3. şahısta kameranın oyuncuyu takip etme hızı.")]
-    public float takipHizi = 12.0f;
+    public float takipHizi = 16.0f;
 
     [Tooltip("Kameranın dönüş yumuşaklık hızı.")]
-    public float donusHizi = 14.0f;
+    public float donusHizi = 18.0f;
 
     [Header("1. Şahıs (First Person / Counter-Strike) Ayarları")]
     [Tooltip("Sağ tık basıldığında Counter-Strike tarzı 1. şahıs moduna geçilsin mi?")]
     public bool sagTiklaBirinciSahis = true;
 
-    [Tooltip("1. Şahıs modunda kameranın karaktere göre ofseti (X: Yatay merkez, Y: Counter-Strike göz seviyesi, Z: İleri ofset).")]
+    [Tooltip("1. Şahıs modunda kameranın karaktere göre ofseti (X: Yatay merkez, Y: Göz seviyesi, Z: İleri ofset).")]
     public Vector3 birinciSahisOfset = new Vector3(0.0f, 1.82f, 0.28f);
 
     [Tooltip("Normal 3. şahıs kamera görüş açısı (FOV).")]
     public float normalFOV = 60f;
 
     [Tooltip("1. şahıs nişan alma kamera görüş açısı (FOV - Hafif zoom).")]
-    public float nisanFOV = 58f;
+    public float nisanFOV = 55f;
 
     [Tooltip("1. şahıs ve 3. şahıs arasındaki geçiş yumuşaklık hızı.")]
     public float gecisHizi = 15f;
 
     [Header("Açı Sınırları (Dikey)")]
     [Tooltip("Kameranın aşağı bakabilme alt açısı.")]
-    public float minPitch = -35f;
+    public float minPitch = -32f;
 
     [Tooltip("Kameranın yukarı bakabilme üst açısı.")]
-    public float maxPitch = 60f;
+    public float maxPitch = 55f;
 
-    /// <summary>
-    /// Kameranın şu an 1. şahıs (First Person) modunda olup olmadığını belirtir.
-    /// Diğer bileşenler (örn. KarakterAtes) buradan okuma yapabilir.
-    /// </summary>
     public static bool IsFirstPerson { get; private set; } = false;
-
-    /// <summary>
-    /// Kameranın anlık yatay açısı (Yaw).
-    /// Karakterin ve silahın yönünü gecikmesiz senkronize etmek için kullanılır.
-    /// </summary>
     public static float CurrentYaw { get; private set; } = 0f;
+    public static float CurrentPitch { get; private set; } = 8f;
 
-    /// <summary>
-    /// Kameranın anlık dikey açısı (Pitch).
-    /// </summary>
-    public static float CurrentPitch { get; private set; } = 15f;
-
-    private float pitch = 15f;
+    private float pitch = 8f;
     private float yaw = 0f;
     private Camera cam;
     private float fpsGecis = 0f;
@@ -83,10 +75,14 @@ public class KameraTakip : MonoBehaviour
         cam = GetComponent<Camera>();
         if (cam != null)
         {
-            // 1. şahısta yakındaki silah ve ellerin kesilmemesi (clipping olmaması) için
             cam.nearClipPlane = 0.03f;
             cam.fieldOfView = normalFOV;
         }
+
+        // Sahnedeki eski Inspector değerlerini yeni omuz üstü (Over-the-Shoulder) standartlarına yükselt
+        if (bakisYuksekligi < 1.65f) bakisYuksekligi = 1.74f;
+        if (omuzSagOfset < 0.55f) omuzSagOfset = 0.72f;
+        if (mesafe > 3.8f) mesafe = 3.5f;
     }
 
     void Start()
@@ -100,89 +96,112 @@ public class KameraTakip : MonoBehaviour
         CurrentYaw = yaw;
         CurrentPitch = pitch;
 
-        // Fare imlecini oyun ekranına kilitle
         ImleciKilitle(true);
     }
 
     void Update()
     {
-        // Minigame açıkken fare serbesttir, kamerayı döndürme
         if (Yazlab.Mekanikler.KapiBulmacaPaneli.MinigameAcik) return;
 
-        // Fare girdileri ile kamerayı karakter etrafında döndür
         FareyiOku();
         CurrentYaw = yaw;
         CurrentPitch = pitch;
 
-        // ESC / Tıklama ile fare imlecini aç/kapat
         ImlecKontrolu();
     }
 
     void LateUpdate()
     {
         HedefiBul();
-
         if (hedef == null) return;
 
         // Eğilme (Crouch) yüksekliği yumuşak geçişi
-        float hedefEgikOfset = KarakterHareket.EgiliyorMu ? -0.68f : 0f;
-        egilmeKameraOfseti = Mathf.Lerp(egilmeKameraOfseti, hedefEgikOfset, Time.deltaTime * 11f);
+        float hedefEgikOfset = KarakterHareket.EgiliyorMu ? -0.62f : 0f;
+        egilmeKameraOfseti = Mathf.Lerp(egilmeKameraOfseti, hedefEgikOfset, Time.deltaTime * 12f);
 
-        // Sağ tık kontrolü ile 1. Şahıs (Counter-Strike FPS) moduna geçiş
+        // Sağ tık kontrolü ile 1. Şahıs (FPS) moduna geçiş
         bool sagTikBasili = sagTiklaBirinciSahis && SagTikGirdisiAl();
         IsFirstPerson = sagTikBasili;
 
-        // Geçiş ağırlığını güncelle (0: 3. Şahıs, 1: 1. Şahıs)
         float hedefGecis = sagTikBasili ? 1f : 0f;
         fpsGecis = Mathf.MoveTowards(fpsGecis, hedefGecis, Time.deltaTime * gecisHizi);
 
         Quaternion rotasyon = Quaternion.Euler(pitch, yaw, 0f);
-
-        // Counter-Strike 1. Şahıs Kamera Konumu:
-        // Karakterin dünya koordinatlarındaki anlık pozisyonunu ve yatay yönünü baz alır.
         Vector3 yatayIleri = Quaternion.Euler(0f, yaw, 0f) * Vector3.forward;
         Vector3 yataySag = Quaternion.Euler(0f, yaw, 0f) * Vector3.right;
+
+        // 1. Şahıs (FPS) Kamera Konumu:
         Vector3 fpsKonum = hedef.position
             + Vector3.up * (birinciSahisOfset.y + egilmeKameraOfseti)
             + (yatayIleri * birinciSahisOfset.z)
             + (yataySag * birinciSahisOfset.x);
 
-        // 3. Şahıs Konum Hesabı:
-        Vector3 odakNoktasi = hedef.position + Vector3.up * (bakisYuksekligi + egilmeKameraOfseti * 0.75f);
-        Vector3 tpsKonum = odakNoktasi - (rotasyon * Vector3.forward * mesafe);
+        // 3. Şahıs (Sağ Omuz Üstü / Over-the-Shoulder) Kamera Konumu:
+        // Odak noktası karakterin sağ omzunun dışına (+yataySag * omuzSagOfset) ve baş hizasının üstüne alınır.
+        // Böylece karakter ekranın solunda kalır, ekranın tam ortasındaki nişangahın önü tamamen AÇIK olur!
+        Vector3 kafaMerkez = hedef.position + Vector3.up * (bakisYuksekligi + egilmeKameraOfseti * 0.7f);
+        Vector3 omuzOdakNoktasi = kafaMerkez + (yataySag * omuzSagOfset);
+        Vector3 istenenTpsKonum = omuzOdakNoktasi - (rotasyon * Vector3.forward * mesafe);
+
+        // Kamera Duvar Çarpışma Koruması (Dar koridorlarda ve kapı önlerinde duvarın arkasına geçmesini önler)
+        Vector3 tpsKonum = DuvarCarpismasiniOnle(kafaMerkez, istenenTpsKonum);
 
         if (fpsGecis >= 0.999f)
         {
-            // === TAM 1. ŞAHIS (COUNTER-STRIKE) MODU ===
             transform.position = fpsKonum;
             transform.rotation = rotasyon;
-
-            // Karakter gövdesini kameranın yatay açısına tam kilitle
             hedef.rotation = Quaternion.Euler(0f, yaw, 0f);
         }
         else if (fpsGecis <= 0.001f)
         {
-            // === TAM 3. ŞAHIS MODU ===
             transform.position = Vector3.Lerp(transform.position, tpsKonum, Time.deltaTime * takipHizi);
             transform.rotation = Quaternion.Slerp(transform.rotation, rotasyon, Time.deltaTime * donusHizi);
         }
         else
         {
-            // === 3. ŞAHIS İLE 1. ŞAHIS ARASINDAKİ YUMUŞAK GEÇİŞ ===
             float t = Mathf.SmoothStep(0f, 1f, fpsGecis);
-            Vector3 araKonum = Vector3.Lerp(tpsKonum, fpsKonum, t);
-            transform.position = araKonum;
+            transform.position = Vector3.Lerp(tpsKonum, fpsKonum, t);
             transform.rotation = Quaternion.Slerp(transform.rotation, rotasyon, t);
-
-            // Karakter gövdesini de ileri yöne yumuşakça hizala
             hedef.rotation = Quaternion.Euler(0f, yaw, 0f);
         }
 
-        // Görüş açısını (FOV) geçişe göre ayarla
         if (cam != null)
         {
             cam.fieldOfView = Mathf.Lerp(normalFOV, nisanFOV, fpsGecis);
         }
+    }
+
+    private Vector3 DuvarCarpismasiniOnle(Vector3 baslangic, Vector3 hedefKameraKonumu)
+    {
+        Vector3 yon = hedefKameraKonumu - baslangic;
+        float toplamMesafe = yon.magnitude;
+        if (toplamMesafe < 0.05f) return hedefKameraKonumu;
+
+        yon /= toplamMesafe;
+        RaycastHit[] hits = Physics.SphereCastAll(baslangic, 0.22f, yon, toplamMesafe, ~0, QueryTriggerInteraction.Ignore);
+
+        float enYakinEngel = toplamMesafe;
+        bool engelBulundu = false;
+
+        foreach (var h in hits)
+        {
+            if (h.collider == null || h.collider.isTrigger) continue;
+            if (hedef != null && (h.transform == hedef || h.transform.IsChildOf(hedef))) continue;
+            if (h.collider.GetComponentInParent<YardimciKarakter>() != null) continue;
+
+            if (h.distance < enYakinEngel && h.distance > 0.4f)
+            {
+                enYakinEngel = h.distance;
+                engelBulundu = true;
+            }
+        }
+
+        if (engelBulundu)
+        {
+            return baslangic + yon * Mathf.Max(0.85f, enYakinEngel - 0.15f);
+        }
+
+        return hedefKameraKonumu;
     }
 
     private void FareyiOku()

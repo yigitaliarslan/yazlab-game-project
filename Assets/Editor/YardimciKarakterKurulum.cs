@@ -19,17 +19,16 @@ public class YardimciKarakterKurulum
         Yapilandir();
         if (!Application.isBatchMode)
         {
-            EditorUtility.DisplayDialog("Başarılı", "Müttefik asker karakteri (düşmanlara ateş eden takım arkadaşı) hazırlandı!", "Tamam");
+            EditorUtility.DisplayDialog("Başarılı", "Müttefik asker karakteri ve sağ omuz üstü taktiksel kamera hazırlandı!", "Tamam");
         }
     }
 
     public static void Yapilandir()
     {
-        // 1. Ana Kamera ayarları (KameraTakip)
+        // 1. Ana Kamera ayarları (Sağ Omuz Üstü Taktiksel KameraTakip)
         Camera mainCam = Camera.main;
         if (mainCam != null)
         {
-            // Eski OyuncuHareket varsa kaldır
             OyuncuHareket oh = mainCam.GetComponent<OyuncuHareket>();
             if (oh != null)
             {
@@ -47,22 +46,23 @@ public class YardimciKarakterKurulum
             {
                 kt.hedef = kh.transform;
             }
-            kt.mesafe = 4.5f;
-            kt.bakisYuksekligi = 1.50f;
+            kt.mesafe = 3.5f;
+            kt.bakisYuksekligi = 1.74f;
+            kt.omuzSagOfset = 0.72f;
             kt.fareHassasiyeti = 2.0f;
-            kt.takipHizi = 12.0f;
-            kt.donusHizi = 14.0f;
-            kt.minPitch = -35f;
-            kt.maxPitch = 60f;
+            kt.takipHizi = 16.0f;
+            kt.donusHizi = 18.0f;
+            kt.minPitch = -32f;
+            kt.maxPitch = 55f;
             kt.sagTiklaBirinciSahis = true;
             kt.birinciSahisOfset = new Vector3(0.0f, 1.82f, 0.28f);
             kt.normalFOV = 60f;
-            kt.nisanFOV = 58f;
+            kt.nisanFOV = 55f;
             kt.gecisHizi = 15f;
             EditorUtility.SetDirty(kt);
         }
 
-        // 2. Yardımcı Asker Karakteri Kurulumu (Düşmanlara sıkan müttefik asker)
+        // 2. Yardımcı Asker Karakteri Kurulumu
         YardimciKarakter yk = Object.FindAnyObjectByType<YardimciKarakter>();
         bool eskiAjanMi = false;
         if (yk != null)
@@ -76,14 +76,13 @@ public class YardimciKarakterKurulum
 
         if (yk == null || eskiAjanMi)
         {
-            Vector3 spawnPos = new Vector3(2.5f, 0f, 2.0f);
+            Vector3 spawnPos = new Vector3(2.0f, 0.05f, -21.5f);
             if (yk != null)
             {
                 spawnPos = yk.transform.position;
                 Object.DestroyImmediate(yk.gameObject);
             }
 
-            // Orijinal Asker Prefabını Yükle
             GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/ToonSoldiers_WW2_demo/ToonSoldier_WW2_demo_Prefab.prefab");
             Material companionMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/ToonSoldiers_WW2_demo/model/Materials/US_soldier_companion.mat");
             RuntimeAnimatorController animCtrl = AssetDatabase.LoadAssetAtPath<RuntimeAnimatorController>("Assets/ToonSoldiers_WW2_demo/KarakterAnimator.controller");
@@ -95,7 +94,6 @@ public class YardimciKarakterKurulum
                 instance.transform.position = spawnPos;
                 instance.transform.rotation = Quaternion.identity;
 
-                // Fazlalık oyuncu scriptlerini temizle
                 KarakterHareket kh = instance.GetComponent<KarakterHareket>();
                 if (kh != null) Object.DestroyImmediate(kh);
                 OyuncuHareket oh = instance.GetComponent<OyuncuHareket>();
@@ -145,7 +143,6 @@ public class YardimciKarakterKurulum
         }
         else
         {
-            // Mevcut yardımcı askerin hedefini oyuncuya bağla
             KarakterHareket oyuncu = Object.FindAnyObjectByType<KarakterHareket>();
             if (oyuncu != null)
             {
@@ -154,7 +151,6 @@ public class YardimciKarakterKurulum
             }
         }
 
-        // 3. Sahneyi Kaydet
         if (!Application.isPlaying && !Application.isBatchMode)
         {
             var aktifSahne = EditorSceneManager.GetActiveScene();
