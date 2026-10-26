@@ -36,11 +36,13 @@ namespace Yazlab.Mekanikler
         public UnityEvent onKopruIndi = new UnityEvent();
 
         private bool _acikMi = false;
+        private bool _kilitliMi = true;
         private float _mevcutAciX;
         private NavMeshObstacle _navEngel;
         private AudioSource _sesKaynagi;
 
         public bool AcikMi => _acikMi;
+        public bool KilitliMi => _kilitliMi;
 
         private void Awake()
         {
@@ -82,9 +84,31 @@ namespace Yazlab.Mekanikler
             }
         }
 
+        public void KilidiAc()
+        {
+            _kilitliMi = false;
+            KapiyiAc();
+        }
+
+        public void Kilitle()
+        {
+            _kilitliMi = true;
+        }
+
+        public void KapiyiAc()
+        {
+            Ac();
+        }
+
+        public void KapiyiKapat()
+        {
+            Kapat();
+        }
+
         public void Ac()
         {
             if (_acikMi) return;
+            _kilitliMi = false;
             _acikMi = true;
 
             if (_navEngel != null)
@@ -132,7 +156,6 @@ namespace Yazlab.Mekanikler
             for (int i = 0; i < ornekSayisi; i++)
             {
                 float t = (float)i / sampleRate;
-                // Zincir şıkırtısı + ağır ahşap gıcırtısı simülasyonu
                 float halkaMod = Mathf.Abs(Mathf.Sin(t * 28f));
                 float dusukGicirti = Mathf.Sin(2f * Mathf.PI * 65f * t) * 0.4f;
                 float metalGurultu = (Random.value * 2f - 1f) * 0.35f * halkaMod;
