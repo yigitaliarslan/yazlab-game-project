@@ -5,7 +5,8 @@ using UnityEngine;
 /// Oyuncunun müttefiki olan asker kontrolcüsü.
 /// - Canı vardır ve hasar alabilir.
 /// - Sahnede düşman gördüğünde onlara ateş açar ve hasar verir.
-/// - Çatışma yokken oyuncuya doğru döner ve oyuncuyu izler.
+/// - Co-op bulmacalarda (ör. 2 Anahtarlı Asma Köprü) emredilen görev noktasına koşup anahtarı tutar.
+/// - Serbest durumdayken oyuncuyu takip eder ve çatışma yokken oyuncuya doğru döner.
 /// - Öldüğünde yere yığılır.
 /// </summary>
 public class YardimciKarakter : MonoBehaviour
@@ -25,6 +26,8 @@ public class YardimciKarakter : MonoBehaviour
     [Header("Dönüş ve Takip")]
     public DonusModu donusModu = DonusModu.OyuncuyaBak;
     public float donusHizi = 8.0f;
+    public float hareketHizi = 4.8f;
+    public float takipMesafesi = 3.2f;
     public Transform hedef;
 
     [Header("Ateş ve Çatışma Ayarları")]
@@ -52,13 +55,19 @@ public class YardimciKarakter : MonoBehaviour
     private bool oldu = false;
     private DusmanKontrol hedefDusman;
 
+    // Co-op Görev Noktası Sistemi (2 Anahtarlı Asma Köprü vb. için)
+    private bool gorevAktif = false;
+    private Vector3 gorevHedefNoktasi;
+    private bool gorevNoktasinaUlasti = false;
+
     public bool IsDead => oldu;
+    public bool GorevAktifMi => gorevAktif;
+    public bool GorevNoktasindaMi => gorevAktif && gorevNoktasinaUlasti;
 
     void Awake()
     {
         Instance = this;
 
-        // Oyuncuyla aynı can kapasitesini ve değerini al
         OyuncuCani oyuncu = Object.FindAnyObjectByType<OyuncuCani>();
         if (oyuncu != null)
         {
@@ -92,7 +101,6 @@ public class YardimciKarakter : MonoBehaviour
             col.center = new Vector3(0f, 0.9f, 0f);
         }
 
-        // Namlu ucu
         GameObject namluObj = new GameObject("YardimciNamluUcu");
         namluObj.transform.SetParent(transform);
         namluObj.transform.localPosition = new Vector3(0.22f, 1.20f, 0.95f);
@@ -110,6 +118,26 @@ public class YardimciKarakter : MonoBehaviour
         {
             animator.CrossFade("infantry_combat_idle", 0.2f);
         }
+    }
+
+    /// <summary>
+    /// Yardımcı karakteri belirli bir co-op görev noktasına (ör. Sağ Köprü Anahtarı) yönlendirir.
+    /// </summary>
+    public void GorevNoktasinaGit(Vector3 nokta)
+    {
+        if (oldu) return;
+        gorevAktif = true;
+        gorevHedefNoktasi = new Vector3(nokta.x, transform.position.y, nokta.z);
+        gorevNoktasinaUlasti = false;
+    }
+
+    /// <summary>
+    /// Co-op görevi bittiğinde yardımcı karakterin tekrar oyuncuyu takip etmesini sağlar.
+    /// </summary>
+    public void GoreviBitirVeTakipEt()
+    {
+        gorevAktif = false;
+        gorevNoktasinaUlasti = false;
     }
 
     public void RengiUygula()
@@ -131,12 +159,39 @@ public class YardimciKarakter : MonoBehaviour
 
         HedefiBul();
 
-        // 1. En yakın canlı düşmanı ara
+        // 1. Co-op Görev Noktası Hareketi (Öncelikli)
+        if (gorevAktif)
+        {
+            Vector3 fark = gorevHedefNoktasi - transform.position;
+            fark.y = 0f;
+            float mesafe = fark.magnitude;
+
+            if (mesafe > 0.65f)
+            {
+                gorevNoktasinaUlasti = false;
+                Vector3 yon = fark.normalized;
+                transform.position += yon * hareketHizi * Time.deltaTime;
+                Quaternion hedefRot = Quaternion.LookRotation(yon);
+                transform.rotation = Quaternion.Slerp(transform.rotation, hedefRot, Time.deltaTime * donusHizi * 1.4f);
+                AnimasyonAyarla("infantry_combat_run");
+                return;
+            }
+            else
+            {
+                gorevNoktasinaUlasti = true;
+                AnimasyonAyarla("infantry_combat_idle");
+                // Anahtar sütununa doğru bak
+                Quaternion ileriRot = Quaternion.Euler(0f, 0f, 0f);
+                transform.rotation = Quaternion.Slerp(transform.rotation, ileriRot, Time.deltaTime * donusHizi);
+                return;
+            }
+        }
+
+        // 2. En yakın canlı düşmanı ara
         hedefDusman = EnYakinCanliDusmaniBul();
 
         if (hedefDusman != null)
         {
-            // Düşmana doğru dön
             Vector3 dusmanYon = (hedefDusman.transform.position - transform.position);
             dusmanYon.y = 0f;
             if (dusmanYon.sqrMagnitude > 0.01f)
@@ -145,7 +200,6 @@ public class YardimciKarakter : MonoBehaviour
                 transform.rotation = Quaternion.Slerp(transform.rotation, hedefRot, Time.deltaTime * donusHizi * 1.5f);
             }
 
-            // Düşmana ateş et!
             if (Time.time >= sonrakiAtesZamani)
             {
                 sonrakiAtesZamani = Time.time + atesAraligi + Random.Range(-0.1f, 0.2f);
@@ -166,6 +220,17 @@ public class YardimciKarakter : MonoBehaviour
                     transform.rotation = Quaternion.Slerp(transform.rotation, hedefRotasyon, Time.deltaTime * donusHizi);
                 }
             }
+            AnimasyonAyarla("infantry_combat_idle");
+        }
+    }
+
+    private void AnimasyonAyarla(string stateAdi)
+    {
+        if (animator == null) return;
+        AnimatorStateInfo info = animator.GetCurrentAnimatorStateInfo(0);
+        if (!info.IsName(stateAdi))
+        {
+            animator.CrossFade(stateAdi, 0.15f);
         }
     }
 
@@ -182,7 +247,6 @@ public class YardimciKarakter : MonoBehaviour
             float mesafe = Vector3.Distance(transform.position, d.transform.position);
             if (mesafe <= enKisaMesafe)
             {
-                // Görüş çizgisi kontrolü (arada engel var mı?)
                 Vector3 goz = transform.position + Vector3.up * 1.3f;
                 float hedefYukseklik = (d is Yazlab.Mekanikler.TaretKontrol) ? 2.8f : 1.0f;
                 Vector3 hedefGovde = d.transform.position + Vector3.up * hedefYukseklik;
@@ -205,50 +269,39 @@ public class YardimciKarakter : MonoBehaviour
     {
         if (oldu || hedef == null || hedef.IsDead) return;
 
-        // 1. Ateş Animasyonu
         if (animator != null)
         {
             animator.CrossFade("infantry_combat_shoot", 0.05f);
         }
 
-        // 2. Ses
         if (audioSource != null)
         {
             audioSource.pitch = Random.Range(0.9f, 1.1f);
             audioSource.Play();
         }
 
-        // 3. Namlu Konumu
         Vector3 baslangic = namluNoktasi != null ? namluNoktasi.position : (transform.position + Vector3.up * 1.2f + transform.forward * 0.8f);
         float hedefYukseklik = (hedef is Yazlab.Mekanikler.TaretKontrol) ? 2.8f : 1.0f;
         Vector3 hedefNokta = hedef.transform.position + Vector3.up * hedefYukseklik + Random.insideUnitSphere * 0.15f;
 
-        // 4. Efektler
         StartCoroutine(NamluFlasiParla(baslangic));
         if (mermiIziRenderer != null)
         {
             StartCoroutine(MermiIziCiz(baslangic, hedefNokta));
         }
 
-        // 5. Düşmana Hasar Ver!
         hedef.HasarAl(atesHasari);
     }
 
     private float sonHasarZamani = -1f;
 
-    /// <summary>
-    /// Düşman mermisi isabet ettiğinde çağrılır.
-    /// Oyuncu ile birebir aynı hasar kurallarına ve direncine tabidir.
-    /// </summary>
     public void HasarAl(float miktar)
     {
         if (oldu) return;
 
-        // Oyuncuyla aynı spam koruması (0.18s)
         if (Time.time < sonHasarZamani + 0.18f) return;
         sonHasarZamani = Time.time;
 
-        // Oyuncuyla aynı mermi hasar tavanı (8 HP)
         OyuncuCani oyuncu = Object.FindAnyObjectByType<OyuncuCani>();
         float limit = oyuncu != null ? oyuncu.mermiHasarLimiti : 8f;
         float gercekHasar = Mathf.Min(miktar, limit);
