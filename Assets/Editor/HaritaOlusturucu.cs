@@ -19,6 +19,11 @@ namespace Yazlab.Editor
         [MenuItem("Tools/YazLab/1. Haritayı Sıfırdan Oluştur (Yuvarlak Kale Seviyesi)")]
         public static void HaritayiKur()
         {
+            if (EditorApplication.isPlaying)
+            {
+                EditorUtility.DisplayDialog("Uyari: Oyun Calisiyor!", "Oyun su anda Play modunda calisiyor! Lutfen once ustteki Play butonuna basarak oyunu durdurun, ardindan haritayi olusturun.", "Tamam");
+                return;
+            }
             if (!Application.isBatchMode && !EditorUtility.DisplayDialog("Taktiksel İstihbarat Haritası", 
                 "Taktiksel İstihbarat Operasyonu senaryosuna uygun Yuvarlak Kale & Yıkıntı Haritası inşa edilecek:\n\n" +
                 "• Yuvarlak Dış Surlar ve Yıkık Kuleler\n" +
@@ -545,9 +550,15 @@ namespace Yazlab.Editor
             navSurface.BuildNavMesh();
 
             // Sahneyi kaydet
-            var activeScene = EditorSceneManager.GetActiveScene();
-            EditorSceneManager.MarkSceneDirty(activeScene);
-            EditorSceneManager.SaveScene(activeScene);
+            if (!EditorApplication.isPlaying)
+            {
+                var activeScene = EditorSceneManager.GetActiveScene();
+                if (activeScene.IsValid())
+                {
+                    EditorSceneManager.MarkSceneDirty(activeScene);
+                    EditorSceneManager.SaveScene(activeScene);
+                }
+            }
         }
 
         public static void KarakterleriSahneyeKur()
