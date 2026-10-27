@@ -1,13 +1,15 @@
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using Yazlab.Yonetim;
 
 namespace Yazlab.Editor
 {
     /// <summary>
     /// Kamera, oyuncu kontrolleri ve 3 bölümlü kale haritasının eksiksiz kurulu olduğu
     /// asıl oyun sahnesini (SampleScene) varsayılan yapar ve yeni harita bileşenleri
-    /// (Hendek, Asma Köprü, Kablo Odası, Yanları Kapalı Merdiven Holü) sahnede yoksa otomatik olarak inşa eder.
+    /// (Derin Hendek Kanyonu, 3B Dalgalı Su, Asma Köprü, Kablo Odası, Kapalı Merdiven Holü)
+    /// sahnede yoksa otomatik olarak inşa eder.
     /// </summary>
     [InitializeOnLoad]
     public static class BaslangicSahneAyari
@@ -54,14 +56,24 @@ namespace Yazlab.Editor
         {
             if (EditorApplication.isPlaying) return;
 
-            // Sahnede güncel 3. bölüm Merdiven Holü veya Asma Köprü yoksa otomatik olarak güncel haritayı kur!
             if (GameObject.Find("Asma_Kopru_Sistemi") == null ||
                 GameObject.Find("Kablo_Ve_Salter_Odasi") == null ||
                 GameObject.Find("MerdivenHolu_SolDuvar") == null)
             {
-                Debug.Log("[YazLab] Güncel 3 Bölümlü Kale Haritası (Kapalı Merdiven Holü & Düzeltmeler) otomatik inşa ediliyor...");
                 HaritaOlusturucu.HaritayiKurInternal();
-                Debug.Log("[YazLab] Güncel 3 Bölümlü Kale Haritası otomatik olarak oluşturuldu ve kaydedildi!");
+            }
+
+            if (GameObject.Find("Hendek_DerinTaban") == null)
+            {
+                ProsedurelDokuUretici.DerinHendekVeCevreyiGarantile();
+                ProsedurelDokuUretici.SahnedekiMateryalleriKapla();
+
+                var activeScene = EditorSceneManager.GetActiveScene();
+                if (activeScene.IsValid())
+                {
+                    EditorSceneManager.MarkSceneDirty(activeScene);
+                    EditorSceneManager.SaveScene(activeScene);
+                }
             }
         }
     }
