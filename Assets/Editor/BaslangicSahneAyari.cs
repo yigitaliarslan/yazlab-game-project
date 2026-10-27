@@ -1,6 +1,7 @@
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using Yazlab.Mekanikler;
 using Yazlab.Yonetim;
 
 namespace Yazlab.Editor
@@ -8,7 +9,7 @@ namespace Yazlab.Editor
     /// <summary>
     /// Kamera, oyuncu kontrolleri ve 3 bölümlü kale haritasının eksiksiz kurulu olduğu
     /// asıl oyun sahnesini (SampleScene) varsayılan yapar ve yeni harita bileşenleri
-    /// (Derin Hendek Kanyonu, 3B Dalgalı Su, Asma Köprü, Kablo Odası, Kapalı Merdiven Holü)
+    /// (Şelaleli Canlı Hendek Suyu, Suya Düşünce Yeniden Başlatma, Asma Köprü, Kablo Odası, Merdiven Holü)
     /// sahnede yoksa otomatik olarak inşa eder.
     /// </summary>
     [InitializeOnLoad]
@@ -63,7 +64,9 @@ namespace Yazlab.Editor
                 HaritaOlusturucu.HaritayiKurInternal();
             }
 
-            if (GameObject.Find("Hendek_DerinTaban") == null)
+            if (GameObject.Find("Hendek_DerinTaban") == null ||
+                Object.FindAnyObjectByType<HendekDusmeKontrolu>() == null ||
+                Object.FindAnyObjectByType<HendekSuAnimasyonu>() == null)
             {
                 ProsedurelDokuUretici.DerinHendekVeCevreyiGarantile();
                 ProsedurelDokuUretici.SahnedekiMateryalleriKapla();
