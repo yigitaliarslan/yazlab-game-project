@@ -13,7 +13,6 @@ namespace Yazlab.Yonetim
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         public static void SahnedekiMateryalleriKapla()
         {
-            // Eğer sahnede eski düz su küpü varsa, gerçek derin taş hendek kanyonuna ve 3B dalgalı suya dönüştür
             DerinHendekVeCevreyiGarantile();
 
             MeshRenderer[] renderers = Object.FindObjectsByType<MeshRenderer>(FindObjectsInactive.Include);
@@ -57,47 +56,60 @@ namespace Yazlab.Yonetim
                 }
                 else if (ad.Contains("Mat_HendekSuyu"))
                 {
-                    if (texSu == null) texSu = UretSuDokusu(new Color(0.06f, 0.28f, 0.42f), new Color(0.28f, 0.72f, 0.88f));
-                    KaplamaAta(m, texSu, new Vector2(7f, 2.5f), 0.90f);
+                    if (texSu == null) texSu = UretSuDokusu(new Color(0.06f, 0.36f, 0.58f), new Color(0.42f, 0.86f, 0.98f));
+                    KaplamaAta(m, texSu, new Vector2(8f, 2.5f), 0.92f);
                 }
             }
         }
 
         /// <summary>
-        /// Düz zemin üstündeki ince su kutusunu kaldırıp yerine:
-        /// - Gerçek 3.5m derinliğinde oyulmuş taş hendek kanyonu (Kale İçi ve Kale Dışı ayrı zemin blokları),
-        /// - Hendek içi taş istinat duvarları, taş köprü ayakları, su altı kayaları, kıyı köpükleri,
-        /// - 1.1m aşağıda akan gerçek 3B dalgalı su ağı (GercekciSuYuzeyi) ve çevre çam ağaçları inşa eder.
+        /// Zemini Kale İçi ve Kale Dışı olarak ikiye ayırarak gerçek 3.5m derinliğinde açık hendek çukuru oluşturur,
+        /// görünmez hendek duvarlarını kaldırır (oyuncu suya düşebilsin diye), şelale/köpük su animasyonunu
+        /// (HendekSuAnimasyonu) ve suya düşünce yeniden başlatma sistemini (HendekDusmeKontrolu) kurar.
         /// </summary>
         public static void DerinHendekVeCevreyiGarantile()
         {
             GameObject zeminGrup = GameObject.Find("1_Bolum1_KaleDisi_Hendek_Ve_AsmaKopru");
             if (zeminGrup == null) return;
 
-            // 1. Ana Zemini Hendek Boyunca İkiye Ayır (Gerçek 3.5m Derinliğinde Hendek Çukuru Aç!)
+            // 1. Ana Zemini Hendek Boyunca İkiye Ayır (Z = -14.8 ile -8.6 arası gerçek açık çukur!)
             Transform anaZemin = zeminGrup.transform.Find("AnaZemin_Toprak");
             Material matToprak = anaZemin != null ? anaZemin.GetComponent<MeshRenderer>()?.sharedMaterial : null;
 
-            if (anaZemin != null && zeminGrup.transform.Find("KaleDisi_Zemin_Toprak") == null)
+            if (anaZemin != null)
             {
                 // AnaZemin sadece Kale İçi zemini olsun (Z = -8.6'dan Z = +58'e kadar)
                 anaZemin.position = new Vector3(0f, -0.5f, 24.7f);
                 anaZemin.localScale = new Vector3(78f, 1f, 66.6f);
 
-                // Kale Dışı Kamp Zemini (Z = -38'den Z = -14.8'e kadar -> Aradaki Z = -14.8 ile -8.6 arası GERÇEK DERİN HENDEK ÇUKURUDUR!)
-                GameObject disZemin = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                disZemin.name = "KaleDisi_Zemin_Toprak";
-                disZemin.transform.SetParent(zeminGrup.transform);
-                disZemin.transform.position = new Vector3(0f, -0.5f, -26.4f);
-                disZemin.transform.localScale = new Vector3(78f, 1f, 23.2f);
-                if (matToprak != null) disZemin.GetComponent<MeshRenderer>().sharedMaterial = matToprak;
+                if (zeminGrup.transform.Find("KaleDisi_Zemin_Toprak") == null)
+                {
+                    GameObject disZemin = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                    disZemin.name = "KaleDisi_Zemin_Toprak";
+                    disZemin.transform.SetParent(zeminGrup.transform);
+                    disZemin.transform.position = new Vector3(0f, -0.5f, -26.4f);
+                    disZemin.transform.localScale = new Vector3(78f, 1f, 23.2f);
+                    if (matToprak != null) disZemin.GetComponent<MeshRenderer>().sharedMaterial = matToprak;
+                }
             }
 
-            // 2. Hendek Kanyonu, Taş İstinat Duvarları, Köprü Ayakları ve 3B Dalgalı Su Kurulumu
             Transform hendekGrup = zeminGrup.transform.Find("Kale_Hendegi_Moat");
             if (hendekGrup == null) return;
 
-            if (hendekGrup.Find("Hendek_DerinTaban") != null) return; // Zaten yeni derin hendek kurulmuş
+            // 2. Görünmez hendek duvarlarını ve korkulukları kaldır ki oyuncu suya gerçekten düşebilsin!
+            HendekDusmeKontrolu.GorunmezHendekEngelleriniKaldir();
+
+            // 3. Su Animasyonu ve Suya Düşünce Yeniden Başlatma bileşenlerini ekle
+            if (hendekGrup.GetComponent<HendekSuAnimasyonu>() == null)
+            {
+                hendekGrup.gameObject.AddComponent<HendekSuAnimasyonu>();
+            }
+            if (hendekGrup.GetComponent<HendekDusmeKontrolu>() == null)
+            {
+                hendekGrup.gameObject.AddComponent<HendekDusmeKontrolu>();
+            }
+
+            if (hendekGrup.Find("Hendek_DerinTaban") != null) return;
 
             MeshRenderer ornekTasRend = GameObject.Find("Sol_Anahtar_Sutunu")?.GetComponent<MeshRenderer>();
             Material matKoyuTas = ornekTasRend != null ? ornekTasRend.sharedMaterial : matToprak;
@@ -109,29 +121,25 @@ namespace Yazlab.Yonetim
                 Object.DestroyImmediate(eskiSu.gameObject);
             }
 
-            // Hendek Derin Taş Tabanı (Y = -3.4m derinlikte)
+            // Hendek Derin Taş Tabanı (Y = -3.4m)
             OlusturParca("Hendek_DerinTaban", new Vector3(0f, -3.4f, -11.7f), new Vector3(48f, 0.6f, 7.2f), matKoyuTas, hendekGrup);
 
-            // Hendek Güney (Dış) ve Kuzey (Kale Tarafı) Derin Taş İstinat Duvarları (Y = 0'dan Y = -3.4m'ye inen gerçek taş kanyon duvarları)
-            OlusturParca("Hendek_GuneyIstinatDuvari", new Vector3(0f, -1.65f, -14.9f), new Vector3(48f, 3.5f, 0.7f), matKoyuTas, hendekGrup);
-            OlusturParca("Hendek_KuzeyIstinatDuvari", new Vector3(0f, -1.65f, -8.5f), new Vector3(48f, 3.5f, 0.7f), matKoyuTas, hendekGrup);
+            // Hendek Yan İstinat Duvarları (Üst kenarda engel yok, kanyon içine doğru taş duvarlar)
+            OlusturParca("Hendek_GuneyIstinatDuvari", new Vector3(0f, -1.85f, -14.9f), new Vector3(48f, 3.1f, 0.5f), matKoyuTas, hendekGrup);
+            OlusturParca("Hendek_KuzeyIstinatDuvari", new Vector3(0f, -1.85f, -8.5f), new Vector3(48f, 3.1f, 0.5f), matKoyuTas, hendekGrup);
             OlusturParca("Hendek_SolKanyonDuvari", new Vector3(-16.2f, -1.65f, -11.7f), new Vector3(1.2f, 3.5f, 7.0f), matKoyuTas, hendekGrup);
             OlusturParca("Hendek_SagKanyonDuvari", new Vector3(16.2f, -1.65f, -11.7f), new Vector3(1.2f, 3.5f, 7.0f), matKoyuTas, hendekGrup);
 
-            // Hendek Kenarı Ortaçağ Taş Korkuluk Siperleri (Köprü ağzı X = -2.8..+2.8 açık kalır)
-            OlusturParca("Hendek_KenarSiper_Sol", new Vector3(-9.5f, 0.45f, -14.8f), new Vector3(13.2f, 0.9f, 0.75f), matKoyuTas, hendekGrup);
-            OlusturParca("Hendek_KenarSiper_Sag", new Vector3(9.5f, 0.45f, -14.8f), new Vector3(13.2f, 0.9f, 0.75f), matKoyuTas, hendekGrup);
-
-            // Asma Köprünün Karşı Kıyıda Oturduğu Kemerli Taş Köprü İskelesi & Su İçi Taş Sütunlar
-            OlusturParca("Kopru_KarsiTasIskele", new Vector3(0f, -1.2f, -14.5f), new Vector3(5.8f, 2.5f, 1.4f), matKoyuTas, hendekGrup);
+            // Asma Köprü Karşı Taş İskelesi & Su İçi Taş Sütunlar
+            OlusturParca("Kopru_KarsiTasIskele", new Vector3(0f, -1.2f, -14.6f), new Vector3(5.4f, 2.4f, 1.0f), matKoyuTas, hendekGrup);
             OlusturParca("Kopru_SuIciSutun_Sol", new Vector3(-2.3f, -1.7f, -11.7f), new Vector3(0.95f, 3.4f, 0.95f), matKoyuTas, hendekGrup);
             OlusturParca("Kopru_SuIciSutun_Sag", new Vector3(2.3f, -1.7f, -11.7f), new Vector3(0.95f, 3.4f, 0.95f), matKoyuTas, hendekGrup);
 
-            // Gerçek 3B Dalgalı Hendek Suyu (Zeminden 0.95m aşağıda, taş kanyonun içinde akar!)
+            // Gerçek 3B Dalgalı Hendek Suyu
             GameObject yeniSu = new GameObject("Hendek_Suyu_3B");
             yeniSu.transform.SetParent(hendekGrup);
-            yeniSu.transform.position = new Vector3(0f, -0.95f, -11.7f);
-            MeshFilter mf = yeniSu.AddComponent<MeshFilter>();
+            yeniSu.transform.position = new Vector3(0f, -1.05f, -11.7f);
+            yeniSu.AddComponent<MeshFilter>();
             MeshRenderer mr = yeniSu.AddComponent<MeshRenderer>();
             if (matSu != null) mr.sharedMaterial = matSu;
             GercekciSuYuzeyi suDalga = yeniSu.AddComponent<GercekciSuYuzeyi>();
@@ -139,13 +147,13 @@ namespace Yazlab.Yonetim
             suDalga.uzunluk = 6.2f;
             suDalga.SuMeshOlustur();
 
-            // Su İçi Doğal Kayalar (Boşluk hissini tamamen ortadan kaldıran çevre detayları)
-            KayaOlustur("HendekKaya_Sol1", new Vector3(-7.5f, -0.9f, -11.2f), new Vector3(1.8f, 1.4f, 1.5f), matKoyuTas, hendekGrup);
-            KayaOlustur("HendekKaya_Sol2", new Vector3(-11.5f, -0.8f, -12.4f), new Vector3(2.2f, 1.6f, 1.9f), matKoyuTas, hendekGrup);
-            KayaOlustur("HendekKaya_Sag1", new Vector3(7.8f, -0.9f, -12.0f), new Vector3(1.9f, 1.5f, 1.6f), matKoyuTas, hendekGrup);
-            KayaOlustur("HendekKaya_Sag2", new Vector3(12.0f, -0.8f, -11.0f), new Vector3(2.4f, 1.7f, 2.0f), matKoyuTas, hendekGrup);
+            // Su İçi Doğal Kayalar
+            KayaOlustur("HendekKaya_Sol1", new Vector3(-7.5f, -1.0f, -11.2f), new Vector3(1.8f, 1.4f, 1.5f), matKoyuTas, hendekGrup);
+            KayaOlustur("HendekKaya_Sol2", new Vector3(-11.5f, -0.9f, -12.4f), new Vector3(2.2f, 1.6f, 1.9f), matKoyuTas, hendekGrup);
+            KayaOlustur("HendekKaya_Sag1", new Vector3(7.8f, -1.0f, -12.0f), new Vector3(1.9f, 1.5f, 1.6f), matKoyuTas, hendekGrup);
+            KayaOlustur("HendekKaya_Sag2", new Vector3(12.0f, -0.9f, -11.0f), new Vector3(2.4f, 1.7f, 2.0f), matKoyuTas, hendekGrup);
 
-            // Kale Dışı Çam Ağaçları ve Siper Kayalıkları
+            // Kale Dışı Çam Ağaçları
             CamAgaciOlustur("DisOrman_Agac_Sol1", new Vector3(-11.5f, 0f, -19.5f), zeminGrup.transform);
             CamAgaciOlustur("DisOrman_Agac_Sol2", new Vector3(-13.0f, 0f, -25.0f), zeminGrup.transform);
             CamAgaciOlustur("DisOrman_Agac_Sag1", new Vector3(11.5f, 0f, -19.5f), zeminGrup.transform);
@@ -363,9 +371,6 @@ namespace Yazlab.Yonetim
             return tex;
         }
 
-        /// <summary>
-        /// Su kostik yansımaları (caustics) ve dalga köpüğü içeren gerçekçi su dokusu.
-        /// </summary>
         public static Texture2D UretSuDokusu(Color derinSu, Color dalgaKopugu)
         {
             int boyut = 256;
@@ -383,7 +388,7 @@ namespace Yazlab.Yonetim
                     float dalga = Mathf.Sin(x * 0.08f + n1 * 6f) * 0.5f + 0.5f;
 
                     Color c = Color.Lerp(derinSu, dalgaKopugu, Mathf.Clamp01(dalga * 0.35f + kostik * 0.65f));
-                    c.a = 0.95f;
+                    c.a = 0.85f;
                     tex.SetPixel(x, y, c);
                 }
             }
