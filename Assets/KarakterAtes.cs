@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using UnityEngine;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
@@ -52,7 +52,13 @@ public class KarakterAtes : MonoBehaviour
     public Color hedefKilitRengi = new Color(1.0f, 0.22f, 0.20f, 0.95f);
 
     [Tooltip("Mermi izi (Tracer) rengi.")]
-    public Color mermiIziRengi = new Color(1f, 0.85f, 0.35f, 0.9f);
+    public Color mermiIziRengi = new Color(1f, 0.88f, 0.38f, 0.92f);
+
+    [Tooltip("Mermi izinin ekranda kalma süresi.")]
+    public float tracerSuresi = 0.055f;
+
+    [Tooltip("Namlu flaşı parlama süresi.")]
+    public float namluFlasSuresi = 0.045f;
 
     [Header("Ses Efektleri (İsteğe Bağlı)")]
     [Tooltip("Ateş edildiğinde çalacak ses efekti.")]
@@ -349,8 +355,8 @@ public class KarakterAtes : MonoBehaviour
         Light spLight = spark.AddComponent<Light>();
         spLight.type = LightType.Point;
         spLight.color = new Color(1f, 0.7f, 0.2f);
-        spLight.range = 2.0f;
-        spLight.intensity = 3.0f;
+        spLight.range = 2.4f;
+        spLight.intensity = 3.6f;
         Destroy(spark, 0.08f);
     }
 
@@ -370,7 +376,7 @@ public class KarakterAtes : MonoBehaviour
             namluFlasRenderer.enabled = true;
         }
 
-        yield return new WaitForSeconds(0.04f);
+        yield return new WaitForSeconds(namluFlasSuresi);
 
         if (namluIsigi != null)
         {
@@ -388,7 +394,7 @@ public class KarakterAtes : MonoBehaviour
         mermiIziRenderer.SetPosition(0, baslangic);
         mermiIziRenderer.SetPosition(1, bitis);
 
-        yield return new WaitForSeconds(0.05f);
+        yield return new WaitForSeconds(tracerSuresi);
 
         if (mermiIziRenderer != null)
         {
@@ -423,8 +429,8 @@ public class KarakterAtes : MonoBehaviour
         namluIsigi = lightObj.AddComponent<Light>();
         namluIsigi.type = LightType.Point;
         namluIsigi.color = new Color(1f, 0.85f, 0.35f);
-        namluIsigi.range = 3.5f;
-        namluIsigi.intensity = 4.0f;
+        namluIsigi.range = 4.2f;
+        namluIsigi.intensity = 4.6f;
         namluIsigi.enabled = false;
     }
 
