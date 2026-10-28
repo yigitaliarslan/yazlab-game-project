@@ -65,6 +65,7 @@ namespace Yazlab.Editor
             }
 
             if (GameObject.Find("Hendek_DerinTaban") == null ||
+                GameObject.Find("Bolum1_Hendek_Aydinlatma_Grubu") == null ||
                 Object.FindAnyObjectByType<HendekDusmeKontrolu>() == null ||
                 Object.FindAnyObjectByType<HendekSuAnimasyonu>() == null)
             {
