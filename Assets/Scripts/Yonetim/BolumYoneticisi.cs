@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using UnityEngine;
 using UnityEngine.Events;
 #if ENABLE_INPUT_SYSTEM
@@ -199,8 +199,8 @@ namespace Yazlab.Yonetim
             }
 
             // 1. SOL ÜST: OPERASYON GÖREV BİLGİ KUTUSU
-            float kutuW = 380f;
-            float kutuH = 68f;
+            float kutuW = 410f;
+            float kutuH = 72f;
             float x = 20f;
             float y = 20f;
 
@@ -214,13 +214,13 @@ namespace Yazlab.Yonetim
             switch (mevcutDurum)
             {
                 case OyunDurumu.Baslangic:
-                    gorevDetay = "• Siperleri aşın, düşmanları etkisiz hale getirin.\n• Kilitli Depo Kapısına veya Jeneratör Şalterine ulaşın.";
+                    gorevDetay = "• 1. Bölüm: [G] + [E] ile Askı Kapıyı indirip hendeği geçin.\n• 2. Bölüm: Kablo Odasındaki şalteri açın ve Tareti aşın.";
                     break;
                 case OyunDurumu.FizikselEngelAlaninda:
-                    gorevDetay = "• Elektrik paneli bulmacasını çözün veya\n• Yoldaş ile gizli yoldan jeneratör şalterini indirin.";
+                    gorevDetay = "• Kablo Odasındaki elektrik şalteri bulmacasını çözün veya\n• Doğu koridorundaki yedek jeneratör şalterini indirin.";
                     break;
                 case OyunDurumu.FizikselEngelAsildi:
-                    gorevDetay = "• Merdivenlerden kuleye çıkın.\n• Nöbetçi Muhafızın bulunduğu odaya ilerleyin.";
+                    gorevDetay = "• 3. Bölüm: İç Kule merdiven holünden 2. kata çıkın.\n• Nöbetçi Muhafızın koruduğu çıkış odasına ilerleyin.";
                     break;
                 case OyunDurumu.SosyalEngelAlaninda:
                     gorevDetay = "• [E] Rüşvetçi Muhafız ile görüşün ve kapıyı açtırın.\n• Açılan kapıdan çıkış bölgesine ulaşın.";
