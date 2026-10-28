@@ -66,21 +66,26 @@ namespace Yazlab.Mekanikler
                 if (mr != null)
                 {
                     mr.sharedMaterial = OlusturSaydamSuMateryali();
+                    mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                    mr.receiveShadows = false;
                 }
             }
 
-            // 2. İkinci Katman: Derin Su Altı Parıltı Katmanı (Derinlik hissi için)
+            // 2. İkinci Katman: Derin Su Altı Parıltı Katmanı (Suyun karanlık görünmesini önleyen parlak turkuaz taban)
             GameObject altKatman = GameObject.CreatePrimitive(PrimitiveType.Cube);
             altKatman.name = "Su_AltDerinlikKatmani";
             altKatman.transform.SetParent(detayKok.transform);
-            altKatman.transform.position = new Vector3(0f, _suSeviyesiY - 0.55f, -11.7f);
+            altKatman.transform.position = new Vector3(0f, _suSeviyesiY - 0.45f, -11.7f);
             altKatman.transform.localScale = new Vector3(32f, 0.08f, 6.1f);
             Destroy(altKatman.GetComponent<Collider>());
             Material derinMat = new Material(unlitShader)
             {
-                color = new Color(0.03f, 0.22f, 0.36f, 0.85f)
+                color = new Color(0.18f, 0.72f, 0.92f, 0.92f)
             };
-            altKatman.GetComponent<MeshRenderer>().sharedMaterial = derinMat;
+            MeshRenderer altRend = altKatman.GetComponent<MeshRenderer>();
+            altRend.sharedMaterial = derinMat;
+            altRend.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            altRend.receiveShadows = false;
 
             // 3. Su Üzerinde Akan Dinamik Beyaz Köpük ve Akıntı Şeritleri (18 adet)
             _kopukler.Clear();
@@ -149,19 +154,80 @@ namespace Yazlab.Mekanikler
             SelaleOlustur("Hendek_SolSelale", new Vector3(-15.4f, -0.1f, -11.7f), Quaternion.Euler(0f, 90f, 0f), detayKok.transform);
             SelaleOlustur("Hendek_SagSelale", new Vector3(15.4f, -0.1f, -11.7f), Quaternion.Euler(0f, -90f, 0f), detayKok.transform);
 
-            // 6. Su Altı Turkuaz Aydınlatma Işıkları (Suyun karanlık boşluk gibi görünmesini engeller)
-            float[] isikX = { -10f, -3.5f, 3.5f, 10f };
+            // 6. Hendek Kanyonu, Su Üstü ve 1. Bölüm Anahtar Sütunları Güçlü Aydınlatma Sistemi
+            float[] isikX = { -12f, -6f, 0f, 6f, 12f };
             for (int i = 0; i < isikX.Length; i++)
             {
-                GameObject isikObj = new GameObject($"SuAlti_TurkuazIsik_{i + 1}");
+                // Hendek içi ve su yüzeyi aydınlatması
+                GameObject isikObj = new GameObject($"Hendek_AydinlatmaIsigi_{i + 1}");
                 isikObj.transform.SetParent(detayKok.transform);
-                isikObj.transform.position = new Vector3(isikX[i], _suSeviyesiY + 0.6f, -11.7f);
+                isikObj.transform.position = new Vector3(isikX[i], 2.2f, -11.7f);
                 Light l = isikObj.AddComponent<Light>();
                 l.type = LightType.Point;
-                l.color = new Color(0.15f, 0.78f, 0.95f);
-                l.range = 9.5f;
-                l.intensity = 2.2f;
+                l.color = new Color(0.92f, 0.97f, 1.0f);
+                l.range = 18.0f;
+                l.intensity = 3.2f;
+                l.shadows = LightShadows.None;
             }
+
+            // 1. Bölüm Başlangıç Alanı ve 2 Anahtar Sütunu Üst Aydınlatmaları
+            Vector3[] disAlanIsiklari = new Vector3[]
+            {
+                new Vector3(-6.0f, 4.5f, -17.5f),
+                new Vector3(0.0f, 5.0f, -16.5f),
+                new Vector3(6.0f, 4.5f, -17.5f)
+            };
+            for (int i = 0; i < disAlanIsiklari.Length; i++)
+            {
+                GameObject disIsik = new GameObject($"Bolum1_DisAlanIsigi_{i + 1}");
+                disIsik.transform.SetParent(detayKok.transform);
+                disIsik.transform.position = disAlanIsiklari[i];
+                Light dl = disIsik.AddComponent<Light>();
+                dl.type = LightType.Point;
+                dl.color = new Color(1.0f, 0.95f, 0.86f);
+                dl.range = 22.0f;
+                dl.intensity = 3.0f;
+                dl.shadows = LightShadows.None;
+            }
+
+            // Hendek Ön Kenarı Boyunca Meşale Direkleri (4 adet)
+            float[] mesaleX = { -11.5f, -3.4f, 3.4f, 11.5f };
+            for (int i = 0; i < mesaleX.Length; i++)
+            {
+                HendekKenarMesalesiOlustur($"HendekKenar_Mesale_{i + 1}", new Vector3(mesaleX[i], 0f, -15.1f), detayKok.transform);
+            }
+        }
+
+        private void HendekKenarMesalesiOlustur(string ad, Vector3 pos, Transform parent)
+        {
+            GameObject mKok = new GameObject(ad);
+            mKok.transform.SetParent(parent);
+            mKok.transform.position = pos;
+
+            Shader lit = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+            Shader unlit = Shader.Find("Sprites/Default") ?? Shader.Find("Universal Render Pipeline/Unlit");
+
+            GameObject direk = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            direk.name = "MesaleDiregi";
+            direk.transform.SetParent(mKok.transform);
+            direk.transform.localPosition = new Vector3(0f, 0.75f, 0f);
+            direk.transform.localScale = new Vector3(0.22f, 0.75f, 0.22f);
+            direk.GetComponent<MeshRenderer>().sharedMaterial = new Material(lit) { color = new Color(0.38f, 0.34f, 0.30f) };
+
+            GameObject alev = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            alev.name = "AlevTopu";
+            alev.transform.SetParent(mKok.transform);
+            alev.transform.localPosition = new Vector3(0f, 1.6f, 0f);
+            alev.transform.localScale = new Vector3(0.42f, 0.48f, 0.42f);
+            Destroy(alev.GetComponent<Collider>());
+            alev.GetComponent<MeshRenderer>().sharedMaterial = new Material(unlit) { color = new Color(1.0f, 0.72f, 0.22f, 0.95f) };
+
+            Light pLight = alev.AddComponent<Light>();
+            pLight.type = LightType.Point;
+            pLight.color = new Color(1.0f, 0.76f, 0.38f);
+            pLight.range = 12f;
+            pLight.intensity = 2.4f;
+            pLight.shadows = LightShadows.None;
         }
 
         private void SelaleOlustur(string ad, Vector3 pos, Quaternion rot, Transform parent)
@@ -173,7 +239,7 @@ namespace Yazlab.Mekanikler
 
             // Taş su oluğu
             Shader lit = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
-            Material tasMat = new Material(lit) { color = new Color(0.28f, 0.27f, 0.25f) };
+            Material tasMat = new Material(lit) { color = new Color(0.55f, 0.52f, 0.48f) };
             GameObject oluk = GameObject.CreatePrimitive(PrimitiveType.Cube);
             oluk.name = "TasSuOlugu";
             oluk.transform.SetParent(selaleKok.transform);
@@ -192,7 +258,7 @@ namespace Yazlab.Mekanikler
             main.startLifetime = 0.75f;
             main.startSpeed = 2.6f;
             main.startSize = new ParticleSystem.MinMaxCurve(0.18f, 0.42f);
-            main.startColor = new Color(0.70f, 0.92f, 1.0f, 0.75f);
+            main.startColor = new Color(0.78f, 0.95f, 1.0f, 0.82f);
             main.gravityModifier = 0.8f;
             main.simulationSpace = ParticleSystemSimulationSpace.World;
             main.maxParticles = 120;
@@ -210,23 +276,24 @@ namespace Yazlab.Mekanikler
             {
                 psr.sharedMaterial = new Material(pShader)
                 {
-                    color = new Color(0.80f, 0.95f, 1.0f, 0.70f)
+                    color = new Color(0.85f, 0.97f, 1.0f, 0.80f)
                 };
             }
         }
 
         private Material OlusturSaydamSuMateryali()
         {
-            Shader suShader = Shader.Find("Sprites/Default") ?? Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+            Shader suShader = Shader.Find("Sprites/Default") ?? Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Standard");
             Material m = new Material(suShader)
             {
                 name = "Mat_CanliHendekSuyu",
-                color = new Color(0.08f, 0.52f, 0.78f, 0.82f)
+                // Beyaza yakın açık turkuaz çarpan (dokunun rengini karartmaması için!)
+                color = new Color(0.94f, 0.99f, 1.0f, 0.88f)
             };
 
             Texture2D suTex = Yonetim.ProsedurelDokuUretici.UretSuDokusu(
-                new Color(0.05f, 0.36f, 0.58f, 0.82f),
-                new Color(0.45f, 0.88f, 0.98f, 0.92f));
+                new Color(0.16f, 0.68f, 0.90f, 0.88f),
+                new Color(0.75f, 0.96f, 1.0f, 0.96f));
 
             m.mainTexture = suTex;
             m.mainTextureScale = new Vector2(8f, 2.5f);
@@ -237,7 +304,7 @@ namespace Yazlab.Mekanikler
             }
             if (m.HasProperty("_BaseColor"))
             {
-                m.SetColor("_BaseColor", new Color(0.10f, 0.58f, 0.84f, 0.82f));
+                m.SetColor("_BaseColor", new Color(0.94f, 0.99f, 1.0f, 0.88f));
             }
             return m;
         }
