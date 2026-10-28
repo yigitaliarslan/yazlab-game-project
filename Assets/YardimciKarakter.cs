@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using UnityEngine;
 
 /// <summary>
@@ -27,12 +27,12 @@ public class YardimciKarakter : MonoBehaviour
     public DonusModu donusModu = DonusModu.OyuncuyaBak;
     public float donusHizi = 8.0f;
     public float hareketHizi = 4.8f;
-    public float takipMesafesi = 3.2f;
+    public float takipMesafesi = 3.6f;
     public Transform hedef;
 
     [Header("Ateş ve Çatışma Ayarları")]
     [Tooltip("Düşmanı görebileceği ve ateş edebileceği maksimum menzil.")]
-    public float atesMenzili = 30f;
+    public float atesMenzili = 34f;
 
     [Tooltip("İki atış arasındaki süre.")]
     public float atesAraligi = 0.9f;
@@ -208,10 +208,24 @@ public class YardimciKarakter : MonoBehaviour
         }
         else
         {
-            // Etrafta düşman yoksa oyuncuya doğru dön
+            // Etrafta düşman yoksa oyuncuyu takip mesafesinde izle ve ona doğru dön
             if (hedef != null)
             {
-                Vector3 bakisYonu = donusModu == DonusModu.OyuncuyaBak ? (hedef.position - transform.position) : hedef.forward;
+                Vector3 oyuncuFark = hedef.position - transform.position;
+                oyuncuFark.y = 0f;
+                float oyuncuMesafe = oyuncuFark.magnitude;
+                bool hendekIcAvluAyniTaraf = (transform.position.z > -8.2f && hedef.position.z > -8.2f) || (transform.position.z < -15.0f && hedef.position.z < -15.0f);
+
+                if (hendekIcAvluAyniTaraf && oyuncuMesafe > takipMesafesi && Mathf.Abs(hedef.position.y - transform.position.y) < 1.2f)
+                {
+                    Vector3 takipYon = oyuncuFark.normalized;
+                    transform.position += takipYon * (hareketHizi * 0.9f) * Time.deltaTime;
+                    transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(takipYon), Time.deltaTime * donusHizi);
+                    AnimasyonAyarla("infantry_combat_run");
+                    return;
+                }
+
+                Vector3 bakisYonu = donusModu == DonusModu.OyuncuyaBak ? oyuncuFark : hedef.forward;
                 bakisYonu.y = 0f;
 
                 if (bakisYonu.sqrMagnitude > 0.001f)
@@ -253,7 +267,7 @@ public class YardimciKarakter : MonoBehaviour
                 RaycastHit hit;
                 if (Physics.Raycast(goz, (hedefGovde - goz).normalized, out hit, atesMenzili))
                 {
-                    if (hit.transform == d.transform || hit.transform.IsChildOf(d.transform))
+                    if (hit.transform == d.transform || hit.transform.IsChildOf(d.transform) || hit.collider.GetComponentInParent<DusmanKontrol>() == d)
                     {
                         enKisaMesafe = mesafe;
                         enYakin = d;
