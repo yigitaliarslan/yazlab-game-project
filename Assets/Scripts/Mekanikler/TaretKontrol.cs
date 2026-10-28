@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using UnityEngine;
 using Yazlab.Yonetim;
 
@@ -43,7 +43,9 @@ namespace Yazlab.Mekanikler
 
         [Header("Geri Tepme (Recoil) Ayarları")]
         public float recoilMiktari = 0.35f;
-        public float recoilHizi = 10.0f;
+        public float recoilHizi = 11.5f;
+        public float taramaAcisi = 38.0f;
+        public float taramaHizi = 1.35f;
 
         [Header("Çift Hedef & Eşzamanlı Ateş")]
         public float hasarOyuncu = 10.0f;
@@ -312,12 +314,12 @@ namespace Yazlab.Mekanikler
 
             if (namluSol != null)
             {
-                namluSol.localPosition = Vector3.MoveTowards(namluSol.localPosition, namluSolOrijinalLocalPos, Time.deltaTime * recoilHizi);
+                namluSol.localPosition = Vector3.Lerp(namluSol.localPosition, namluSolOrijinalLocalPos, Time.deltaTime * recoilHizi);
                 namluSol.localRotation = Quaternion.identity;
             }
             if (namluSag != null)
             {
-                namluSag.localPosition = Vector3.MoveTowards(namluSag.localPosition, namluSagOrijinalLocalPos, Time.deltaTime * recoilHizi);
+                namluSag.localPosition = Vector3.Lerp(namluSag.localPosition, namluSagOrijinalLocalPos, Time.deltaTime * recoilHizi);
                 namluSag.localRotation = Quaternion.identity;
             }
 
@@ -381,8 +383,9 @@ namespace Yazlab.Mekanikler
             else
             {
                 DurumIsiginiAyarla(new Color(0.70f, 0.15f, 0.10f), 1.0f);
-                Quaternion beklemeRot = Quaternion.Euler(0f, 180f, 0f);
-                donenGovde.rotation = Quaternion.Slerp(donenGovde.rotation, beklemeRot, Time.deltaTime * 3.0f);
+                float salinim = Mathf.Sin(Time.time * taramaHizi) * taramaAcisi;
+                Quaternion beklemeRot = Quaternion.Euler(0f, 180f + salinim, 0f);
+                donenGovde.rotation = Quaternion.Slerp(donenGovde.rotation, beklemeRot, Time.deltaTime * 3.2f);
             }
         }
 
@@ -629,8 +632,8 @@ namespace Yazlab.Mekanikler
 
         private IEnumerator HasarSensörFlasi()
         {
-            DurumIsiginiAyarla(Color.yellow, 4.5f);
-            yield return new WaitForSeconds(0.08f);
+            DurumIsiginiAyarla(new Color(1f, 0.92f, 0.25f), 5.2f);
+            yield return new WaitForSeconds(0.09f);
             if (!oldu) DurumIsiginiAyarla(new Color(1f, 0.05f, 0.05f), 3.0f);
         }
 
