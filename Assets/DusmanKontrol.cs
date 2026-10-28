@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using UnityEngine;
 
 /// <summary>
@@ -72,6 +72,7 @@ public class DusmanKontrol : MonoBehaviour
     protected float sonrakiAtesZamani = 0f;
     protected bool oldu = false;
     protected float sonHasarZamani = 0f;
+    protected float gorunenCan = 100f;
 
     private Texture2D beyazDokusu;
     private GUIStyle canMetniStili;
@@ -92,6 +93,7 @@ public class DusmanKontrol : MonoBehaviour
     {
         maksimumCan = 140f;
         mevcutCan = maksimumCan;
+        gorunenCan = maksimumCan;
         atesHasari = 9f;
         atesAraligi = 0.75f;
         animator = GetComponent<Animator>();
@@ -556,7 +558,12 @@ public class DusmanKontrol : MonoBehaviour
         GUI.color = new Color(0.25f, 0.05f, 0.05f, 0.9f);
         GUI.DrawTexture(new Rect(solX, ustY, genislik, yukseklik), beyazDokusu);
 
-        // 3. Kırmızı Can Dolgusu
+        // 3. Yumuşak Geçişli Can Dolgusu
+        gorunenCan = Mathf.Lerp(gorunenCan, mevcutCan, Time.deltaTime * 8.0f);
+        float ghostOran = Mathf.Clamp01(gorunenCan / maksimumCan);
+        GUI.color = new Color(0.85f, 0.55f, 0.15f, 0.65f);
+        GUI.DrawTexture(new Rect(solX, ustY, genislik * ghostOran, yukseklik), beyazDokusu);
+
         float oran = Mathf.Clamp01(mevcutCan / maksimumCan);
         float dolguGenislik = genislik * oran;
 

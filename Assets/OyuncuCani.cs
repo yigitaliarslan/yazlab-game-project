@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -24,7 +24,7 @@ public class OyuncuCani : MonoBehaviour
     public float mermiHasarLimiti = 8f;
 
     [Tooltip("Mermi spamını engelleyen hasar koruması.")]
-    public float hasarKorumasi = 0.18f;
+    public float hasarKorumasi = 0.20f;
 
     [Tooltip("Öldükten sonra yeniden başlama süresi.")]
     public float yenidenBaslamaGecikmesi = 1.8f;
@@ -208,6 +208,11 @@ public class OyuncuCani : MonoBehaviour
         GUI.DrawTexture(new Rect(posX - 1, oyuncuBarY - 1, genislik + 2, yukseklik + 2), beyazDokusu);
         GUI.color = new Color(0.12f, 0.12f, 0.12f, 0.85f);
         GUI.DrawTexture(new Rect(posX, oyuncuBarY, genislik, yukseklik), beyazDokusu);
+
+        // Ghost (Yumuşak Hasar İzi) Dolgusu
+        float ghostOran = Mathf.Clamp01(ghostCan / maksimumCan);
+        GUI.color = new Color(0.95f, 0.35f, 0.20f, 0.55f);
+        GUI.DrawTexture(new Rect(posX, oyuncuBarY, genislik * ghostOran, yukseklik), beyazDokusu);
 
         // Oyuncu Renk Hesabı (Yeşil -> Turuncu -> Kırmızı)
         float oran = Mathf.Clamp01(mevcutCan / maksimumCan);
