@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using UnityEngine;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
@@ -165,7 +165,10 @@ namespace Yazlab.Mekanikler
                 if (EscBasildiMi() || EBasildiMi())
                 {
                     PaneliKapat();
+                    return;
                 }
+
+                KlavyeSigortaKisayollariniKontrolEt();
 
                 // Oyuncu uzaklaşırsa paneli otomatik kapat
                 if (mesafe > etkilesimMenzili + 2.0f)
@@ -214,6 +217,34 @@ namespace Yazlab.Mekanikler
             }
             catch { }
             return false;
+        }
+
+        private void KlavyeSigortaKisayollariniKontrolEt()
+        {
+            if (bulmacaCozuldu) return;
+            for (int i = 0; i < 5; i++)
+            {
+                bool basildi = false;
+#if ENABLE_INPUT_SYSTEM
+                if (Keyboard.current != null)
+                {
+                    if (i == 0 && Keyboard.current.digit1Key.wasPressedThisFrame) basildi = true;
+                    else if (i == 1 && Keyboard.current.digit2Key.wasPressedThisFrame) basildi = true;
+                    else if (i == 2 && Keyboard.current.digit3Key.wasPressedThisFrame) basildi = true;
+                    else if (i == 3 && Keyboard.current.digit4Key.wasPressedThisFrame) basildi = true;
+                    else if (i == 4 && Keyboard.current.digit5Key.wasPressedThisFrame) basildi = true;
+                }
+#endif
+                if (!basildi)
+                {
+                    try { if (Input.GetKeyDown(KeyCode.Alpha1 + i)) basildi = true; } catch { }
+                }
+                if (basildi)
+                {
+                    salterler[i] = !salterler[i];
+                    if (sesTik != null && audioSource != null) audioSource.PlayOneShot(sesTik);
+                }
+            }
         }
 
         void OnGUI()
@@ -339,7 +370,7 @@ namespace Yazlab.Mekanikler
             }
             durumStili.fontSize = Mathf.RoundToInt(14 * olcek);
             durumStili.normal.textColor = new Color(0.85f, 0.90f, 0.95f);
-            GUI.Label(new Rect(panelX + 20 * olcek, panelY + 44 * olcek, panelW - 140 * olcek, 26 * olcek), "Tüm sigortaları YUKARI (AÇIK) konuma getirerek ana jeneratörü ve güneşi devreye sokun.", durumStili);
+            GUI.Label(new Rect(panelX + 20 * olcek, panelY + 44 * olcek, panelW - 140 * olcek, 26 * olcek), "Tüm sigortaları (Fare veya [1-5] tuşlarıyla) AÇIK konuma getirerek ana jeneratörü devreye sokun. [ESC: Çıkış]", durumStili);
 
             // Sağ Üst [X] ÇIKIŞ Butonu
             float cikisBtnW = 95 * olcek;
