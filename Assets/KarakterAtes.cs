@@ -147,7 +147,7 @@ public class KarakterAtes : MonoBehaviour
 
     void Update()
     {
-        if (Yazlab.Mekanikler.KapiBulmacaPaneli.MinigameAcik) return;
+        if ((Yazlab.Mekanikler.KapiBulmacaPaneli.MinigameAcik || Yazlab.Yonetim.OllamaNpcDiyalogUI.DiyalogAcikMi)) return;
 
         HedefKilitKontrolEt();
 
@@ -456,7 +456,7 @@ public class KarakterAtes : MonoBehaviour
 
     void OnGUI()
     {
-        if (!nisangahGoster || Yazlab.Mekanikler.KapiBulmacaPaneli.MinigameAcik) return;
+        if (!nisangahGoster || (Yazlab.Mekanikler.KapiBulmacaPaneli.MinigameAcik || Yazlab.Yonetim.OllamaNpcDiyalogUI.DiyalogAcikMi)) return;
 
         if (beyazTexture == null)
         {

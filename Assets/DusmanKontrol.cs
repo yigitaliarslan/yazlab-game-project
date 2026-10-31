@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using UnityEngine;
 
 /// <summary>
@@ -586,7 +586,7 @@ public class DusmanKontrol : MonoBehaviour
         {
             dusmanBaslikStili = new GUIStyle(GUI.skin.label)
             {
-                fontSize = Mathf.RoundToInt(10 * olcek),
+                fontSize = Mathf.Max(13, Mathf.RoundToInt(13 * olcek)),
                 fontStyle = FontStyle.Bold,
                 alignment = TextAnchor.LowerCenter
             };
@@ -600,7 +600,7 @@ public class DusmanKontrol : MonoBehaviour
         {
             canMetniStili = new GUIStyle(GUI.skin.label)
             {
-                fontSize = Mathf.RoundToInt(9 * olcek),
+                fontSize = Mathf.Max(12, Mathf.RoundToInt(12 * olcek)),
                 fontStyle = FontStyle.Bold,
                 alignment = TextAnchor.MiddleCenter
             };

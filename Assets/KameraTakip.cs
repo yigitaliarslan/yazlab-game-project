@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
@@ -101,7 +101,7 @@ public class KameraTakip : MonoBehaviour
 
     void Update()
     {
-        if (Yazlab.Mekanikler.KapiBulmacaPaneli.MinigameAcik) return;
+        if ((Yazlab.Mekanikler.KapiBulmacaPaneli.MinigameAcik || Yazlab.Yonetim.OllamaNpcDiyalogUI.DiyalogAcikMi)) return;
 
         FareyiOku();
         CurrentYaw = yaw;

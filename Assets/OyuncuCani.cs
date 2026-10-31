@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -229,7 +229,7 @@ public class OyuncuCani : MonoBehaviour
         // "Ajanın Barı" Yazısı (Barın üstünde/solunda zarif font)
         GUIStyle ajanYaziStili = new GUIStyle(GUI.skin.label)
         {
-            fontSize = 10,
+            fontSize = 13,
             fontStyle = FontStyle.Bold,
             alignment = TextAnchor.MiddleRight
         };

@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using UnityEngine;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
@@ -322,7 +322,7 @@ namespace Yazlab.Mekanikler
             GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), texBeyaz);
 
             // Ekran boyutuna göre duyarlı ölçekleme (Responsive Scaling)
-            float olcek = Mathf.Clamp(Screen.height / 850f, 0.80f, 1.35f);
+            float olcek = Mathf.Clamp(Screen.height / 650f, 0.95f, 1.35f);
 
             float panelW = 820f * olcek;
             float panelH = 550f * olcek;
@@ -354,7 +354,7 @@ namespace Yazlab.Mekanikler
                     alignment = TextAnchor.MiddleCenter
                 };
             }
-            baslikStili.fontSize = Mathf.RoundToInt(20 * olcek);
+            GoruntuKalitesiYoneticisi.StiliKeskinlestir(baslikStili, Mathf.RoundToInt(20 * olcek));
             baslikStili.normal.textColor = new Color(1.0f, 0.85f, 0.20f);
 
             GUI.color = Color.white;
@@ -368,7 +368,7 @@ namespace Yazlab.Mekanikler
                     alignment = TextAnchor.MiddleCenter
                 };
             }
-            durumStili.fontSize = Mathf.RoundToInt(14 * olcek);
+            GoruntuKalitesiYoneticisi.StiliKeskinlestir(durumStili, Mathf.RoundToInt(14 * olcek));
             durumStili.normal.textColor = new Color(0.85f, 0.90f, 0.95f);
             GUI.Label(new Rect(panelX + 20 * olcek, panelY + 44 * olcek, panelW - 140 * olcek, 26 * olcek), "Tüm sigortaları (Fare veya [1-5] tuşlarıyla) AÇIK konuma getirerek ana jeneratörü devreye sokun. [ESC: Çıkış]", durumStili);
 
@@ -476,7 +476,7 @@ namespace Yazlab.Mekanikler
             {
                 // Başarı Bildirimi
                 GUI.color = Color.green;
-                baslikStili.fontSize = Mathf.RoundToInt(20 * olcek);
+                GoruntuKalitesiYoneticisi.StiliKeskinlestir(baslikStili, Mathf.RoundToInt(20 * olcek));
                 baslikStili.normal.textColor = new Color(0.20f, 1.0f, 0.40f);
                 GUI.Label(new Rect(panelX + 20 * olcek, altY + 22 * olcek, panelW - 40 * olcek, 36 * olcek), "✓ GÜÇ VERİLDİ! GÜNEŞ DOĞUYOR VE 1. KAPI AÇILIYOR...", baslikStili);
             }

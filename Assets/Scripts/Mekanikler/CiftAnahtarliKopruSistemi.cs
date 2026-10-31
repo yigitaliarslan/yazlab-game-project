@@ -233,7 +233,7 @@ namespace Yazlab.Mekanikler
             {
                 _baslikStil = new GUIStyle(GUI.skin.label)
                 {
-                    fontSize = 15,
+                    fontSize = 16,
                     fontStyle = FontStyle.Bold,
                     alignment = TextAnchor.MiddleCenter
                 };
@@ -244,15 +244,18 @@ namespace Yazlab.Mekanikler
             {
                 _altStil = new GUIStyle(GUI.skin.label)
                 {
-                    fontSize = 13,
+                    fontSize = 14,
                     fontStyle = FontStyle.Bold,
                     alignment = TextAnchor.MiddleCenter
                 };
                 _altStil.normal.textColor = Color.white;
             }
 
-            float genislik = 660f;
-            float yukseklik = 76f;
+            float olcek = Yazlab.Yonetim.GoruntuKalitesiYoneticisi.KeskinOlcek;
+            Yazlab.Yonetim.GoruntuKalitesiYoneticisi.StiliKeskinlestir(_baslikStil, Mathf.RoundToInt(16 * olcek));
+            Yazlab.Yonetim.GoruntuKalitesiYoneticisi.StiliKeskinlestir(_altStil, Mathf.RoundToInt(14 * olcek));
+            float genislik = Mathf.Min(Screen.width - 30f, 700f * olcek);
+            float yukseklik = 82f * olcek;
             Rect kutu = new Rect((Screen.width - genislik) * 0.5f, 16f, genislik, yukseklik);
             GUI.Box(kutu, GUIContent.none, _panelStil);
 

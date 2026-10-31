@@ -177,7 +177,7 @@ public class KarakterHareket : MonoBehaviour
 
     void Update()
     {
-        if (Yazlab.Mekanikler.KapiBulmacaPaneli.MinigameAcik)
+        if ((Yazlab.Mekanikler.KapiBulmacaPaneli.MinigameAcik || Yazlab.Yonetim.OllamaNpcDiyalogUI.DiyalogAcikMi))
         {
             if (animator != null && hasIsRunningParam)
             {
@@ -369,7 +369,7 @@ public class KarakterHareket : MonoBehaviour
 
     private void OnGUI()
     {
-        if (Yazlab.Mekanikler.KapiBulmacaPaneli.MinigameAcik) return;
+        if ((Yazlab.Mekanikler.KapiBulmacaPaneli.MinigameAcik || Yazlab.Yonetim.OllamaNpcDiyalogUI.DiyalogAcikMi)) return;
 
         if (durusArkaTex == null)
         {
@@ -387,7 +387,7 @@ public class KarakterHareket : MonoBehaviour
         if (durusYaziStili == null)
         {
             durusYaziStili = new GUIStyle(GUI.skin.label);
-            durusYaziStili.fontSize = 13;
+            Yazlab.Yonetim.GoruntuKalitesiYoneticisi.StiliKeskinlestir(durusYaziStili, 15);
             durusYaziStili.fontStyle = FontStyle.Bold;
             durusYaziStili.alignment = TextAnchor.MiddleLeft;
         }

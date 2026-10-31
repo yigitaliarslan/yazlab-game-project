@@ -236,10 +236,11 @@ namespace Yazlab.Yonetim
 
         public static Texture2D UretOrmeTasDokusu(Color anaTasRengi, Color derzRengi)
         {
-            int boyut = 256;
+            int boyut = 512;
             Texture2D tex = new Texture2D(boyut, boyut, TextureFormat.RGBA32, true);
             tex.wrapMode = TextureWrapMode.Repeat;
-            tex.filterMode = FilterMode.Bilinear;
+            tex.filterMode = FilterMode.Trilinear;
+            tex.anisoLevel = 8;
 
             int satirSayisi = 8;
             int sutunSayisi = 4;
@@ -290,10 +291,11 @@ namespace Yazlab.Yonetim
 
         public static Texture2D UretAhsapKalasDokusu(Color acikAhsap, Color koyuDamar)
         {
-            int boyut = 256;
+            int boyut = 512;
             Texture2D tex = new Texture2D(boyut, boyut, TextureFormat.RGBA32, true);
             tex.wrapMode = TextureWrapMode.Repeat;
-            tex.filterMode = FilterMode.Bilinear;
+            tex.filterMode = FilterMode.Trilinear;
+            tex.anisoLevel = 8;
 
             int kalasSayisi = 6;
             int kalasGenislik = boyut / kalasSayisi;
@@ -323,10 +325,11 @@ namespace Yazlab.Yonetim
 
         public static Texture2D UretPercinliMetalDokusu(Color metalRengi, Color pasRengi)
         {
-            int boyut = 256;
+            int boyut = 512;
             Texture2D tex = new Texture2D(boyut, boyut, TextureFormat.RGBA32, true);
             tex.wrapMode = TextureWrapMode.Repeat;
-            tex.filterMode = FilterMode.Bilinear;
+            tex.filterMode = FilterMode.Trilinear;
+            tex.anisoLevel = 8;
 
             for (int y = 0; y < boyut; y++)
             {
@@ -350,10 +353,11 @@ namespace Yazlab.Yonetim
 
         public static Texture2D UretToprakDokusu(Color acikToprak, Color koyuToprak)
         {
-            int boyut = 256;
+            int boyut = 512;
             Texture2D tex = new Texture2D(boyut, boyut, TextureFormat.RGBA32, true);
             tex.wrapMode = TextureWrapMode.Repeat;
-            tex.filterMode = FilterMode.Bilinear;
+            tex.filterMode = FilterMode.Trilinear;
+            tex.anisoLevel = 8;
 
             for (int y = 0; y < boyut; y++)
             {
@@ -373,10 +377,11 @@ namespace Yazlab.Yonetim
 
         public static Texture2D UretSuDokusu(Color derinSu, Color dalgaKopugu)
         {
-            int boyut = 256;
+            int boyut = 512;
             Texture2D tex = new Texture2D(boyut, boyut, TextureFormat.RGBA32, true);
             tex.wrapMode = TextureWrapMode.Repeat;
-            tex.filterMode = FilterMode.Bilinear;
+            tex.filterMode = FilterMode.Trilinear;
+            tex.anisoLevel = 8;
 
             for (int y = 0; y < boyut; y++)
             {
