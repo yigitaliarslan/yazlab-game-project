@@ -199,8 +199,8 @@ public class OyuncuCani : MonoBehaviour
         float yukseklik = Mathf.Round(10f * olcek);
         float posX = Mathf.Round(Screen.width - genislik - 22f);
 
-        // 1. Oyuncunun Kendi Can Barı
-        float oyuncuBarY = Mathf.Round(Screen.height - 48f * olcek);
+        // Oyuncunun Kendi Can Barı (Yan karakterin canı sonsuz olduğu için yalnızca oyuncu barı çizilir)
+        float oyuncuBarY = Mathf.Round(Screen.height - 34f * olcek);
 
         if (barYaziStili == null)
         {
@@ -239,34 +239,6 @@ public class OyuncuCani : MonoBehaviour
         Color barRengi = GetGtaRenk(oran);
         GUI.color = barRengi;
         GUI.DrawTexture(new Rect(posX, oyuncuBarY, genislik * oran, yukseklik), beyazDokusu);
-
-        // 2. Ajanın / Yardımcının Can Barı (Hemen Kendi Barımızın Altında)
-        YardimciKarakter ajan = YardimciKarakter.Instance;
-        if (ajan == null) ajan = Object.FindAnyObjectByType<YardimciKarakter>();
-
-        float ajanBarY = Mathf.Round(Screen.height - 24f * olcek);
-
-        // "Ajanın Barı" Yazısı (Yeterli yükseklik ile kesilmeden tam hizalı çizilir)
-        GUI.color = Color.white;
-        Yazlab.Yonetim.GoruntuKalitesiYoneticisi.KeskinEtiketCiz(
-            new Rect(posX - etiketW - 8f, ajanBarY + (yukseklik - etiketH) * 0.5f, etiketW, etiketH),
-            "Ajanın Barı", barYaziStili);
-
-        // Ajan Siyah Çerçeve ve Zemin
-        GUI.color = new Color(0f, 0f, 0f, 0.85f);
-        GUI.DrawTexture(new Rect(posX - 1, ajanBarY - 1, genislik + 2, yukseklik + 2), beyazDokusu);
-        GUI.color = new Color(0.12f, 0.12f, 0.12f, 0.85f);
-        GUI.DrawTexture(new Rect(posX, ajanBarY, genislik, yukseklik), beyazDokusu);
-
-        // Ajan Doluluk ve Renk
-        float ajanOran = 0f;
-        if (ajan != null)
-        {
-            ajanOran = Mathf.Clamp01(ajan.mevcutCan / ajan.maksimumCan);
-        }
-        Color ajanBarRengi = GetGtaRenk(ajanOran);
-        GUI.color = ajanBarRengi;
-        GUI.DrawTexture(new Rect(posX, ajanBarY, genislik * ajanOran, yukseklik), beyazDokusu);
 
         GUI.color = eskiRenk;
     }

@@ -27,7 +27,7 @@ namespace Yazlab.Mekanikler
     /// - Hem oyuncuya hem de yan karaktere (yoldaşa) AYNI ANDA çift namlusuyla ateş eder.
     /// - Taretin silah yüzü ve çift namlusu ateş ederken hedefe tam cepheden dönüktür.
     /// - Oyuncu eğildiğinde (Crouch) alçak siperlerin arkasında gizlenebilir ve taret görüşünü kaybeder.
-    /// - İmha edildiğinde (canı sıfırlandığında) patlama efektiyle sahneden tamamen yok olur.
+    /// - İmha edildiğinde patlama efektiyle yok olur ve sağ-sol kanatlardan düşman askerler spawn olur.
     /// </summary>
     public class TaretKontrol : DusmanKontrol
     {
@@ -449,7 +449,6 @@ namespace Yazlab.Mekanikler
 
             bool hedefEgiliyor = (hedef == oyuncuHedef && KarakterHareket.EgiliyorMu);
 
-            // Oyuncu eğildiğinde baş ve göğüs yüksekliği 0.65m'ye iner; siper duvarları (1.2m-1.5m) görüşü tamamen keser!
             Vector3[] testNoktalari = hedefEgiliyor
                 ? new Vector3[]
                 {
@@ -458,10 +457,10 @@ namespace Yazlab.Mekanikler
                 }
                 : new Vector3[]
                 {
-                    hedef.position + Vector3.up * 1.55f, // Kafa
-                    hedef.position + Vector3.up * 1.15f, // Göğüs
-                    hedef.position + Vector3.up * 0.75f, // Karın/Bel
-                    hedef.position + Vector3.up * 0.35f  // Bacaklar
+                    hedef.position + Vector3.up * 1.55f,
+                    hedef.position + Vector3.up * 1.15f,
+                    hedef.position + Vector3.up * 0.75f,
+                    hedef.position + Vector3.up * 0.35f
                 };
 
             foreach (var nokta in testNoktalari)
@@ -654,6 +653,7 @@ namespace Yazlab.Mekanikler
             }
 
             UretPatlamaEfekti();
+            SagVeSoldanDusmanAskerleriSpawnla();
 
             BolumYoneticisi by = BolumYoneticisi.Ornek;
             if (by != null)
@@ -661,8 +661,111 @@ namespace Yazlab.Mekanikler
                 by.FizikselEngeliAs();
             }
 
-            Debug.Log("[TaretKontrol] Savunma tareti başarıyla imha edildi ve tamamen yok edildi!");
+            Debug.Log("[TaretKontrol] Savunma tareti başarıyla imha edildi ve sağ-sol kanatlardan düşman askerler spawn edildi!");
             Destroy(gameObject, 0.05f);
+        }
+
+        /// <summary>
+        /// Taret imha edildiğinde sağ ve sol kanatlardan oyuncuya doğru ateş ederek yürüyen düşman askerler oluşturur.
+        /// </summary>
+        private void SagVeSoldanDusmanAskerleriSpawnla()
+        {
+            // Sahnedeki mevcut asker modelini (YardimciKarakter veya Oyuncu) şablon olarak bul
+            GameObject sablonObj = null;
+            if (YardimciKarakter.Instance != null)
+            {
+                sablonObj = YardimciKarakter.Instance.gameObject;
+            }
+            else
+            {
+                YardimciKarakter yk = Object.FindAnyObjectByType<YardimciKarakter>();
+                if (yk != null) sablonObj = yk.gameObject;
+            }
+
+            if (sablonObj == null && oyuncuHedef != null)
+            {
+                sablonObj = oyuncuHedef.gameObject;
+            }
+
+            if (sablonObj == null)
+            {
+                KarakterHareket kh = Object.FindAnyObjectByType<KarakterHareket>();
+                if (kh != null) sablonObj = kh.gameObject;
+            }
+
+            if (sablonObj == null) return;
+
+            // Sol ve sağ kanat doğma noktaları (Taret avlusu sol ve sağ açık alanları)
+            Vector3[] spawnNoktalari = new Vector3[]
+            {
+                new Vector3(-7.5f, 0.05f, 17.8f), // Sol Kanat Ön
+                new Vector3(-5.2f, 0.05f, 19.8f), // Sol Kanat Arka
+                new Vector3( 7.5f, 0.05f, 17.8f), // Sağ Kanat Ön
+                new Vector3( 5.2f, 0.05f, 19.8f)  // Sağ Kanat Arka
+            };
+
+            bool sablonAktifti = sablonObj.activeSelf;
+            sablonObj.SetActive(false);
+
+            for (int i = 0; i < spawnNoktalari.Length; i++)
+            {
+                Vector3 dogumKonumu = spawnNoktalari[i];
+                Vector3 bakisHedefi = oyuncuHedef != null ? oyuncuHedef.position : (transform.position - Vector3.forward * 5f);
+                Vector3 bakisYonu = bakisHedefi - dogumKonumu;
+                bakisYonu.y = 0f;
+                Quaternion baslangicRot = bakisYonu.sqrMagnitude > 0.01f ? Quaternion.LookRotation(bakisYonu) : Quaternion.Euler(0f, 180f, 0f);
+
+                GameObject asker = Instantiate(sablonObj, dogumKonumu, baslangicRot);
+                asker.name = $"TaretBaskin_Askeri_{(i < 2 ? "Sol" : "Sag")}_{(i % 2) + 1}";
+                asker.tag = "Untagged";
+                asker.transform.localScale = Vector3.one;
+
+                // Şablondan gelen oyuncu/müttefik bileşenlerini temizle
+                YardimciKarakter ykComp = asker.GetComponent<YardimciKarakter>();
+                if (ykComp != null) DestroyImmediate(ykComp);
+
+                KarakterHareket khComp = asker.GetComponent<KarakterHareket>();
+                if (khComp != null) DestroyImmediate(khComp);
+
+                KarakterAtes kaComp = asker.GetComponent<KarakterAtes>();
+                if (kaComp != null) DestroyImmediate(kaComp);
+
+                OyuncuCani ocComp = asker.GetComponent<OyuncuCani>();
+                if (ocComp != null) DestroyImmediate(ocComp);
+
+                CharacterController ccComp = asker.GetComponent<CharacterController>();
+                if (ccComp != null) DestroyImmediate(ccComp);
+
+                HendekDusmeKontrolu hdComp = asker.GetComponent<HendekDusmeKontrolu>();
+                if (hdComp != null) DestroyImmediate(hdComp);
+
+                // Şablondan kopyalanan eski namlu/iz alt objelerini temizle
+                string[] silinecekAltObjeler = { "YardimciNamluUcu", "YardimciMermiIzi", "YardimciNamluIsigi", "YardimciNamluFlasi", "NamluUcu", "MermiIzi" };
+                foreach (string altAd in silinecekAltObjeler)
+                {
+                    Transform alt = asker.transform.Find(altAd);
+                    if (alt != null) DestroyImmediate(alt.gameObject);
+                }
+
+                // Düşman kontrolcüsünü ekle ve oyuncuya yürüyerek ateş edecek şekilde yapılandır
+                DusmanKontrol dk = asker.GetComponent<DusmanKontrol>();
+                if (dk == null) dk = asker.AddComponent<DusmanKontrol>();
+
+                dk.maksimumCan = 110f;
+                dk.mevcutCan = 110f;
+                dk.oyuncuyaDogruYuru = true;
+                dk.herZamanOyuncuyuTakipEt = true;
+                dk.yurumeHizi = 3.2f + (i % 2) * 0.35f;
+                dk.durmaMesafesi = 3.6f + (i % 2) * 0.8f;
+                dk.gorusMenzili = 45f;
+                dk.atesAraligi = 0.95f;
+                dk.atesHasari = 6f;
+
+                asker.SetActive(true);
+                dk.RengiUygula();
+            }
+
+            sablonObj.SetActive(sablonAktifti);
         }
 
         private void UretPatlamaEfekti()

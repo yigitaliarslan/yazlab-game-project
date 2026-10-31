@@ -3,37 +3,50 @@ using UnityEngine;
 
 /// <summary>
 /// Gelişmiş Düşman Asker Yapay Zekası.
-/// - Oyuncuyu gördüğünde ona döner ve ateş etmeye başlar.
+/// - Oyuncuyu algıladığında veya baskın dalgasında oyuncuya doğru yürür ve yürürken ateş eder.
 /// - Başının üzerinde süzülen dinamik 3D / GUI Can Barı (Floating Health Bar) gösterir.
 /// - Oyuncu ona sıktığında canı azalır.
 /// - Oyuncuya ateş ettiğinde oyuncunun sağ alttaki can barını azaltır.
-/// - Öldüğünde yere yığılma/ölüm animasyonu ve duman efektiyle kaybolur.
+/// - Öldüğünde yere yığılma/ölüm animasyonu ile kaybolur.
 /// </summary>
 public class DusmanKontrol : MonoBehaviour
 {
     [Header("Sağlık Ayarları")]
     [Tooltip("Düşmanın maksimum canı.")]
-    public float maksimumCan = 100f;
+    public float maksimumCan = 120f;
 
     [Tooltip("Düşmanın mevcut canı.")]
-    public float mevcutCan = 100f;
+    public float mevcutCan = 120f;
 
     [Header("Görüş ve Algılama Ayarları")]
     [Tooltip("Düşmanın oyuncuyu görebileceği maksimum mesafe.")]
-    public float gorusMenzili = 25f;
+    public float gorusMenzili = 35f;
 
     [Tooltip("Düşmanın oyuncuya doğru dönme hızı.")]
-    public float donusHizi = 6.0f;
+    public float donusHizi = 8.0f;
 
     [Tooltip("Engel kontrolü için göz hizası yüksekliği.")]
     public float gozYuksekligi = 1.4f;
 
+    [Header("Yürüme ve Baskın Ayarları")]
+    [Tooltip("Düşman oyuncuya doğru yürüyerek yaklaşsın mı?")]
+    public bool oyuncuyaDogruYuru = true;
+
+    [Tooltip("Düşman askerinin yürüme hızı.")]
+    public float yurumeHizi = 3.2f;
+
+    [Tooltip("Oyuncuya ne kadar yaklaşınca durup ateş etmeye devam edeceği.")]
+    public float durmaMesafesi = 3.8f;
+
+    [Tooltip("Görüş hattı beklemeksizin doğrudan oyuncunun konumuna ilerlesin mi?")]
+    public bool herZamanOyuncuyuTakipEt = true;
+
     [Header("Ateş Etme Ayarları")]
     [Tooltip("İki atış arasındaki süre (saniye).")]
-    public float atesAraligi = 1.0f;
+    public float atesAraligi = 0.95f;
 
     [Tooltip("Her atışta oyuncuya vereceği hasar.")]
-    public float atesHasari = 8f;
+    public float atesHasari = 7f;
 
     [Tooltip("Atış isabet sapması / doğruluğu (0: tam isabet, 1: hafif sapmalı).")]
     public float isabetSapmasi = 0.25f;
@@ -62,6 +75,10 @@ public class DusmanKontrol : MonoBehaviour
     protected Transform oyuncuHedef;
     protected OyuncuCani oyuncuCaniBileseni;
     private Animator animator;
+    private int isRunningHash;
+    private bool isRunningParamVar = false;
+    private bool suAnYuruyor = false;
+
     private AudioSource audioSource;
     private LineRenderer mermiIziRenderer;
     private Light namluIsigi;
@@ -72,7 +89,7 @@ public class DusmanKontrol : MonoBehaviour
     protected float sonrakiAtesZamani = 0f;
     protected bool oldu = false;
     protected float sonHasarZamani = 0f;
-    protected float gorunenCan = 100f;
+    protected float gorunenCan = 120f;
 
     private Texture2D beyazDokusu;
     private GUIStyle canMetniStili;
@@ -83,21 +100,21 @@ public class DusmanKontrol : MonoBehaviour
     private float sonGorusKontrolZamani = 0f;
     private const float GORUS_KONTROL_ARALIGI = 0.04f;
 
-    // NavMesh Takip & Siper Arkası Nişan Alma
-    private UnityEngine.AI.NavMeshAgent navAgent;
-
+    protected Transform aktifHedef;
 
     public bool IsDead => oldu;
 
     protected virtual void Awake()
     {
-        maksimumCan = 140f;
+        maksimumCan = 120f;
         mevcutCan = maksimumCan;
         gorunenCan = maksimumCan;
-        atesHasari = 9f;
-        atesAraligi = 0.75f;
+        atesHasari = 7f;
+        atesAraligi = 0.90f;
+
         animator = GetComponent<Animator>();
         if (animator == null) animator = GetComponentInChildren<Animator>();
+        HazirlaAnimator();
 
         audioSource = GetComponent<AudioSource>();
         if (audioSource == null)
@@ -106,6 +123,10 @@ public class DusmanKontrol : MonoBehaviour
             audioSource.playOnAwake = false;
             audioSource.spatialBlend = 0.8f;
             audioSource.maxDistance = 35f;
+        }
+        if (atesSesi == null)
+        {
+            atesSesi = UretVarsayilanAtesSesi();
         }
 
         col = GetComponent<CapsuleCollider>();
@@ -125,18 +146,34 @@ public class DusmanKontrol : MonoBehaviour
 
         KurMermiEfektleri();
 
-        // NavMeshAgent bileşeni ayarla (Siper arkasındaki oyuncuyu takip ve dolaşma)
-        navAgent = GetComponent<UnityEngine.AI.NavMeshAgent>();
-        if (navAgent == null)
+        // Varsa eski NavMeshAgent'ı devre dışı bırak (doğrudan akıcı fiziksel yürüyüş kullanıyoruz)
+        UnityEngine.AI.NavMeshAgent eskiNav = GetComponent<UnityEngine.AI.NavMeshAgent>();
+        if (eskiNav != null)
         {
-            navAgent = gameObject.AddComponent<UnityEngine.AI.NavMeshAgent>();
+            eskiNav.enabled = false;
         }
-        navAgent.speed = 3.6f;
-        navAgent.stoppingDistance = 5.0f;
-        navAgent.acceleration = 12.0f;
-        navAgent.angularSpeed = 260.0f;
+    }
 
+    private void HazirlaAnimator()
+    {
+        if (animator == null) return;
 
+        animator.applyRootMotion = false;
+        animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+        isRunningHash = Animator.StringToHash("IsRunning");
+        isRunningParamVar = false;
+
+        if (animator.runtimeAnimatorController != null)
+        {
+            foreach (var param in animator.parameters)
+            {
+                if (param.name == "IsRunning" && param.type == AnimatorControllerParameterType.Bool)
+                {
+                    isRunningParamVar = true;
+                    break;
+                }
+            }
+        }
     }
 
     protected virtual void Start()
@@ -144,29 +181,26 @@ public class DusmanKontrol : MonoBehaviour
         HedefiBul();
         RengiUygula();
         OlusturDokular();
-
-        // Başlangıçta bekleme animasyonuna al
-        if (animator != null)
-        {
-            animator.CrossFade("infantry_combat_idle", 0.2f);
-        }
+        HazirlaAnimator();
+        YurumeAnimasyonuGuncelle(false);
     }
 
     public void RengiUygula()
     {
-        SkinnedMeshRenderer smr = GetComponentInChildren<SkinnedMeshRenderer>();
-        if (smr != null && smr.sharedMaterial != null)
+        SkinnedMeshRenderer[] renderers = GetComponentsInChildren<SkinnedMeshRenderer>(true);
+        foreach (var smr in renderers)
         {
-            Material mat = new Material(smr.sharedMaterial);
-            mat.name = "Enemy_Soldier_Instance";
-            if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", kiyafetRengi);
-            if (mat.HasProperty("_Color")) mat.SetColor("_Color", kiyafetRengi);
-            if (mat.HasProperty("_EmissionColor")) mat.SetColor("_EmissionColor", new Color(0.25f, 0.05f, 0.05f));
-            smr.material = mat;
+            if (smr != null && smr.sharedMaterial != null)
+            {
+                Material mat = new Material(smr.sharedMaterial);
+                mat.name = "Enemy_Soldier_Instance";
+                if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", kiyafetRengi);
+                if (mat.HasProperty("_Color")) mat.SetColor("_Color", kiyafetRengi);
+                if (mat.HasProperty("_EmissionColor")) mat.SetColor("_EmissionColor", new Color(0.25f, 0.05f, 0.05f));
+                smr.material = mat;
+            }
         }
     }
-
-    protected Transform aktifHedef;
 
     protected virtual void Update()
     {
@@ -179,60 +213,148 @@ public class DusmanKontrol : MonoBehaviour
             oyuncuBeniGoruyorMu = OyuncuDusmaniGoruyorMu();
         }
 
-        // En uygun hedefi belirle (Oyuncu veya Müttefik Asker)
+        // Hedefi belirle (Öncelikle Oyuncu)
         HedefSec();
+
+        bool suKaredeYurudu = false;
 
         if (aktifHedef != null)
         {
-            // Hedefe doğru dön
-            Vector3 yon = (aktifHedef.position - transform.position);
-            yon.y = 0f;
-            if (yon.sqrMagnitude > 0.01f)
+            Vector3 fark = aktifHedef.position - transform.position;
+            fark.y = 0f;
+            float mesafe = fark.magnitude;
+
+            // 1. Hedefe doğru dön
+            if (fark.sqrMagnitude > 0.01f)
             {
-                Quaternion hedefRot = Quaternion.LookRotation(yon);
-                transform.rotation = Quaternion.Slerp(transform.rotation, hedefRot, Time.deltaTime * donusHizi * 1.3f);
+                Quaternion hedefRot = Quaternion.LookRotation(fark.normalized);
+                transform.rotation = Quaternion.Slerp(transform.rotation, hedefRot, Time.deltaTime * donusHizi * 1.4f);
             }
 
-            // Ateş etme kontrolü (Daha seri ve zorlayıcı atış!)
-            if (Time.time >= sonrakiAtesZamani)
+            // 2. Oyuncuya doğru yürü
+            if (oyuncuyaDogruYuru && mesafe > durmaMesafesi)
+            {
+                Vector3 ilerlemeYonu = EngelsizYonBul(fark.normalized);
+                transform.position += ilerlemeYonu * yurumeHizi * Time.deltaTime;
+                ZeminYuksekliginiHizala(aktifHedef.position.y);
+                suKaredeYurudu = true;
+            }
+            else
+            {
+                ZeminYuksekliginiHizala(aktifHedef.position.y);
+            }
+
+            // 3. Yürürken ve dururken oyuncuya ateş et
+            bool atesEdebilir = mesafe <= gorusMenzili && (HedefiGoruyorMu(aktifHedef) || mesafe <= 18f);
+            if (atesEdebilir && Time.time >= sonrakiAtesZamani)
             {
                 sonrakiAtesZamani = Time.time + atesAraligi + Random.Range(-0.08f, 0.15f);
-                AtesEt();
+                AtesEt(suKaredeYurudu);
             }
         }
+
+        YurumeAnimasyonuGuncelle(suKaredeYurudu);
+    }
+
+    private Vector3 EngelsizYonBul(Vector3 arzuEdilenYon)
+    {
+        if (!YonEngelliMi(arzuEdilenYon)) return arzuEdilenYon;
+
+        float[] acilar = { 35f, -35f, 65f, -65f, 90f, -90f };
+        foreach (float aci in acilar)
+        {
+            Vector3 alternatif = Quaternion.Euler(0f, aci, 0f) * arzuEdilenYon;
+            if (!YonEngelliMi(alternatif))
+            {
+                return alternatif;
+            }
+        }
+
+        return arzuEdilenYon;
+    }
+
+    private bool YonEngelliMi(Vector3 yon)
+    {
+        Vector3 baslangic = transform.position + Vector3.up * 0.8f;
+        RaycastHit[] hits = Physics.SphereCastAll(baslangic, 0.30f, yon, 0.85f, ~0, QueryTriggerInteraction.Ignore);
+        foreach (var h in hits)
+        {
+            if (h.transform == transform || h.transform.IsChildOf(transform)) continue;
+            if (oyuncuHedef != null && (h.transform == oyuncuHedef || h.transform.IsChildOf(oyuncuHedef))) continue;
+            if (h.transform.GetComponent<YardimciKarakter>() != null || h.transform.GetComponentInParent<YardimciKarakter>() != null) continue;
+            if (h.normal.y > 0.55f) continue;
+            return true;
+        }
+        return false;
+    }
+
+    private void ZeminYuksekliginiHizala(float referansY)
+    {
+        float hedefY = referansY;
+        Vector3 rayBaslangic = transform.position + Vector3.up * 1.8f;
+        RaycastHit[] hits = Physics.RaycastAll(rayBaslangic, Vector3.down, 4.0f, ~0, QueryTriggerInteraction.Ignore);
+        float enYakinY = float.MinValue;
+
+        foreach (var h in hits)
+        {
+            if (h.transform == transform || h.transform.IsChildOf(transform)) continue;
+            if (oyuncuHedef != null && (h.transform == oyuncuHedef || h.transform.IsChildOf(oyuncuHedef))) continue;
+            if (h.point.y > enYakinY && h.point.y <= referansY + 1.2f)
+            {
+                enYakinY = h.point.y;
+            }
+        }
+
+        if (enYakinY > -5f)
+        {
+            hedefY = enYakinY;
+        }
+
+        Vector3 pos = transform.position;
+        pos.y = Mathf.Lerp(pos.y, hedefY, Time.deltaTime * 12f);
+        transform.position = pos;
+    }
+
+    private void YurumeAnimasyonuGuncelle(bool yuruyor)
+    {
+        if (animator == null)
+        {
+            animator = GetComponentInChildren<Animator>();
+            if (animator == null) return;
+            HazirlaAnimator();
+        }
+
+        if (isRunningParamVar)
+        {
+            animator.SetBool(isRunningHash, yuruyor);
+        }
+
+        string hedefState = yuruyor ? "infantry_combat_run" : "infantry_combat_idle";
+        AnimatorStateInfo info = animator.GetCurrentAnimatorStateInfo(0);
+
+        if (yuruyor != suAnYuruyor || (!info.IsName(hedefState) && !animator.IsInTransition(0)))
+        {
+            animator.CrossFade(hedefState, 0.12f);
+        }
+
+        suAnYuruyor = yuruyor;
     }
 
     private void HedefSec()
     {
         HedefiBul();
 
-        Transform enIyi = null;
-        float enKisaMesafe = gorusMenzili;
-
-        // 1. Oyuncu
         if (oyuncuHedef != null && (oyuncuCaniBileseni == null || !oyuncuCaniBileseni.IsDead))
         {
             float mesafe = Vector3.Distance(transform.position, oyuncuHedef.position);
-            if (mesafe <= enKisaMesafe && HedefiGoruyorMu(oyuncuHedef))
+            if (herZamanOyuncuyuTakipEt || (mesafe <= gorusMenzili && HedefiGoruyorMu(oyuncuHedef)))
             {
-                enKisaMesafe = mesafe;
-                enIyi = oyuncuHedef;
+                aktifHedef = oyuncuHedef;
+                return;
             }
         }
 
-        // 2. Müttefik Asker (Yardımcı Karakter)
-        if (YardimciKarakter.Instance != null && !YardimciKarakter.Instance.IsDead)
-        {
-            Transform yk = YardimciKarakter.Instance.transform;
-            float mesafe = Vector3.Distance(transform.position, yk.position);
-            if (mesafe <= enKisaMesafe && HedefiGoruyorMu(yk))
-            {
-                enKisaMesafe = mesafe;
-                enIyi = yk;
-            }
-        }
-
-        aktifHedef = enIyi;
+        aktifHedef = null;
     }
 
     private bool HedefiGoruyorMu(Transform t)
@@ -240,23 +362,33 @@ public class DusmanKontrol : MonoBehaviour
         if (t == null) return false;
         Vector3 goz = transform.position + Vector3.up * gozYuksekligi;
         Vector3 hedefNokta = t.position + Vector3.up * 1.0f;
-        RaycastHit hit;
-        if (Physics.Raycast(goz, (hedefNokta - goz).normalized, out hit, gorusMenzili))
+        Vector3 yon = hedefNokta - goz;
+        float mesafe = yon.magnitude;
+
+        RaycastHit[] hits = Physics.RaycastAll(goz, yon.normalized, Mathf.Min(mesafe + 0.5f, gorusMenzili), ~0, QueryTriggerInteraction.Ignore);
+        if (hits == null || hits.Length == 0) return true;
+
+        System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+
+        foreach (var hit in hits)
         {
+            if (hit.transform == transform || hit.transform.IsChildOf(transform)) continue;
+            if (hit.transform.GetComponent<DusmanKontrol>() != null || hit.transform.GetComponentInParent<DusmanKontrol>() != null) continue;
             if (hit.transform == t || hit.transform.IsChildOf(t)) return true;
+            return false;
         }
-        return false;
+        return true;
     }
 
     /// <summary>
-    /// Düşmanın oyuncuya veya yardımcı askere ateş etme mekaniği.
+    /// Düşmanın oyuncuya ateş etme mekaniği (yürürken koşma animasyonunu kesmez).
     /// </summary>
-    private void AtesEt()
+    private void AtesEt(bool yururkenAtesEdiyor)
     {
         if (oldu || aktifHedef == null) return;
 
-        // 1. Ateş Animasyonu
-        if (animator != null)
+        // 1. Ateş Animasyonu (Sadece dururken oynatılır, yürürken yürüme animasyonu korunur)
+        if (animator != null && !yururkenAtesEdiyor)
         {
             animator.CrossFade("infantry_combat_shoot", 0.05f);
         }
@@ -264,13 +396,13 @@ public class DusmanKontrol : MonoBehaviour
         // 2. Ateş Sesi
         if (audioSource != null)
         {
+            audioSource.pitch = Random.Range(0.90f, 1.12f);
             if (atesSesi != null)
             {
-                audioSource.PlayOneShot(atesSesi);
+                audioSource.PlayOneShot(atesSesi, 0.65f);
             }
             else
             {
-                audioSource.pitch = Random.Range(0.85f, 1.15f);
                 audioSource.Play();
             }
         }
@@ -294,7 +426,7 @@ public class DusmanKontrol : MonoBehaviour
             StartCoroutine(MermiIziCiz(baslangic, hedefNokta));
         }
 
-        // 7. Hasar Ver (Oyuncu veya Müttefik Karakter)
+        // 7. Hasar Ver (Oyuncu)
         if (aktifHedef == oyuncuHedef && oyuncuCaniBileseni != null && !oyuncuCaniBileseni.IsDead)
         {
             oyuncuCaniBileseni.HasarAl(atesHasari);
@@ -303,6 +435,28 @@ public class DusmanKontrol : MonoBehaviour
         {
             aktifHedef.SendMessage("HasarAl", atesHasari, SendMessageOptions.DontRequireReceiver);
         }
+    }
+
+    private AudioClip UretVarsayilanAtesSesi()
+    {
+        int sampleRate = 44100;
+        float duration = 0.14f;
+        int totalSamples = (int)(sampleRate * duration);
+        float[] data = new float[totalSamples];
+
+        for (int i = 0; i < totalSamples; i++)
+        {
+            float t = (float)i / sampleRate;
+            float freq = Mathf.Lerp(280f, 75f, (float)i / totalSamples);
+            float noise = (Random.value * 2f - 1f) * 0.45f;
+            float wave = Mathf.Sin(2f * Mathf.PI * freq * t) * 0.55f;
+            float envelope = 1f - ((float)i / totalSamples);
+            data[i] = (wave + noise) * envelope * 0.6f;
+        }
+
+        AudioClip clip = AudioClip.Create("SesDusmanAtes", totalSamples, 1, sampleRate, false);
+        clip.SetData(data, 0);
+        return clip;
     }
 
     /// <summary>
@@ -327,7 +481,6 @@ public class DusmanKontrol : MonoBehaviour
 
     private IEnumerator HasarGorselTepkisi()
     {
-        // Karakterin rengini anlık beyaza/parlak kırmızıya flaşlat
         SkinnedMeshRenderer smr = GetComponentInChildren<SkinnedMeshRenderer>();
         if (smr != null && smr.material != null)
         {
@@ -349,25 +502,20 @@ public class DusmanKontrol : MonoBehaviour
         if (oldu) return;
         oldu = true;
 
-        // Çarpışmayı ve fiziksel etkileri kaldır
         if (col != null) col.enabled = false;
 
-        // Efektleri kapat
         if (namluIsigi != null) namluIsigi.enabled = false;
         if (namluFlasRenderer != null) namluFlasRenderer.enabled = false;
         if (mermiIziRenderer != null) mermiIziRenderer.enabled = false;
 
-        // Ölüm sekansını başlat: Yere yığılma + duman partikülleri + yok oluş
         StartCoroutine(OlumSekansi());
     }
 
     private IEnumerator OlumSekansi()
     {
-        // 1. Aşamada: Karakter geriye doğru yere yığılır (Yumuşak yere düşme hareketi)
         float gecenSure = 0f;
         float dususSuresi = 0.7f;
         Quaternion baslangicRot = transform.rotation;
-        // Geriye doğru 85 derece devrilme
         Quaternion hedefRot = baslangicRot * Quaternion.Euler(-80f, 0f, 0f);
         Vector3 baslangicPos = transform.position;
         Vector3 hedefPos = baslangicPos + Vector3.down * 0.4f - transform.forward * 0.5f;
@@ -382,10 +530,8 @@ public class DusmanKontrol : MonoBehaviour
             yield return null;
         }
 
-        // 2. Aşamada: Yerde 1.2 saniye bekler (Ölüm anı net görünsün)
         yield return new WaitForSeconds(1.2f);
 
-        // 3. Aşamada: Küçülerek veya saydamlaşarak kaybolur (Disappear)
         float yokOlmaSuresi = 0.8f;
         gecenSure = 0f;
         Vector3 baslangicOlcek = transform.localScale;
@@ -398,7 +544,6 @@ public class DusmanKontrol : MonoBehaviour
             yield return null;
         }
 
-        // Tamamen sahneden kaldır
         Destroy(gameObject);
     }
 
@@ -406,7 +551,6 @@ public class DusmanKontrol : MonoBehaviour
     {
         if (oyuncuHedef != null && oyuncuCaniBileseni != null) return;
 
-        // 1. KarakterHareket'e sahip ana oyuncuyu bul
         KarakterHareket kh = FindAnyObjectByType<KarakterHareket>();
         if (kh != null && kh.gameObject != gameObject)
         {
@@ -419,7 +563,6 @@ public class DusmanKontrol : MonoBehaviour
             return;
         }
 
-        // 2. 'Player' etiketli nesneyi bul
         GameObject player = GameObject.FindWithTag("Player");
         if (player != null && player != gameObject)
         {
@@ -430,7 +573,6 @@ public class DusmanKontrol : MonoBehaviour
 
     private void KurMermiEfektleri()
     {
-        // Mermi İzi (LineRenderer)
         GameObject lineObj = new GameObject("DusmanMermiIzi");
         lineObj.transform.SetParent(transform);
         mermiIziRenderer = lineObj.AddComponent<LineRenderer>();
@@ -446,7 +588,6 @@ public class DusmanKontrol : MonoBehaviour
         mermiIziRenderer.startColor = dusmanMermiIziRengi;
         mermiIziRenderer.endColor = new Color(1f, 0.4f, 0.1f, 0.2f);
 
-        // Namlu Işığı (Kırmızı-Sarı Namlu Flaş Işığı)
         GameObject lightObj = new GameObject("DusmanNamluIsigi");
         lightObj.transform.SetParent(namluUcu != null ? namluUcu : transform);
         lightObj.transform.localPosition = Vector3.zero;
@@ -458,7 +599,6 @@ public class DusmanKontrol : MonoBehaviour
         namluIsigi.intensity = 4.0f;
         namluIsigi.enabled = false;
 
-        // Namlu Görsel Flaşı
         GameObject flashObj = new GameObject("DusmanNamluFlasi");
         flashObj.transform.SetParent(namluUcu != null ? namluUcu : transform);
         flashObj.transform.localPosition = Vector3.zero;
@@ -521,14 +661,12 @@ public class DusmanKontrol : MonoBehaviour
 
     protected virtual void OnGUI()
     {
-        // Öldüyse, arayüz açıksa veya oyuncu düşmanı doğrudan görmüyorsa can barı çizilmez
         if (oldu || !oyuncuBeniGoruyorMu) return;
         if (Yazlab.Mekanikler.KapiBulmacaPaneli.MinigameAcik || Yazlab.Yonetim.OllamaNpcDiyalogUI.DiyalogAcikMi) return;
 
         Camera cam = Camera.main;
         if (cam == null) return;
 
-        // Düşmanın başının üzerindeki 3D dünya noktası (1:1 Viewport dönüşümü ile kayma olmaz)
         Vector3 dunyaKonumu = transform.position + Vector3.up * canBariYukseklikOfseti;
         if (!Yazlab.Yonetim.GoruntuKalitesiYoneticisi.DunyaNoktasiniEkranaCevir(cam, dunyaKonumu, out Vector2 ekranKonumu))
             return;
@@ -536,7 +674,6 @@ public class DusmanKontrol : MonoBehaviour
         float guiX = ekranKonumu.x;
         float guiY = ekranKonumu.y;
 
-        // Mesafe perspektifine göre hafif ölçekleme
         float mesafe = Vector3.Distance(cam.transform.position, dunyaKonumu);
         float olcek = Mathf.Clamp(15f / Mathf.Max(mesafe, 5f), 0.85f, 1.30f);
 
@@ -545,6 +682,8 @@ public class DusmanKontrol : MonoBehaviour
 
         float solX = Mathf.Round(guiX - (genislik * 0.5f));
         float ustY = Mathf.Round(guiY - yukseklik);
+
+        if (beyazDokusu == null) OlusturDokular();
 
         Color eskiRenk = GUI.color;
 
@@ -565,7 +704,6 @@ public class DusmanKontrol : MonoBehaviour
         float oran = Mathf.Clamp01(mevcutCan / maksimumCan);
         float dolguGenislik = genislik * oran;
 
-        // Hasar yeni alındıysa can barı anlık parlak sarı/beyaz parlasın
         bool yeniHasar = (Time.time - sonHasarZamani) < 0.15f;
         Color dolguRengi = yeniHasar ? new Color(1f, 0.9f, 0.4f) : new Color(0.95f, 0.15f, 0.15f);
 
@@ -579,7 +717,7 @@ public class DusmanKontrol : MonoBehaviour
         GUI.DrawTexture(new Rect(solX, ustY, 1, yukseklik), beyazDokusu);
         GUI.DrawTexture(new Rect(solX + genislik - 1, ustY, 1, yukseklik), beyazDokusu);
 
-        // 5. "DÜŞMAN" Başlığı (Barın üzerinde)
+        // 5. "DÜŞMAN ASKER" Başlığı (Barın üzerinde)
         if (dusmanBaslikStili == null)
         {
             dusmanBaslikStili = new GUIStyle(GUI.skin.label)
@@ -594,9 +732,9 @@ public class DusmanKontrol : MonoBehaviour
         GUI.color = Color.white;
         float baslikH = Mathf.Max(20f, 20f * olcek);
         Yazlab.Yonetim.GoruntuKalitesiYoneticisi.KeskinEtiketCiz(
-            new Rect(solX - 30f, ustY - baslikH - 2f, genislik + 60f, baslikH), "⚔ DÜŞMAN", dusmanBaslikStili);
+            new Rect(solX - 30f, ustY - baslikH - 2f, genislik + 60f, baslikH), "⚔ DÜŞMAN ASKER", dusmanBaslikStili);
 
-        // 6. Can Miktarı Metni: "140 / 140" (Barın ortasında)
+        // 6. Can Miktarı Metni
         if (canMetniStili == null)
         {
             canMetniStili = new GUIStyle(GUI.skin.label)
@@ -614,38 +752,27 @@ public class DusmanKontrol : MonoBehaviour
         GUI.color = eskiRenk;
     }
 
-    /// <summary>
-    /// Kamera/Oyuncu ile düşman arasında duvar veya katı engel olup olmadığını Raycast ile kontrol eder.
-    /// Düşman duvar arkasındaysa false döner.
-    /// </summary>
     private bool OyuncuDusmaniGoruyorMu()
     {
         Camera cam = Camera.main;
         if (cam == null) return false;
 
         Vector3 camPos = cam.transform.position;
-
-        // 1. Düşmanın kafa konumu
         Vector3 kafaKonumu = transform.position + Vector3.up * 1.6f;
 
-        // 2. Kameranın önünde mi kontrol et
         Vector3 ekranNoktasi = cam.WorldToScreenPoint(kafaKonumu);
         if (ekranNoktasi.z <= 0.1f) return false;
 
-        // Ekran sınırları içinde mi?
         if (ekranNoktasi.x < -60 || ekranNoktasi.x > Screen.width + 60 ||
             ekranNoktasi.y < -60 || ekranNoktasi.y > Screen.height + 60)
         {
             return false;
         }
 
-        // Mesafe kontrolü (50 metreden uzaktaysa can barı gösterme)
         float mesafe = Vector3.Distance(camPos, kafaKonumu);
         if (mesafe > 50f) return false;
 
-        // 3. Kafa veya Gövde noktalarından en az birini doğrudan görüyor muyuz? (Line of Sight)
         Vector3 govdeKonumu = transform.position + Vector3.up * 0.9f;
-
         return NoktaGorunurMu(camPos, kafaKonumu) || NoktaGorunurMu(camPos, govdeKonumu);
     }
 
@@ -658,31 +785,26 @@ public class DusmanKontrol : MonoBehaviour
         RaycastHit[] hits = Physics.RaycastAll(baslangic, yon.normalized, mesafe, ~0, QueryTriggerInteraction.Ignore);
         if (hits == null || hits.Length == 0) return true;
 
-        // En yakından en uzağa doğru sırala
         System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
 
         foreach (var hit in hits)
         {
-            // Eğer ışın doğrudan bu düşmana veya alt objesine çarptıysa görüş açıktır
             if (hit.transform == transform || hit.transform.IsChildOf(transform))
             {
                 return true;
             }
 
-            // Kendi oyuncumuz ve yoldaş karakter görüşü engellemez (3. şahıs kamerada oyuncunun arkasında olabiliriz)
             if (hit.transform.CompareTag("Player") ||
                 hit.transform.name.Contains("Companion") || hit.transform.name.Contains("Oyuncu") || hit.transform.name.Contains("Yardimci"))
             {
                 continue;
             }
 
-            // Diğer düşman karakterler de birbirlerinin görüşünü ve can barını engellemesin
             if (hit.transform.GetComponent<DusmanKontrol>() != null || hit.transform.GetComponentInParent<DusmanKontrol>() != null)
             {
                 continue;
             }
 
-            // Başka herhangi bir katı cisme (Duvar, Engel, Kapı, Kutu vb.) çarptıysa görüş engellenmiştir
             return false;
         }
 
