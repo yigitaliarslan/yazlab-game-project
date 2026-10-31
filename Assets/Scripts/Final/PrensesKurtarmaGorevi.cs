@@ -1,7 +1,8 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using Yazlab.Yonetim;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
