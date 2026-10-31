@@ -10,10 +10,10 @@ public class OyuncuCani : MonoBehaviour
 {
     [Header("Sağlık Değerleri")]
     [Tooltip("Karakterin başlangıçtaki maksimum canı.")]
-    public float maksimumCan = 100f;
+    public float maksimumCan = 260f;
 
     [Tooltip("Karakterin şu anki güncel canı.")]
-    public float mevcutCan = 100f;
+    public float mevcutCan = 260f;
 
     [Header("HUD Tasarım Ayarları")]
     public float hudGenisligi = 290f;
@@ -21,30 +21,31 @@ public class OyuncuCani : MonoBehaviour
 
     [Header("Hasar Koruması ve Ölüm")]
     [Tooltip("Tek bir mermiden alınabilecek maksimum hasar.")]
-    public float mermiHasarLimiti = 8f;
+    public float mermiHasarLimiti = 5f;
 
     [Tooltip("Mermi spamını engelleyen hasar koruması.")]
-    public float hasarKorumasi = 0.18f;
+    public float hasarKorumasi = 0.30f;
 
     [Tooltip("Öldükten sonra yeniden başlama süresi.")]
     public float yenidenBaslamaGecikmesi = 1.8f;
 
-    private float ghostCan = 100f; // Yumuşak azalan hasar izi (Ghost bar)
+    private float ghostCan = 260f; // Yumuşak azalan hasar izi (Ghost bar)
     private float sonHasarAlmaZamani = -1f;
     private float hasarFlasSure = 0f;
     private bool oldu = false;
 
     private Texture2D beyazDokusu;
-    private GUIStyle sayiBuyukStili;
-    private GUIStyle sayiKucukStili;
-    private GUIStyle baslikStili;
-    private GUIStyle durumStili;
+    private GUIStyle barYaziStili;
     private GUIStyle olumStili;
 
     public bool IsDead => oldu;
 
     void Awake()
     {
+        // Sahnedeki eski serialize edilmiş düşük can değerlerini ezerek yüksek dayanıklılık uygula
+        if (maksimumCan < 260f) maksimumCan = 260f;
+        mermiHasarLimiti = 5f;
+        hasarKorumasi = 0.30f;
         mevcutCan = maksimumCan;
         ghostCan = maksimumCan;
     }
@@ -166,7 +167,6 @@ public class OyuncuCani : MonoBehaviour
             {
                 olumStili = new GUIStyle(GUI.skin.label)
                 {
-                    fontSize = Mathf.Clamp(Screen.width / 26, 28, 56),
                     fontStyle = FontStyle.Bold,
                     alignment = TextAnchor.MiddleCenter
                 };
@@ -176,32 +176,56 @@ public class OyuncuCani : MonoBehaviour
             GUI.color = new Color(0f, 0f, 0f, 0.72f);
             GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), beyazDokusu);
 
+            Yazlab.Yonetim.GoruntuKalitesiYoneticisi.StiliKeskinlestir(olumStili, Mathf.Clamp(Screen.width / 26, 26, 48));
             olumStili.normal.textColor = new Color(1f, 0.25f, 0.25f, 1f);
-            GUI.Label(new Rect(0, Screen.height * 0.40f - 30, Screen.width, 60), "GÖREV BAŞARISIZ // ÖLDÜNÜZ", olumStili);
+            GUI.Label(new Rect(0, Screen.height * 0.40f - 35, Screen.width, 65), "GÖREV BAŞARISIZ // ÖLDÜNÜZ", olumStili);
 
-            olumStili.fontSize = Mathf.Clamp(Screen.width / 45, 18, 30);
+            Yazlab.Yonetim.GoruntuKalitesiYoneticisi.StiliKeskinlestir(olumStili, Mathf.Clamp(Screen.width / 45, 16, 28));
             olumStili.normal.textColor = Color.white;
-            GUI.Label(new Rect(0, Screen.height * 0.40f + 35, Screen.width, 40), "Oyun Yeniden Başlatılıyor...", olumStili);
+            GUI.Label(new Rect(0, Screen.height * 0.40f + 35, Screen.width, 45), "Oyun Yeniden Başlatılıyor...", olumStili);
 
             GUI.color = eski;
             return;
         }
 
-        // 3. GTA 5 Tarzı Sade Küçük Dikdörtgen Can Barı
+        // Bulmaca veya NPC Diyalog penceresi açıkken sağ alt HUD barlarını gizle
+        if (Yazlab.Mekanikler.KapiBulmacaPaneli.MinigameAcik || Yazlab.Yonetim.OllamaNpcDiyalogUI.DiyalogAcikMi)
+            return;
+
+        // 3. GTA 5 Tarzı Sade Küçük Dikdörtgen Can Barları
         CizGTA5CanBari();
     }
 
     private void CizGTA5CanBari()
     {
-        // GTA 5 tarzı sağ altta küçük düz dikdörtgen barlar
-        float genislik = 170f;
-        float yukseklik = 9f;
-        float posX = Screen.width - genislik - 25f;
-        
-        // 1. Oyuncunun Kendi Can Barı
-        float oyuncuBarY = Screen.height - 48f;
+        float olcek = Yazlab.Yonetim.GoruntuKalitesiYoneticisi.KeskinOlcek;
+        float genislik = Mathf.Round(170f * olcek);
+        float yukseklik = Mathf.Round(10f * olcek);
+        float posX = Mathf.Round(Screen.width - genislik - 22f);
+
+        // Oyuncunun Kendi Can Barı (Yan karakterin canı sonsuz olduğu için yalnızca oyuncu barı çizilir)
+        float oyuncuBarY = Mathf.Round(Screen.height - 34f * olcek);
+
+        if (barYaziStili == null)
+        {
+            barYaziStili = new GUIStyle(GUI.skin.label)
+            {
+                fontStyle = FontStyle.Bold,
+                alignment = TextAnchor.MiddleRight
+            };
+        }
+        Yazlab.Yonetim.GoruntuKalitesiYoneticisi.StiliKeskinlestir(barYaziStili, Mathf.RoundToInt(12 * olcek));
+        barYaziStili.normal.textColor = new Color(0.92f, 0.96f, 1.0f, 0.95f);
 
         Color eskiRenk = GUI.color;
+
+        // "Oyuncu Canı" Etiketi (Yeterli yükseklik ile kesilmeden tam hizalı çizilir)
+        GUI.color = Color.white;
+        float etiketW = 110f * olcek;
+        float etiketH = 22f * olcek;
+        Yazlab.Yonetim.GoruntuKalitesiYoneticisi.KeskinEtiketCiz(
+            new Rect(posX - etiketW - 8f, oyuncuBarY + (yukseklik - etiketH) * 0.5f, etiketW, etiketH),
+            "Oyuncu Canı", barYaziStili);
 
         // Oyuncu Siyah Çerçeve ve Zemin
         GUI.color = new Color(0f, 0f, 0f, 0.85f);
@@ -209,44 +233,16 @@ public class OyuncuCani : MonoBehaviour
         GUI.color = new Color(0.12f, 0.12f, 0.12f, 0.85f);
         GUI.DrawTexture(new Rect(posX, oyuncuBarY, genislik, yukseklik), beyazDokusu);
 
+        // Ghost (Yumuşak Hasar İzi) Dolgusu
+        float ghostOran = Mathf.Clamp01(ghostCan / maksimumCan);
+        GUI.color = new Color(0.95f, 0.35f, 0.20f, 0.55f);
+        GUI.DrawTexture(new Rect(posX, oyuncuBarY, genislik * ghostOran, yukseklik), beyazDokusu);
+
         // Oyuncu Renk Hesabı (Yeşil -> Turuncu -> Kırmızı)
         float oran = Mathf.Clamp01(mevcutCan / maksimumCan);
         Color barRengi = GetGtaRenk(oran);
         GUI.color = barRengi;
         GUI.DrawTexture(new Rect(posX, oyuncuBarY, genislik * oran, yukseklik), beyazDokusu);
-
-        // 2. Ajanın / Yardımcının Can Barı (Hemen Kendi Barımızın Altında)
-        YardimciKarakter ajan = YardimciKarakter.Instance;
-        if (ajan == null) ajan = Object.FindAnyObjectByType<YardimciKarakter>();
-
-        float ajanBarY = Screen.height - 24f;
-
-        // "Ajanın Barı" Yazısı (Barın üstünde/solunda zarif font)
-        GUIStyle ajanYaziStili = new GUIStyle(GUI.skin.label)
-        {
-            fontSize = 10,
-            fontStyle = FontStyle.Bold,
-            alignment = TextAnchor.MiddleRight
-        };
-        ajanYaziStili.normal.textColor = new Color(0.85f, 0.90f, 0.95f, 0.90f);
-        GUI.color = Color.white;
-        GUI.Label(new Rect(posX - 90, ajanBarY - 2, 85, 14), "Ajanın Barı", ajanYaziStili);
-
-        // Ajan Siyah Çerçeve ve Zemin
-        GUI.color = new Color(0f, 0f, 0f, 0.85f);
-        GUI.DrawTexture(new Rect(posX - 1, ajanBarY - 1, genislik + 2, yukseklik + 2), beyazDokusu);
-        GUI.color = new Color(0.12f, 0.12f, 0.12f, 0.85f);
-        GUI.DrawTexture(new Rect(posX, ajanBarY, genislik, yukseklik), beyazDokusu);
-
-        // Ajan Doluluk ve Renk
-        float ajanOran = 0f;
-        if (ajan != null)
-        {
-            ajanOran = Mathf.Clamp01(ajan.mevcutCan / ajan.maksimumCan);
-        }
-        Color ajanBarRengi = GetGtaRenk(ajanOran);
-        GUI.color = ajanBarRengi;
-        GUI.DrawTexture(new Rect(posX, ajanBarY, genislik * ajanOran, yukseklik), beyazDokusu);
 
         GUI.color = eskiRenk;
     }

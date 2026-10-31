@@ -177,7 +177,7 @@ public class KarakterHareket : MonoBehaviour
 
     void Update()
     {
-        if (Yazlab.Mekanikler.KapiBulmacaPaneli.MinigameAcik)
+        if ((Yazlab.Mekanikler.KapiBulmacaPaneli.MinigameAcik || Yazlab.Yonetim.OllamaNpcDiyalogUI.DiyalogAcikMi))
         {
             if (animator != null && hasIsRunningParam)
             {
@@ -369,12 +369,14 @@ public class KarakterHareket : MonoBehaviour
 
     private void OnGUI()
     {
-        if (Yazlab.Mekanikler.KapiBulmacaPaneli.MinigameAcik) return;
+        if ((Yazlab.Mekanikler.KapiBulmacaPaneli.MinigameAcik || Yazlab.Yonetim.OllamaNpcDiyalogUI.DiyalogAcikMi)) return;
+
+        float olcek = Yazlab.Yonetim.GoruntuKalitesiYoneticisi.KeskinOlcek;
 
         if (durusArkaTex == null)
         {
             durusArkaTex = new Texture2D(1, 1);
-            durusArkaTex.SetPixel(0, 0, new Color(0.08f, 0.11f, 0.14f, 0.82f));
+            durusArkaTex.SetPixel(0, 0, new Color(0.08f, 0.11f, 0.14f, 0.88f));
             durusArkaTex.Apply();
         }
 
@@ -386,23 +388,27 @@ public class KarakterHareket : MonoBehaviour
 
         if (durusYaziStili == null)
         {
-            durusYaziStili = new GUIStyle(GUI.skin.label);
-            durusYaziStili.fontSize = 13;
-            durusYaziStili.fontStyle = FontStyle.Bold;
-            durusYaziStili.alignment = TextAnchor.MiddleLeft;
+            durusYaziStili = new GUIStyle(GUI.skin.label)
+            {
+                fontStyle = FontStyle.Bold,
+                alignment = TextAnchor.MiddleLeft
+            };
         }
+        Yazlab.Yonetim.GoruntuKalitesiYoneticisi.StiliKeskinlestir(durusYaziStili, Mathf.RoundToInt(13 * olcek));
 
-        Rect r = new Rect(18f, Screen.height - 46f, 340f, 30f);
+        float kutuW = Mathf.Round(365f * olcek);
+        float kutuH = Mathf.Round(32f * olcek);
+        Rect r = new Rect(16f, Mathf.Round(Screen.height - kutuH - 14f), kutuW, kutuH);
         GUI.Box(r, GUIContent.none, durusKutuStili);
 
         durusYaziStili.normal.textColor = EgiliyorMu
             ? new Color(0.30f, 0.95f, 0.55f)
-            : new Color(0.85f, 0.88f, 0.92f);
+            : new Color(0.88f, 0.92f, 0.96f);
 
         string metin = EgiliyorMu
             ? "  [C / CTRL] DURUŞ: EĞİLDİ (SİPERDE GİZLİ)"
             : "  [C / CTRL] DURUŞ: AYAKTA";
 
-        GUI.Label(r, metin, durusYaziStili);
+        Yazlab.Yonetim.GoruntuKalitesiYoneticisi.KeskinEtiketCiz(r, metin, durusYaziStili);
     }
 }

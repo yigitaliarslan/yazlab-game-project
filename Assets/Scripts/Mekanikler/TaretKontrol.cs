@@ -27,7 +27,7 @@ namespace Yazlab.Mekanikler
     /// - Hem oyuncuya hem de yan karaktere (yoldaşa) AYNI ANDA çift namlusuyla ateş eder.
     /// - Taretin silah yüzü ve çift namlusu ateş ederken hedefe tam cepheden dönüktür.
     /// - Oyuncu eğildiğinde (Crouch) alçak siperlerin arkasında gizlenebilir ve taret görüşünü kaybeder.
-    /// - İmha edildiğinde (canı sıfırlandığında) patlama efektiyle sahneden tamamen yok olur.
+    /// - İmha edildiğinde patlama efektiyle yok olur ve sağ-sol kanatlardan düşman askerler spawn olur.
     /// </summary>
     public class TaretKontrol : DusmanKontrol
     {
@@ -43,7 +43,9 @@ namespace Yazlab.Mekanikler
 
         [Header("Geri Tepme (Recoil) Ayarları")]
         public float recoilMiktari = 0.35f;
-        public float recoilHizi = 10.0f;
+        public float recoilHizi = 11.5f;
+        public float taramaAcisi = 38.0f;
+        public float taramaHizi = 1.35f;
 
         [Header("Çift Hedef & Eşzamanlı Ateş")]
         public float hasarOyuncu = 10.0f;
@@ -312,12 +314,12 @@ namespace Yazlab.Mekanikler
 
             if (namluSol != null)
             {
-                namluSol.localPosition = Vector3.MoveTowards(namluSol.localPosition, namluSolOrijinalLocalPos, Time.deltaTime * recoilHizi);
+                namluSol.localPosition = Vector3.Lerp(namluSol.localPosition, namluSolOrijinalLocalPos, Time.deltaTime * recoilHizi);
                 namluSol.localRotation = Quaternion.identity;
             }
             if (namluSag != null)
             {
-                namluSag.localPosition = Vector3.MoveTowards(namluSag.localPosition, namluSagOrijinalLocalPos, Time.deltaTime * recoilHizi);
+                namluSag.localPosition = Vector3.Lerp(namluSag.localPosition, namluSagOrijinalLocalPos, Time.deltaTime * recoilHizi);
                 namluSag.localRotation = Quaternion.identity;
             }
 
@@ -381,8 +383,9 @@ namespace Yazlab.Mekanikler
             else
             {
                 DurumIsiginiAyarla(new Color(0.70f, 0.15f, 0.10f), 1.0f);
-                Quaternion beklemeRot = Quaternion.Euler(0f, 180f, 0f);
-                donenGovde.rotation = Quaternion.Slerp(donenGovde.rotation, beklemeRot, Time.deltaTime * 3.0f);
+                float salinim = Mathf.Sin(Time.time * taramaHizi) * taramaAcisi;
+                Quaternion beklemeRot = Quaternion.Euler(0f, 180f + salinim, 0f);
+                donenGovde.rotation = Quaternion.Slerp(donenGovde.rotation, beklemeRot, Time.deltaTime * 3.2f);
             }
         }
 
@@ -446,7 +449,6 @@ namespace Yazlab.Mekanikler
 
             bool hedefEgiliyor = (hedef == oyuncuHedef && KarakterHareket.EgiliyorMu);
 
-            // Oyuncu eğildiğinde baş ve göğüs yüksekliği 0.65m'ye iner; siper duvarları (1.2m-1.5m) görüşü tamamen keser!
             Vector3[] testNoktalari = hedefEgiliyor
                 ? new Vector3[]
                 {
@@ -455,10 +457,10 @@ namespace Yazlab.Mekanikler
                 }
                 : new Vector3[]
                 {
-                    hedef.position + Vector3.up * 1.55f, // Kafa
-                    hedef.position + Vector3.up * 1.15f, // Göğüs
-                    hedef.position + Vector3.up * 0.75f, // Karın/Bel
-                    hedef.position + Vector3.up * 0.35f  // Bacaklar
+                    hedef.position + Vector3.up * 1.55f,
+                    hedef.position + Vector3.up * 1.15f,
+                    hedef.position + Vector3.up * 0.75f,
+                    hedef.position + Vector3.up * 0.35f
                 };
 
             foreach (var nokta in testNoktalari)
@@ -629,8 +631,8 @@ namespace Yazlab.Mekanikler
 
         private IEnumerator HasarSensörFlasi()
         {
-            DurumIsiginiAyarla(Color.yellow, 4.5f);
-            yield return new WaitForSeconds(0.08f);
+            DurumIsiginiAyarla(new Color(1f, 0.92f, 0.25f), 5.2f);
+            yield return new WaitForSeconds(0.09f);
             if (!oldu) DurumIsiginiAyarla(new Color(1f, 0.05f, 0.05f), 3.0f);
         }
 
@@ -651,6 +653,7 @@ namespace Yazlab.Mekanikler
             }
 
             UretPatlamaEfekti();
+            SagVeSoldanDusmanAskerleriSpawnla();
 
             BolumYoneticisi by = BolumYoneticisi.Ornek;
             if (by != null)
@@ -658,8 +661,111 @@ namespace Yazlab.Mekanikler
                 by.FizikselEngeliAs();
             }
 
-            Debug.Log("[TaretKontrol] Savunma tareti başarıyla imha edildi ve tamamen yok edildi!");
+            Debug.Log("[TaretKontrol] Savunma tareti başarıyla imha edildi ve sağ-sol kanatlardan düşman askerler spawn edildi!");
             Destroy(gameObject, 0.05f);
+        }
+
+        /// <summary>
+        /// Taret imha edildiğinde sağ ve sol kanatlardan oyuncuya doğru ateş ederek yürüyen düşman askerler oluşturur.
+        /// </summary>
+        private void SagVeSoldanDusmanAskerleriSpawnla()
+        {
+            // Sahnedeki mevcut asker modelini (YardimciKarakter veya Oyuncu) şablon olarak bul
+            GameObject sablonObj = null;
+            if (YardimciKarakter.Instance != null)
+            {
+                sablonObj = YardimciKarakter.Instance.gameObject;
+            }
+            else
+            {
+                YardimciKarakter yk = Object.FindAnyObjectByType<YardimciKarakter>();
+                if (yk != null) sablonObj = yk.gameObject;
+            }
+
+            if (sablonObj == null && oyuncuHedef != null)
+            {
+                sablonObj = oyuncuHedef.gameObject;
+            }
+
+            if (sablonObj == null)
+            {
+                KarakterHareket kh = Object.FindAnyObjectByType<KarakterHareket>();
+                if (kh != null) sablonObj = kh.gameObject;
+            }
+
+            if (sablonObj == null) return;
+
+            // Sol ve sağ kanat doğma noktaları (Taret avlusu sol ve sağ açık alanları)
+            Vector3[] spawnNoktalari = new Vector3[]
+            {
+                new Vector3(-7.5f, 0.05f, 17.8f), // Sol Kanat Ön
+                new Vector3(-5.2f, 0.05f, 19.8f), // Sol Kanat Arka
+                new Vector3( 7.5f, 0.05f, 17.8f), // Sağ Kanat Ön
+                new Vector3( 5.2f, 0.05f, 19.8f)  // Sağ Kanat Arka
+            };
+
+            bool sablonAktifti = sablonObj.activeSelf;
+            sablonObj.SetActive(false);
+
+            for (int i = 0; i < spawnNoktalari.Length; i++)
+            {
+                Vector3 dogumKonumu = spawnNoktalari[i];
+                Vector3 bakisHedefi = oyuncuHedef != null ? oyuncuHedef.position : (transform.position - Vector3.forward * 5f);
+                Vector3 bakisYonu = bakisHedefi - dogumKonumu;
+                bakisYonu.y = 0f;
+                Quaternion baslangicRot = bakisYonu.sqrMagnitude > 0.01f ? Quaternion.LookRotation(bakisYonu) : Quaternion.Euler(0f, 180f, 0f);
+
+                GameObject asker = Instantiate(sablonObj, dogumKonumu, baslangicRot);
+                asker.name = $"TaretBaskin_Askeri_{(i < 2 ? "Sol" : "Sag")}_{(i % 2) + 1}";
+                asker.tag = "Untagged";
+                asker.transform.localScale = Vector3.one;
+
+                // Şablondan gelen oyuncu/müttefik bileşenlerini temizle
+                YardimciKarakter ykComp = asker.GetComponent<YardimciKarakter>();
+                if (ykComp != null) DestroyImmediate(ykComp);
+
+                KarakterHareket khComp = asker.GetComponent<KarakterHareket>();
+                if (khComp != null) DestroyImmediate(khComp);
+
+                KarakterAtes kaComp = asker.GetComponent<KarakterAtes>();
+                if (kaComp != null) DestroyImmediate(kaComp);
+
+                OyuncuCani ocComp = asker.GetComponent<OyuncuCani>();
+                if (ocComp != null) DestroyImmediate(ocComp);
+
+                CharacterController ccComp = asker.GetComponent<CharacterController>();
+                if (ccComp != null) DestroyImmediate(ccComp);
+
+                HendekDusmeKontrolu hdComp = asker.GetComponent<HendekDusmeKontrolu>();
+                if (hdComp != null) DestroyImmediate(hdComp);
+
+                // Şablondan kopyalanan eski namlu/iz alt objelerini temizle
+                string[] silinecekAltObjeler = { "YardimciNamluUcu", "YardimciMermiIzi", "YardimciNamluIsigi", "YardimciNamluFlasi", "NamluUcu", "MermiIzi" };
+                foreach (string altAd in silinecekAltObjeler)
+                {
+                    Transform alt = asker.transform.Find(altAd);
+                    if (alt != null) DestroyImmediate(alt.gameObject);
+                }
+
+                // Düşman kontrolcüsünü ekle ve oyuncuya yürüyerek ateş edecek şekilde yapılandır
+                DusmanKontrol dk = asker.GetComponent<DusmanKontrol>();
+                if (dk == null) dk = asker.AddComponent<DusmanKontrol>();
+
+                dk.maksimumCan = 110f;
+                dk.mevcutCan = 110f;
+                dk.oyuncuyaDogruYuru = true;
+                dk.herZamanOyuncuyuTakipEt = true;
+                dk.yurumeHizi = 3.2f + (i % 2) * 0.35f;
+                dk.durmaMesafesi = 3.6f + (i % 2) * 0.8f;
+                dk.gorusMenzili = 45f;
+                dk.atesAraligi = 0.95f;
+                dk.atesHasari = 6f;
+
+                asker.SetActive(true);
+                dk.RengiUygula();
+            }
+
+            sablonObj.SetActive(sablonAktifti);
         }
 
         private void UretPatlamaEfekti()
@@ -780,6 +886,7 @@ namespace Yazlab.Mekanikler
         protected override void OnGUI()
         {
             if (oldu) return;
+            if (KapiBulmacaPaneli.MinigameAcik || OllamaNpcDiyalogUI.DiyalogAcikMi) return;
 
             if (kapiKontrolBileseni != null && !kapiKontrolBileseni.AcikMi) return;
 
@@ -787,26 +894,26 @@ namespace Yazlab.Mekanikler
             if (cam == null) return;
 
             Vector3 dunyaKonumu = (kuleBasi != null ? kuleBasi.position : transform.position + Vector3.up * 3.2f) + Vector3.up * canBariYukseklikOfseti;
-            Vector3 ekranNoktasi = cam.WorldToScreenPoint(dunyaKonumu);
-            if (ekranNoktasi.z <= 0.1f) return;
+            if (!GoruntuKalitesiYoneticisi.DunyaNoktasiniEkranaCevir(cam, dunyaKonumu, out Vector2 ekranKonumu))
+                return;
 
-            if (ekranNoktasi.x < -80 || ekranNoktasi.x > Screen.width + 80 ||
-                ekranNoktasi.y < -80 || ekranNoktasi.y > Screen.height + 80)
+            if (ekranKonumu.x < -80 || ekranKonumu.x > Screen.width + 80 ||
+                ekranKonumu.y < -80 || ekranKonumu.y > Screen.height + 80)
             {
                 return;
             }
 
-            float guiY = Screen.height - ekranNoktasi.y;
-            float guiX = ekranNoktasi.x;
+            float guiX = ekranKonumu.x;
+            float guiY = ekranKonumu.y;
 
             float mesafe = Vector3.Distance(cam.transform.position, dunyaKonumu);
-            float olcek = Mathf.Clamp(15f / Mathf.Max(mesafe, 5f), 0.75f, 1.35f);
+            float olcek = Mathf.Clamp(15f / Mathf.Max(mesafe, 5f), 0.85f, 1.30f);
 
-            float genislik = canBariGenislik * olcek;
-            float yukseklik = canBariYukseklik * olcek;
+            float genislik = Mathf.Round(Mathf.Max(140f, canBariGenislik) * olcek);
+            float yukseklik = Mathf.Round(Mathf.Max(16f, canBariYukseklik) * olcek);
 
-            float solX = guiX - (genislik * 0.5f);
-            float ustY = guiY - yukseklik;
+            float solX = Mathf.Round(guiX - (genislik * 0.5f));
+            float ustY = Mathf.Round(guiY - yukseklik);
 
             if (taretBeyazTex == null)
             {
@@ -817,7 +924,7 @@ namespace Yazlab.Mekanikler
 
             Color eskiRenk = GUI.color;
 
-            GUI.color = new Color(0.05f, 0.05f, 0.05f, 0.85f);
+            GUI.color = new Color(0.05f, 0.05f, 0.05f, 0.88f);
             GUI.DrawTexture(new Rect(solX - 2, ustY - 2, genislik + 4, yukseklik + 4), taretBeyazTex);
 
             GUI.color = new Color(0.25f, 0.05f, 0.05f, 0.9f);
@@ -842,27 +949,31 @@ namespace Yazlab.Mekanikler
             {
                 taretBaslikStili = new GUIStyle(GUI.skin.label)
                 {
-                    fontSize = Mathf.RoundToInt(10 * olcek),
                     fontStyle = FontStyle.Bold,
-                    alignment = TextAnchor.LowerCenter
+                    alignment = TextAnchor.MiddleCenter
                 };
-                taretBaslikStili.normal.textColor = new Color(1f, 0.35f, 0.35f, 0.95f);
             }
+            GoruntuKalitesiYoneticisi.StiliKeskinlestir(taretBaslikStili, Mathf.RoundToInt(12 * olcek));
+            taretBaslikStili.normal.textColor = new Color(1f, 0.38f, 0.38f, 0.98f);
+
             GUI.color = Color.white;
-            GUI.Label(new Rect(solX - 25, ustY - 16 * olcek, genislik + 50, 16 * olcek), "⚔ DÜŞMAN TARET", taretBaslikStili);
+            float baslikH = Mathf.Max(20f, 20f * olcek);
+            GoruntuKalitesiYoneticisi.KeskinEtiketCiz(
+                new Rect(solX - 35f, ustY - baslikH - 2f, genislik + 70f, baslikH), "⚔ DÜŞMAN TARET", taretBaslikStili);
 
             if (taretCanStili == null)
             {
                 taretCanStili = new GUIStyle(GUI.skin.label)
                 {
-                    fontSize = Mathf.RoundToInt(9 * olcek),
                     fontStyle = FontStyle.Bold,
                     alignment = TextAnchor.MiddleCenter
                 };
-                taretCanStili.normal.textColor = Color.white;
             }
+            GoruntuKalitesiYoneticisi.StiliKeskinlestir(taretCanStili, Mathf.RoundToInt(11 * olcek));
+            taretCanStili.normal.textColor = Color.white;
+
             string canYazisi = $"{Mathf.CeilToInt(mevcutCan)} / {Mathf.CeilToInt(maksimumCan)}";
-            GUI.Label(new Rect(solX, ustY, genislik, yukseklik), canYazisi, taretCanStili);
+            GUI.Label(new Rect(solX, ustY - 2f, genislik, yukseklik + 4f), canYazisi, taretCanStili);
 
             GUI.color = eskiRenk;
         }

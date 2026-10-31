@@ -49,9 +49,20 @@ namespace Yazlab.Yonetim
             Ornek = this;
         }
 
+        private Transform _oyuncuTransform;
+        private Transform _npcTransform;
+        private OllamaNpcDiyalogUI _ollamaDiyalogUI;
+
         private void Start()
         {
             DurumuDegistir(OyunDurumu.Baslangic);
+
+            // Ollama LLM Diyalog bileşenini hazırla
+            _ollamaDiyalogUI = GetComponent<OllamaNpcDiyalogUI>();
+            if (_ollamaDiyalogUI == null)
+            {
+                _ollamaDiyalogUI = gameObject.AddComponent<OllamaNpcDiyalogUI>();
+            }
 
             // Şalter tetiklendiğinde otomatik olarak durumu güncelle
             if (salterMekanizmasi != null)
@@ -68,13 +79,55 @@ namespace Yazlab.Yonetim
 
         private void Update()
         {
-            // Sosyal engel alanındayken (NPC Muhafızın yanında) E tuşu ile etkileşim
-            if (mevcutDurum == OyunDurumu.SosyalEngelAlaninda)
+            if (OllamaNpcDiyalogUI.DiyalogAcikMi) return;
+
+            ReferanslariKontrolEt();
+
+            // Oyuncu NPC Muhafızın yakınına geldiyse veya SosyalEngelAlaninda ise [E] tuşu ile Ollama Diyalog Ekranını aç
+            bool npcYakininda = false;
+            if (_oyuncuTransform != null && _npcTransform != null)
+            {
+                float mesafe = Vector3.Distance(_oyuncuTransform.position, _npcTransform.position);
+                if (mesafe <= 4.8f)
+                {
+                    npcYakininda = true;
+                    if (mevcutDurum != OyunDurumu.SosyalEngelAlaninda && mevcutDurum != OyunDurumu.BolumTamamlandi)
+                    {
+                        NpcEtkilesimBaslat();
+                    }
+                }
+            }
+
+            if (!_muhafizSaldirganMi && (mevcutDurum == OyunDurumu.SosyalEngelAlaninda || npcYakininda) && mevcutDurum != OyunDurumu.BolumTamamlandi)
             {
                 if (EBasildiMi())
                 {
-                    MuhafizlaGorusVeKapisiAc();
+                    if (_ollamaDiyalogUI == null)
+                    {
+                        _ollamaDiyalogUI = GetComponent<OllamaNpcDiyalogUI>() ?? gameObject.AddComponent<OllamaNpcDiyalogUI>();
+                    }
+                    _ollamaDiyalogUI.DiyalogPenceresiniAc();
                 }
+            }
+        }
+
+        private void ReferanslariKontrolEt()
+        {
+            if (_oyuncuTransform == null)
+            {
+                KarakterHareket kh = FindAnyObjectByType<KarakterHareket>();
+                if (kh != null) _oyuncuTransform = kh.transform;
+                else
+                {
+                    GameObject p = GameObject.FindWithTag("Player");
+                    if (p != null) _oyuncuTransform = p.transform;
+                }
+            }
+
+            if (_npcTransform == null)
+            {
+                GameObject npc = GameObject.Find("NPC_Muhafiz");
+                if (npc != null) _npcTransform = npc.transform;
             }
         }
 
@@ -132,13 +185,16 @@ namespace Yazlab.Yonetim
             if (mevcutDurum == OyunDurumu.FizikselEngelAsildi || mevcutDurum == OyunDurumu.Baslangic)
             {
                 DurumuDegistir(OyunDurumu.SosyalEngelAlaninda);
-                npcDiyalog = "Muhafız: 'Buradan geçiş izniniz yok! Ama yeterli altın veya ikna ile bir yol bulabiliriz...'";
-                diyalogBitisZamani = Time.time + 6.0f;
+                npcDiyalog = "Muhafız Komutan Varg: 'Buradan geçiş iznin yok! [E] tuşuyla konuşup gece parolasını ('Kızıl Şahin') ve kanıtını söyle!'";
+                diyalogBitisZamani = Time.time + 7.0f;
             }
         }
 
+        private bool _muhafizSaldirganMi = false;
+        private DusmanKontrol _muhafizDusmanBileseni;
+
         /// <summary>
-        /// Oyuncu NPC Muhafız ile konuşup kapıyı açtırır.
+        /// Oyuncu NPC Muhafız ile konuşup çok aşamalı müzakere sonunda kapıyı açtırır.
         /// </summary>
         public void MuhafizlaGorusVeKapisiAc()
         {
@@ -148,9 +204,58 @@ namespace Yazlab.Yonetim
                 npsCikisKapisi.KapiyiAc();
             }
 
-            npcDiyalog = "Muhafız: 'Anlaştık! Kapıyı açıyorum, kimseye görünmeden hızlıca çıkışa ilerle!'";
+            npcDiyalog = "Komutan Varg: 'Pekala, kanıtların ve teklifin geçerli! Kapıyı açıyorum, kimseye görünmeden hızlıca çıkışa ilerle!'";
             diyalogBitisZamani = Time.time + 7.0f;
-            Debug.Log("[BolumYoneticisi] NPC Muhafız ikna edildi! Çıkış kapısı açılıyor.");
+            Debug.Log("[BolumYoneticisi] NPC Muhafız (Ollama LLM) ikna edildi! Çıkış kapısı açılıyor.");
+        }
+
+        /// <summary>
+        /// YazLab-I Proje İsterleri (Bölüm 3.2): Oyuncu LLM diyaloğunda muhafızı kızdırır veya tehdit ederse
+        /// yapılandırılmış JSON çıktısındaki 'savasTetikle: true' verisiyle muhafız düşmana dönüşür ve savaş başlar!
+        /// Muhafız etkisiz hale getirildiğinde üzerinden düşen anahtarla çıkış kapısı açılır.
+        /// </summary>
+        public void MuhafizSavasBaslat()
+        {
+            if (_muhafizSaldirganMi) return;
+            _muhafizSaldirganMi = true;
+
+            ReferanslariKontrolEt();
+            if (_npcTransform != null)
+            {
+                _muhafizDusmanBileseni = _npcTransform.GetComponent<DusmanKontrol>();
+                if (_muhafizDusmanBileseni == null)
+                {
+                    _muhafizDusmanBileseni = _npcTransform.gameObject.AddComponent<DusmanKontrol>();
+                }
+                _muhafizDusmanBileseni.maksimumCan = 120f;
+                _muhafizDusmanBileseni.mevcutCan = 120f;
+                _muhafizDusmanBileseni.atesHasari = 6f;
+                _muhafizDusmanBileseni.atesAraligi = 1.1f;
+                _muhafizDusmanBileseni.RengiUygula();
+                StartCoroutine(MuhafizOlumunuIzle());
+            }
+
+            npcDiyalog = "⚔️ Komutan Varg: 'Bana hakaret etmenin bedelini canınla ödeyeceksin! Silah başına!' (Muhafızı etkisiz hale getirip kapıyı açın!)";
+            diyalogBitisZamani = Time.time + 8.0f;
+            Debug.Log("[BolumYoneticisi] LLM JSON kararı ile SAVAŞ TETİKLENDİ! NPC Muhafız saldırıya geçti.");
+        }
+
+        private System.Collections.IEnumerator MuhafizOlumunuIzle()
+        {
+            while (_muhafizDusmanBileseni != null && !_muhafizDusmanBileseni.IsDead)
+            {
+                yield return new WaitForSeconds(0.25f);
+            }
+
+            // Muhafız öldürüldüğünde kapı kilidi kırılır ve çıkış açılır
+            if (npsCikisKapisi != null)
+            {
+                npsCikisKapisi.KilidiAc();
+                npsCikisKapisi.KapiyiAc();
+            }
+
+            npcDiyalog = "✓ Muhafız etkisiz hale getirildi ve üzerindeki anahtarla çıkış kapısı açıldı!";
+            diyalogBitisZamani = Time.time + 7.0f;
         }
 
         /// <summary>
@@ -169,61 +274,82 @@ namespace Yazlab.Yonetim
 
         private void OnGUI()
         {
-            if (KapiBulmacaPaneli.MinigameAcik) return;
+            if (KapiBulmacaPaneli.MinigameAcik || OllamaNpcDiyalogUI.DiyalogAcikMi) return;
+
+            float olcek = GoruntuKalitesiYoneticisi.KeskinOlcek;
 
             if (texKoyuArkaPlan == null)
             {
                 texKoyuArkaPlan = new Texture2D(1, 1);
-                texKoyuArkaPlan.SetPixel(0, 0, new Color(0.08f, 0.10f, 0.14f, 0.88f));
+                texKoyuArkaPlan.SetPixel(0, 0, new Color(0.05f, 0.07f, 0.11f, 0.94f));
                 texKoyuArkaPlan.Apply();
+            }
+
+            // Muhafızın yakınına gelindiğinde başının üzerinde "[E] MUHAFIZ İLE KONUŞ (OLLAMA LLM)" ipucu göster
+            if (!_muhafizSaldirganMi && _oyuncuTransform != null && _npcTransform != null && mevcutDurum != OyunDurumu.BolumTamamlandi)
+            {
+                float npcMesafe = Vector3.Distance(_oyuncuTransform.position, _npcTransform.position);
+                if (npcMesafe <= 4.8f && Camera.main != null)
+                {
+                    Vector3 tepeNokta = _npcTransform.position + Vector3.up * 2.25f;
+                    if (GoruntuKalitesiYoneticisi.DunyaNoktasiniEkranaCevir(Camera.main, tepeNokta, out Vector2 ekranPos))
+                    {
+                        float bw = Mathf.Round(390f * olcek);
+                        float bh = Mathf.Round(42f * olcek);
+                        float bx = Mathf.Clamp(ekranPos.x - bw * 0.5f, 12f, Screen.width - bw - 12f);
+                        float byPos = Mathf.Clamp(ekranPos.y - bh * 0.5f, 12f, Screen.height - bh - 12f);
+                        GUI.DrawTexture(new Rect(bx, byPos, bw, bh), texKoyuArkaPlan);
+                        GUIStyle ipucuStil = new GUIStyle(GUI.skin.label)
+                        {
+                            fontStyle = FontStyle.Bold,
+                            alignment = TextAnchor.MiddleCenter
+                        };
+                        GoruntuKalitesiYoneticisi.StiliKeskinlestir(ipucuStil, Mathf.RoundToInt(14 * olcek));
+                        ipucuStil.normal.textColor = new Color(1.0f, 0.88f, 0.25f);
+                        GoruntuKalitesiYoneticisi.KeskinEtiketCiz(new Rect(bx, byPos, bw, bh), "💬 [E] MUHAFIZ İLE KONUŞ (OLLAMA LLM)", ipucuStil);
+                    }
+                }
             }
 
             if (baslikStil == null)
             {
                 baslikStil = new GUIStyle(GUI.skin.label)
                 {
-                    fontSize = 14,
-                    fontStyle = FontStyle.Bold
+                    fontStyle = FontStyle.Bold,
+                    wordWrap = true
                 };
-                baslikStil.normal.textColor = new Color(0.95f, 0.85f, 0.25f);
             }
+            GoruntuKalitesiYoneticisi.StiliKeskinlestir(baslikStil, Mathf.RoundToInt(15 * olcek));
+            baslikStil.normal.textColor = new Color(1.0f, 0.88f, 0.25f);
 
             if (aciklamaStil == null)
             {
                 aciklamaStil = new GUIStyle(GUI.skin.label)
                 {
-                    fontSize = 13,
-                    fontStyle = FontStyle.Normal
+                    fontStyle = FontStyle.Bold,
+                    wordWrap = true
                 };
-                aciklamaStil.normal.textColor = Color.white;
             }
+            GoruntuKalitesiYoneticisi.StiliKeskinlestir(aciklamaStil, Mathf.RoundToInt(13 * olcek));
+            aciklamaStil.normal.textColor = new Color(0.96f, 0.98f, 1.0f);
 
-            // 1. SOL ÜST: OPERASYON GÖREV BİLGİ KUTUSU
-            float kutuW = 380f;
-            float kutuH = 68f;
-            float x = 20f;
-            float y = 20f;
-
-            Color eski = GUI.color;
-            GUI.color = Color.white;
-            GUI.DrawTexture(new Rect(x, y, kutuW, kutuH), texKoyuArkaPlan);
-
+            // 1. SOL ÜST: OPERASYON GÖREV BİLGİ KUTUSU (Dinamik yükseklik ile yazılar asla taşmaz/kesilmez)
             string gorevBaslik = "OPERASYON HEDEFİ:";
             string gorevDetay = "";
 
             switch (mevcutDurum)
             {
                 case OyunDurumu.Baslangic:
-                    gorevDetay = "• Siperleri aşın, düşmanları etkisiz hale getirin.\n• Kilitli Depo Kapısına veya Jeneratör Şalterine ulaşın.";
+                    gorevDetay = "• 1. Bölüm: [G] + [E] ile Askı Kapıyı indirip hendeği geçin.\n• 2. Bölüm: Kablo Odasındaki şalteri açın ve Tareti aşın.";
                     break;
                 case OyunDurumu.FizikselEngelAlaninda:
-                    gorevDetay = "• Elektrik paneli bulmacasını çözün veya\n• Yoldaş ile gizli yoldan jeneratör şalterini indirin.";
+                    gorevDetay = "• Kablo Odasındaki elektrik şalteri bulmacasını çözün veya\n• Doğu koridorundaki yedek jeneratör şalterini indirin.";
                     break;
                 case OyunDurumu.FizikselEngelAsildi:
-                    gorevDetay = "• Merdivenlerden kuleye çıkın.\n• Nöbetçi Muhafızın bulunduğu odaya ilerleyin.";
+                    gorevDetay = "• 3. Bölüm: İç Kule merdiven holünden 2. kata çıkın.\n• Nöbetçi Muhafızın koruduğu çıkış odasına ilerleyin.";
                     break;
                 case OyunDurumu.SosyalEngelAlaninda:
-                    gorevDetay = "• [E] Rüşvetçi Muhafız ile görüşün ve kapıyı açtırın.\n• Açılan kapıdan çıkış bölgesine ulaşın.";
+                    gorevDetay = "• [E] Muhafız Komutan Varg ile konuşup kapıyı açtırın.\n• İpucu: Gece parolası 'Kızıl Şahin' + Başkomutan emri / 500+ altın.";
                     break;
                 case OyunDurumu.BolumTamamlandi:
                     gorevBaslik = "✓ GÖREV TAMAMLANDI!";
@@ -231,26 +357,42 @@ namespace Yazlab.Yonetim
                     break;
             }
 
-            GUI.Label(new Rect(x + 12, y + 8, kutuW - 24, 20), gorevBaslik, baslikStil);
-            GUI.Label(new Rect(x + 12, y + 26, kutuW - 24, 38), gorevDetay, aciklamaStil);
+            float kutuW = Mathf.Min(Screen.width - 36f, 480f * olcek);
+            float padX = Mathf.Round(14f * olcek);
+            float icW = kutuW - padX * 2f;
+            float baslikH = Mathf.Max(22f * olcek, baslikStil.CalcHeight(new GUIContent(gorevBaslik), icW) + 4f);
+            float detayH = Mathf.Max(42f * olcek, aciklamaStil.CalcHeight(new GUIContent(gorevDetay), icW) + 8f);
+            float kutuH = baslikH + detayH + 18f * olcek;
+            float x = 16f;
+            float y = 16f;
+
+            Color eski = GUI.color;
+            GUI.color = Color.white;
+            GUI.DrawTexture(new Rect(x, y, kutuW, kutuH), texKoyuArkaPlan);
+
+            GoruntuKalitesiYoneticisi.KeskinEtiketCiz(new Rect(x + padX, y + 8f * olcek, icW, baslikH), gorevBaslik, baslikStil);
+            GoruntuKalitesiYoneticisi.KeskinEtiketCiz(new Rect(x + padX, y + 8f * olcek + baslikH + 2f, icW, detayH), gorevDetay, aciklamaStil);
 
             // 2. ORTA ALT: MUHAFIZ DİYALOG / BİLDİRİM KUTUSU
             if (Time.time < diyalogBitisZamani && !string.IsNullOrEmpty(npcDiyalog))
             {
-                float dW = 620f;
-                float dH = 48f;
-                float dX = (Screen.width - dW) * 0.5f;
-                float dY = Screen.height - 110f;
-
-                GUI.DrawTexture(new Rect(dX, dY, dW, dH), texKoyuArkaPlan);
                 GUIStyle dStil = new GUIStyle(GUI.skin.label)
                 {
-                    fontSize = 14,
                     fontStyle = FontStyle.Bold,
+                    wordWrap = true,
                     alignment = TextAnchor.MiddleCenter
                 };
-                dStil.normal.textColor = new Color(0.35f, 0.95f, 0.45f);
-                GUI.Label(new Rect(dX + 10, dY + 6, dW - 20, dH - 12), npcDiyalog, dStil);
+                GoruntuKalitesiYoneticisi.StiliKeskinlestir(dStil, Mathf.RoundToInt(14 * olcek));
+                dStil.normal.textColor = new Color(0.35f, 0.98f, 0.50f);
+
+                float dW = Mathf.Min(Screen.width - 40f, 680f * olcek);
+                float dIcW = dW - 28f * olcek;
+                float dH = Mathf.Max(52f * olcek, dStil.CalcHeight(new GUIContent(npcDiyalog), dIcW) + 18f * olcek);
+                float dX = Mathf.Round((Screen.width - dW) * 0.5f);
+                float dY = Mathf.Round(Screen.height - dH - 58f * olcek);
+
+                GUI.DrawTexture(new Rect(dX, dY, dW, dH), texKoyuArkaPlan);
+                GoruntuKalitesiYoneticisi.KeskinEtiketCiz(new Rect(dX + 14f * olcek, dY + 6f * olcek, dIcW, dH - 12f * olcek), npcDiyalog, dStil);
             }
 
             GUI.color = eski;
