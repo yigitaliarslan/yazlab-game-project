@@ -191,6 +191,10 @@ public class KarakterAtes : MonoBehaviour
             {
                 hedefteDusmanVar = true;
             }
+            else if (enYakinCol.GetComponentInParent<Yazlab.Mekanikler.RunKristali>() != null)
+            {
+                hedefteDusmanVar = true;
+            }
         }
     }
 
