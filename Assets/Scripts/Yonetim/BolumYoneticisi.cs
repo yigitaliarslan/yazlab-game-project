@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using UnityEngine;
 using UnityEngine.Events;
 #if ENABLE_INPUT_SYSTEM
@@ -73,7 +73,7 @@ namespace Yazlab.Yonetim
             // Çıkış kapısı açıldığında oyunu tamamla
             if (npsCikisKapisi != null)
             {
-                npsCikisKapisi.onKapiAcildi.AddListener(OyunuTamamla);
+                npsCikisKapisi.onKapiAcildi.AddListener(KizilKuleGoreviniBaslat);
             }
         }
 
@@ -91,14 +91,14 @@ namespace Yazlab.Yonetim
                 if (mesafe <= 4.8f)
                 {
                     npcYakininda = true;
-                    if (mevcutDurum != OyunDurumu.SosyalEngelAlaninda && mevcutDurum != OyunDurumu.BolumTamamlandi)
+                    if (mevcutDurum != OyunDurumu.SosyalEngelAlaninda && mevcutDurum != OyunDurumu.PrensesKurtarma && mevcutDurum != OyunDurumu.BolumTamamlandi)
                     {
                         NpcEtkilesimBaslat();
                     }
                 }
             }
 
-            if (!_muhafizSaldirganMi && (mevcutDurum == OyunDurumu.SosyalEngelAlaninda || npcYakininda) && mevcutDurum != OyunDurumu.BolumTamamlandi)
+            if (!_muhafizSaldirganMi && (mevcutDurum == OyunDurumu.SosyalEngelAlaninda || npcYakininda) && mevcutDurum != OyunDurumu.PrensesKurtarma && mevcutDurum != OyunDurumu.BolumTamamlandi)
             {
                 if (EBasildiMi())
                 {
@@ -196,6 +196,8 @@ namespace Yazlab.Yonetim
         /// <summary>
         /// Oyuncu NPC Muhafız ile konuşup çok aşamalı müzakere sonunda kapıyı açtırır.
         /// </summary>
+        public void KizilKuleGoreviniBaslat() { if (mevcutDurum == OyunDurumu.PrensesKurtarma || mevcutDurum == OyunDurumu.BolumTamamlandi) return; DurumuDegistir(OyunDurumu.PrensesKurtarma); Debug.Log("[BolumYoneticisi] 4. Bolum: Kizil Kule'ye gecit acildi, Prenses Aylin'i kurtarin!"); }
+
         public void MuhafizlaGorusVeKapisiAc()
         {
             if (npsCikisKapisi != null)
@@ -349,7 +351,11 @@ namespace Yazlab.Yonetim
                     gorevDetay = "• 3. Bölüm: İç Kule merdiven holünden 2. kata çıkın.\n• Nöbetçi Muhafızın koruduğu çıkış odasına ilerleyin.";
                     break;
                 case OyunDurumu.SosyalEngelAlaninda:
-                    gorevDetay = "• [E] Muhafız Komutan Varg ile konuşup kapıyı açtırın.\n• İpucu: Gece parolası 'Kızıl Şahin' + Başkomutan emri / 500+ altın.";
+                    gorevDetay = "• [E] Muhafiz Komutan Varg ile konusup kapiyi actirin.\n• Ipucu: Gece parolasi 'Kizil Sahin' + Baskan emri / 500+ altin.";
+                    break;
+                case OyunDurumu.PrensesKurtarma:
+                    gorevBaslik = "4. BOLUM (FINAL) — PRENSESI KURTAR:";
+                    gorevDetay = "• Kizil Kule'ye girin ve tutsak Prenses Aylin'e ulasin.\n• Kehanet Kuresi'nin run dizilimini vurup kacis tunelini acin.";
                     break;
                 case OyunDurumu.BolumTamamlandi:
                     gorevBaslik = "✓ GÖREV TAMAMLANDI!";
