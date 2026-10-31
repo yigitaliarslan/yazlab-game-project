@@ -185,8 +185,8 @@ namespace Yazlab.Yonetim
             if (mevcutDurum == OyunDurumu.FizikselEngelAsildi || mevcutDurum == OyunDurumu.Baslangic)
             {
                 DurumuDegistir(OyunDurumu.SosyalEngelAlaninda);
-                npcDiyalog = "Muhafız: 'Buradan geçiş izniniz yok! Ama yeterli altın veya ikna ile bir yol bulabiliriz...'";
-                diyalogBitisZamani = Time.time + 6.0f;
+                npcDiyalog = "Muhafız Komutan Varg: 'Buradan geçiş iznin yok! [E] tuşuyla konuşup gece parolasını ('Kızıl Şahin') ve kanıtını söyle!'";
+                diyalogBitisZamani = Time.time + 7.0f;
             }
         }
 
@@ -291,21 +291,20 @@ namespace Yazlab.Yonetim
                 float npcMesafe = Vector3.Distance(_oyuncuTransform.position, _npcTransform.position);
                 if (npcMesafe <= 4.8f && Camera.main != null)
                 {
-                    Vector3 tepeNokta = _npcTransform.position + Vector3.up * 2.3f;
-                    Vector3 ekranPos = Camera.main.WorldToScreenPoint(tepeNokta);
-                    if (ekranPos.z > 0.1f)
+                    Vector3 tepeNokta = _npcTransform.position + Vector3.up * 2.25f;
+                    if (GoruntuKalitesiYoneticisi.DunyaNoktasiniEkranaCevir(Camera.main, tepeNokta, out Vector2 ekranPos))
                     {
-                        float bw = 390f * olcek;
-                        float bh = 44f * olcek;
-                        float bx = ekranPos.x - bw * 0.5f;
-                        float byPos = Screen.height - ekranPos.y - bh * 0.5f;
+                        float bw = Mathf.Round(390f * olcek);
+                        float bh = Mathf.Round(42f * olcek);
+                        float bx = Mathf.Clamp(ekranPos.x - bw * 0.5f, 12f, Screen.width - bw - 12f);
+                        float byPos = Mathf.Clamp(ekranPos.y - bh * 0.5f, 12f, Screen.height - bh - 12f);
                         GUI.DrawTexture(new Rect(bx, byPos, bw, bh), texKoyuArkaPlan);
                         GUIStyle ipucuStil = new GUIStyle(GUI.skin.label)
                         {
                             fontStyle = FontStyle.Bold,
                             alignment = TextAnchor.MiddleCenter
                         };
-                        GoruntuKalitesiYoneticisi.StiliKeskinlestir(ipucuStil, Mathf.RoundToInt(15 * olcek));
+                        GoruntuKalitesiYoneticisi.StiliKeskinlestir(ipucuStil, Mathf.RoundToInt(14 * olcek));
                         ipucuStil.normal.textColor = new Color(1.0f, 0.88f, 0.25f);
                         GoruntuKalitesiYoneticisi.KeskinEtiketCiz(new Rect(bx, byPos, bw, bh), "💬 [E] MUHAFIZ İLE KONUŞ (OLLAMA LLM)", ipucuStil);
                     }
@@ -316,10 +315,11 @@ namespace Yazlab.Yonetim
             {
                 baslikStil = new GUIStyle(GUI.skin.label)
                 {
-                    fontStyle = FontStyle.Bold
+                    fontStyle = FontStyle.Bold,
+                    wordWrap = true
                 };
             }
-            GoruntuKalitesiYoneticisi.StiliKeskinlestir(baslikStil, Mathf.RoundToInt(16 * olcek));
+            GoruntuKalitesiYoneticisi.StiliKeskinlestir(baslikStil, Mathf.RoundToInt(15 * olcek));
             baslikStil.normal.textColor = new Color(1.0f, 0.88f, 0.25f);
 
             if (aciklamaStil == null)
@@ -330,19 +330,10 @@ namespace Yazlab.Yonetim
                     wordWrap = true
                 };
             }
-            GoruntuKalitesiYoneticisi.StiliKeskinlestir(aciklamaStil, Mathf.RoundToInt(14 * olcek));
+            GoruntuKalitesiYoneticisi.StiliKeskinlestir(aciklamaStil, Mathf.RoundToInt(13 * olcek));
             aciklamaStil.normal.textColor = new Color(0.96f, 0.98f, 1.0f);
 
-            // 1. SOL ÜST: OPERASYON GÖREV BİLGİ KUTUSU
-            float kutuW = 460f * olcek;
-            float kutuH = 84f * olcek;
-            float x = 18f;
-            float y = 18f;
-
-            Color eski = GUI.color;
-            GUI.color = Color.white;
-            GUI.DrawTexture(new Rect(x, y, kutuW, kutuH), texKoyuArkaPlan);
-
+            // 1. SOL ÜST: OPERASYON GÖREV BİLGİ KUTUSU (Dinamik yükseklik ile yazılar asla taşmaz/kesilmez)
             string gorevBaslik = "OPERASYON HEDEFİ:";
             string gorevDetay = "";
 
@@ -358,7 +349,7 @@ namespace Yazlab.Yonetim
                     gorevDetay = "• 3. Bölüm: İç Kule merdiven holünden 2. kata çıkın.\n• Nöbetçi Muhafızın koruduğu çıkış odasına ilerleyin.";
                     break;
                 case OyunDurumu.SosyalEngelAlaninda:
-                    gorevDetay = "• [E] Rüşvetçi Muhafız ile görüşün ve kapıyı açtırın.\n• Açılan kapıdan çıkış bölgesine ulaşın.";
+                    gorevDetay = "• [E] Muhafız Komutan Varg ile konuşup kapıyı açtırın.\n• İpucu: Gece parolası 'Kızıl Şahin' + Başkomutan emri / 500+ altın.";
                     break;
                 case OyunDurumu.BolumTamamlandi:
                     gorevBaslik = "✓ GÖREV TAMAMLANDI!";
@@ -366,27 +357,42 @@ namespace Yazlab.Yonetim
                     break;
             }
 
-            GoruntuKalitesiYoneticisi.KeskinEtiketCiz(new Rect(x + 14 * olcek, y + 8 * olcek, kutuW - 28 * olcek, 24 * olcek), gorevBaslik, baslikStil);
-            GoruntuKalitesiYoneticisi.KeskinEtiketCiz(new Rect(x + 14 * olcek, y + 32 * olcek, kutuW - 28 * olcek, 46 * olcek), gorevDetay, aciklamaStil);
+            float kutuW = Mathf.Min(Screen.width - 36f, 480f * olcek);
+            float padX = Mathf.Round(14f * olcek);
+            float icW = kutuW - padX * 2f;
+            float baslikH = Mathf.Max(22f * olcek, baslikStil.CalcHeight(new GUIContent(gorevBaslik), icW) + 4f);
+            float detayH = Mathf.Max(42f * olcek, aciklamaStil.CalcHeight(new GUIContent(gorevDetay), icW) + 8f);
+            float kutuH = baslikH + detayH + 18f * olcek;
+            float x = 16f;
+            float y = 16f;
+
+            Color eski = GUI.color;
+            GUI.color = Color.white;
+            GUI.DrawTexture(new Rect(x, y, kutuW, kutuH), texKoyuArkaPlan);
+
+            GoruntuKalitesiYoneticisi.KeskinEtiketCiz(new Rect(x + padX, y + 8f * olcek, icW, baslikH), gorevBaslik, baslikStil);
+            GoruntuKalitesiYoneticisi.KeskinEtiketCiz(new Rect(x + padX, y + 8f * olcek + baslikH + 2f, icW, detayH), gorevDetay, aciklamaStil);
 
             // 2. ORTA ALT: MUHAFIZ DİYALOG / BİLDİRİM KUTUSU
             if (Time.time < diyalogBitisZamani && !string.IsNullOrEmpty(npcDiyalog))
             {
-                float dW = Mathf.Min(Screen.width - 40f, 700f * olcek);
-                float dH = 56f * olcek;
-                float dX = (Screen.width - dW) * 0.5f;
-                float dY = Screen.height - 115f * olcek;
-
-                GUI.DrawTexture(new Rect(dX, dY, dW, dH), texKoyuArkaPlan);
                 GUIStyle dStil = new GUIStyle(GUI.skin.label)
                 {
                     fontStyle = FontStyle.Bold,
                     wordWrap = true,
                     alignment = TextAnchor.MiddleCenter
                 };
-                GoruntuKalitesiYoneticisi.StiliKeskinlestir(dStil, Mathf.RoundToInt(15 * olcek));
+                GoruntuKalitesiYoneticisi.StiliKeskinlestir(dStil, Mathf.RoundToInt(14 * olcek));
                 dStil.normal.textColor = new Color(0.35f, 0.98f, 0.50f);
-                GoruntuKalitesiYoneticisi.KeskinEtiketCiz(new Rect(dX + 12, dY + 6, dW - 24, dH - 12), npcDiyalog, dStil);
+
+                float dW = Mathf.Min(Screen.width - 40f, 680f * olcek);
+                float dIcW = dW - 28f * olcek;
+                float dH = Mathf.Max(52f * olcek, dStil.CalcHeight(new GUIContent(npcDiyalog), dIcW) + 18f * olcek);
+                float dX = Mathf.Round((Screen.width - dW) * 0.5f);
+                float dY = Mathf.Round(Screen.height - dH - 58f * olcek);
+
+                GUI.DrawTexture(new Rect(dX, dY, dW, dH), texKoyuArkaPlan);
+                GoruntuKalitesiYoneticisi.KeskinEtiketCiz(new Rect(dX + 14f * olcek, dY + 6f * olcek, dIcW, dH - 12f * olcek), npcDiyalog, dStil);
             }
 
             GUI.color = eski;

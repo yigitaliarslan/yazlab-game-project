@@ -1,5 +1,6 @@
 using System.Collections;
 using UnityEngine;
+using Yazlab.Yonetim;
 
 namespace Yazlab.Mekanikler
 {
@@ -205,7 +206,7 @@ namespace Yazlab.Mekanikler
             if (_kutuTex == null)
             {
                 _kutuTex = new Texture2D(1, 1);
-                _kutuTex.SetPixel(0, 0, new Color(0.03f, 0.14f, 0.24f, 0.92f));
+                _kutuTex.SetPixel(0, 0, new Color(0.03f, 0.14f, 0.24f, 0.94f));
                 _kutuTex.Apply();
             }
 
@@ -220,34 +221,36 @@ namespace Yazlab.Mekanikler
             GUIStyle kutuStil = new GUIStyle(GUI.skin.box);
             kutuStil.normal.background = _kutuTex;
 
+            float olcek = GoruntuKalitesiYoneticisi.KeskinOlcek;
+
             if (_baslikStil == null)
             {
                 _baslikStil = new GUIStyle(GUI.skin.label)
                 {
-                    fontSize = 20,
                     fontStyle = FontStyle.Bold,
                     alignment = TextAnchor.MiddleCenter
                 };
-                _baslikStil.normal.textColor = new Color(0.35f, 0.92f, 1.0f);
             }
+            GoruntuKalitesiYoneticisi.StiliKeskinlestir(_baslikStil, Mathf.RoundToInt(19 * olcek));
+            _baslikStil.normal.textColor = new Color(0.35f, 0.92f, 1.0f);
 
             if (_altStil == null)
             {
                 _altStil = new GUIStyle(GUI.skin.label)
                 {
-                    fontSize = 14,
                     fontStyle = FontStyle.Bold,
                     alignment = TextAnchor.MiddleCenter
                 };
-                _altStil.normal.textColor = Color.white;
             }
+            GoruntuKalitesiYoneticisi.StiliKeskinlestir(_altStil, Mathf.RoundToInt(14 * olcek));
+            _altStil.normal.textColor = Color.white;
 
-            float w = 520f;
-            float h = 86f;
-            Rect r = new Rect((Screen.width - w) * 0.5f, (Screen.height - h) * 0.42f, w, h);
+            float w = Mathf.Min(Screen.width - 36f, 520f * olcek);
+            float h = 92f * olcek;
+            Rect r = new Rect(Mathf.Round((Screen.width - w) * 0.5f), Mathf.Round((Screen.height - h) * 0.42f), w, h);
             GUI.Box(r, GUIContent.none, kutuStil);
-            GUI.Label(new Rect(r.x, r.y + 14f, r.width, 30f), "🌊 HENDEK SUYUNA DÜŞTÜNÜZ!", _baslikStil);
-            GUI.Label(new Rect(r.x, r.y + 46f, r.width, 26f), "Başlangıç Noktasından Yeniden Başlatılıyor...", _altStil);
+            GoruntuKalitesiYoneticisi.KeskinEtiketCiz(new Rect(r.x, r.y + 14f * olcek, r.width, 32f * olcek), "🌊 HENDEK SUYUNA DÜŞTÜNÜZ!", _baslikStil);
+            GoruntuKalitesiYoneticisi.KeskinEtiketCiz(new Rect(r.x, r.y + 48f * olcek, r.width, 28f * olcek), "Başlangıç Noktasından Yeniden Başlatılıyor...", _altStil);
 
             GUI.color = eski;
         }

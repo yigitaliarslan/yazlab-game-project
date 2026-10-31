@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using UnityEngine;
 using Yazlab.Yonetim;
 
@@ -783,6 +783,7 @@ namespace Yazlab.Mekanikler
         protected override void OnGUI()
         {
             if (oldu) return;
+            if (KapiBulmacaPaneli.MinigameAcik || OllamaNpcDiyalogUI.DiyalogAcikMi) return;
 
             if (kapiKontrolBileseni != null && !kapiKontrolBileseni.AcikMi) return;
 
@@ -790,26 +791,26 @@ namespace Yazlab.Mekanikler
             if (cam == null) return;
 
             Vector3 dunyaKonumu = (kuleBasi != null ? kuleBasi.position : transform.position + Vector3.up * 3.2f) + Vector3.up * canBariYukseklikOfseti;
-            Vector3 ekranNoktasi = cam.WorldToScreenPoint(dunyaKonumu);
-            if (ekranNoktasi.z <= 0.1f) return;
+            if (!GoruntuKalitesiYoneticisi.DunyaNoktasiniEkranaCevir(cam, dunyaKonumu, out Vector2 ekranKonumu))
+                return;
 
-            if (ekranNoktasi.x < -80 || ekranNoktasi.x > Screen.width + 80 ||
-                ekranNoktasi.y < -80 || ekranNoktasi.y > Screen.height + 80)
+            if (ekranKonumu.x < -80 || ekranKonumu.x > Screen.width + 80 ||
+                ekranKonumu.y < -80 || ekranKonumu.y > Screen.height + 80)
             {
                 return;
             }
 
-            float guiY = Screen.height - ekranNoktasi.y;
-            float guiX = ekranNoktasi.x;
+            float guiX = ekranKonumu.x;
+            float guiY = ekranKonumu.y;
 
             float mesafe = Vector3.Distance(cam.transform.position, dunyaKonumu);
-            float olcek = Mathf.Clamp(15f / Mathf.Max(mesafe, 5f), 0.75f, 1.35f);
+            float olcek = Mathf.Clamp(15f / Mathf.Max(mesafe, 5f), 0.85f, 1.30f);
 
-            float genislik = canBariGenislik * olcek;
-            float yukseklik = canBariYukseklik * olcek;
+            float genislik = Mathf.Round(Mathf.Max(140f, canBariGenislik) * olcek);
+            float yukseklik = Mathf.Round(Mathf.Max(16f, canBariYukseklik) * olcek);
 
-            float solX = guiX - (genislik * 0.5f);
-            float ustY = guiY - yukseklik;
+            float solX = Mathf.Round(guiX - (genislik * 0.5f));
+            float ustY = Mathf.Round(guiY - yukseklik);
 
             if (taretBeyazTex == null)
             {
@@ -820,7 +821,7 @@ namespace Yazlab.Mekanikler
 
             Color eskiRenk = GUI.color;
 
-            GUI.color = new Color(0.05f, 0.05f, 0.05f, 0.85f);
+            GUI.color = new Color(0.05f, 0.05f, 0.05f, 0.88f);
             GUI.DrawTexture(new Rect(solX - 2, ustY - 2, genislik + 4, yukseklik + 4), taretBeyazTex);
 
             GUI.color = new Color(0.25f, 0.05f, 0.05f, 0.9f);
@@ -845,27 +846,31 @@ namespace Yazlab.Mekanikler
             {
                 taretBaslikStili = new GUIStyle(GUI.skin.label)
                 {
-                    fontSize = Mathf.RoundToInt(10 * olcek),
                     fontStyle = FontStyle.Bold,
-                    alignment = TextAnchor.LowerCenter
+                    alignment = TextAnchor.MiddleCenter
                 };
-                taretBaslikStili.normal.textColor = new Color(1f, 0.35f, 0.35f, 0.95f);
             }
+            GoruntuKalitesiYoneticisi.StiliKeskinlestir(taretBaslikStili, Mathf.RoundToInt(12 * olcek));
+            taretBaslikStili.normal.textColor = new Color(1f, 0.38f, 0.38f, 0.98f);
+
             GUI.color = Color.white;
-            GUI.Label(new Rect(solX - 25, ustY - 16 * olcek, genislik + 50, 16 * olcek), "⚔ DÜŞMAN TARET", taretBaslikStili);
+            float baslikH = Mathf.Max(20f, 20f * olcek);
+            GoruntuKalitesiYoneticisi.KeskinEtiketCiz(
+                new Rect(solX - 35f, ustY - baslikH - 2f, genislik + 70f, baslikH), "⚔ DÜŞMAN TARET", taretBaslikStili);
 
             if (taretCanStili == null)
             {
                 taretCanStili = new GUIStyle(GUI.skin.label)
                 {
-                    fontSize = Mathf.RoundToInt(9 * olcek),
                     fontStyle = FontStyle.Bold,
                     alignment = TextAnchor.MiddleCenter
                 };
-                taretCanStili.normal.textColor = Color.white;
             }
+            GoruntuKalitesiYoneticisi.StiliKeskinlestir(taretCanStili, Mathf.RoundToInt(11 * olcek));
+            taretCanStili.normal.textColor = Color.white;
+
             string canYazisi = $"{Mathf.CeilToInt(mevcutCan)} / {Mathf.CeilToInt(maksimumCan)}";
-            GUI.Label(new Rect(solX, ustY, genislik, yukseklik), canYazisi, taretCanStili);
+            GUI.Label(new Rect(solX, ustY - 2f, genislik, yukseklik + 4f), canYazisi, taretCanStili);
 
             GUI.color = eskiRenk;
         }

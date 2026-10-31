@@ -12,6 +12,7 @@ namespace Yazlab.Yonetim
     /// - Hiçbir hazır/scriptlenmiş ikna butonu içermez; oyuncu tamamen kendi serbest metniyle muhafızı ikna etmeye çalışır.
     /// - Modelin ürettiği yapılandırılmış JSON çıktısını (Tepki Türü, Güven Değişimi, Kapı Açma, Savaş Tetikleme) canlı gösterir.
     /// - Muhafız kolay ikna olmaz (en az 2-3 aşamalı sorgulama ve %80+ güven gerekir).
+    /// - Gece parolası ve nasıl ikna edileceğine dair dinamik boyutlu, tam sığan İkna Rehberi (İpucu Kutusu) içerir.
     /// - Oyuncu muhafızı kızdırır veya tehdit ederse muhafız düşmana dönüşüp oyuncuya ateş açar (`savasTetikle: true`)!
     /// </summary>
     [RequireComponent(typeof(OllamaIstemcisi))]
@@ -45,9 +46,14 @@ namespace Yazlab.Yonetim
         private Texture2D _texPanelUst;
         private Texture2D _texSohbetKutu;
         private Texture2D _texGuvenBarArka;
+        private Texture2D _texIpucuKutu;
+        private Texture2D _texMesajMuhafiz;
+        private Texture2D _texMesajOyuncu;
+        private Texture2D _texMesajHata;
 
         private GUIStyle _baslikStil;
         private GUIStyle _altBaslikStil;
+        private GUIStyle _ipucuBaslikStil;
         private GUIStyle _ipucuStil;
         private GUIStyle _mesajOyuncuStil;
         private GUIStyle _mesajMuhafizStil;
@@ -264,10 +270,14 @@ namespace Yazlab.Yonetim
         {
             if (_texArkaPlan == null)
             {
-                _texArkaPlan = RenkDokusu(new Color(0.06f, 0.08f, 0.12f, 0.97f));
+                _texArkaPlan = RenkDokusu(new Color(0.06f, 0.08f, 0.12f, 0.98f));
                 _texPanelUst = RenkDokusu(new Color(0.10f, 0.14f, 0.22f, 1.0f));
-                _texSohbetKutu = RenkDokusu(new Color(0.04f, 0.05f, 0.08f, 0.95f));
+                _texSohbetKutu = RenkDokusu(new Color(0.04f, 0.05f, 0.08f, 0.96f));
                 _texGuvenBarArka = RenkDokusu(new Color(0.18f, 0.20f, 0.25f, 1.0f));
+                _texIpucuKutu = RenkDokusu(new Color(0.09f, 0.13f, 0.19f, 0.98f));
+                _texMesajMuhafiz = RenkDokusu(new Color(0.11f, 0.14f, 0.20f, 0.95f));
+                _texMesajOyuncu = RenkDokusu(new Color(0.08f, 0.20f, 0.26f, 0.95f));
+                _texMesajHata = RenkDokusu(new Color(0.24f, 0.09f, 0.09f, 0.95f));
             }
 
             if (_baslikStil == null)
@@ -275,10 +285,11 @@ namespace Yazlab.Yonetim
                 _baslikStil = new GUIStyle(GUI.skin.label)
                 {
                     fontStyle = FontStyle.Bold,
-                    alignment = TextAnchor.MiddleLeft
+                    alignment = TextAnchor.MiddleLeft,
+                    wordWrap = false
                 };
             }
-            GoruntuKalitesiYoneticisi.StiliKeskinlestir(_baslikStil, Mathf.RoundToInt(17 * olcek));
+            GoruntuKalitesiYoneticisi.StiliKeskinlestir(_baslikStil, Mathf.RoundToInt(16 * olcek));
             _baslikStil.normal.textColor = new Color(1.0f, 0.86f, 0.28f);
 
             if (_altBaslikStil == null)
@@ -286,11 +297,24 @@ namespace Yazlab.Yonetim
                 _altBaslikStil = new GUIStyle(GUI.skin.label)
                 {
                     fontStyle = FontStyle.Bold,
-                    alignment = TextAnchor.MiddleLeft
+                    alignment = TextAnchor.MiddleLeft,
+                    wordWrap = false
                 };
             }
-            GoruntuKalitesiYoneticisi.StiliKeskinlestir(_altBaslikStil, Mathf.RoundToInt(14 * olcek));
+            GoruntuKalitesiYoneticisi.StiliKeskinlestir(_altBaslikStil, Mathf.RoundToInt(13 * olcek));
             _altBaslikStil.normal.textColor = new Color(0.88f, 0.94f, 1.0f);
+
+            if (_ipucuBaslikStil == null)
+            {
+                _ipucuBaslikStil = new GUIStyle(GUI.skin.label)
+                {
+                    fontStyle = FontStyle.Bold,
+                    alignment = TextAnchor.MiddleLeft,
+                    wordWrap = true
+                };
+            }
+            GoruntuKalitesiYoneticisi.StiliKeskinlestir(_ipucuBaslikStil, Mathf.RoundToInt(13 * olcek));
+            _ipucuBaslikStil.normal.textColor = new Color(1.0f, 0.86f, 0.28f);
 
             if (_ipucuStil == null)
             {
@@ -298,11 +322,15 @@ namespace Yazlab.Yonetim
                 {
                     fontStyle = FontStyle.Bold,
                     wordWrap = true,
-                    alignment = TextAnchor.MiddleLeft
+                    alignment = TextAnchor.UpperLeft,
+                    padding = new RectOffset(6, 6, 4, 4)
                 };
             }
-            GoruntuKalitesiYoneticisi.StiliKeskinlestir(_ipucuStil, Mathf.RoundToInt(13 * olcek));
-            _ipucuStil.normal.textColor = new Color(0.80f, 0.88f, 0.96f);
+            GoruntuKalitesiYoneticisi.StiliKeskinlestir(_ipucuStil, Mathf.RoundToInt(12.5f * olcek));
+            _ipucuStil.normal.textColor = new Color(0.88f, 0.95f, 1.0f);
+
+            int padX = Mathf.Max(10, Mathf.RoundToInt(12 * olcek));
+            int padY = Mathf.Max(8, Mathf.RoundToInt(8 * olcek));
 
             if (_mesajOyuncuStil == null)
             {
@@ -310,12 +338,13 @@ namespace Yazlab.Yonetim
                 {
                     wordWrap = true,
                     fontStyle = FontStyle.Bold,
-                    alignment = TextAnchor.UpperLeft,
-                    padding = new RectOffset(12, 12, 8, 8)
+                    alignment = TextAnchor.UpperLeft
                 };
             }
-            GoruntuKalitesiYoneticisi.StiliKeskinlestir(_mesajOyuncuStil, Mathf.RoundToInt(15 * olcek));
-            _mesajOyuncuStil.normal.textColor = new Color(0.68f, 0.94f, 1.0f);
+            _mesajOyuncuStil.normal.background = _texMesajOyuncu;
+            _mesajOyuncuStil.padding = new RectOffset(padX, padX, padY, padY);
+            GoruntuKalitesiYoneticisi.StiliKeskinlestir(_mesajOyuncuStil, Mathf.RoundToInt(14 * olcek));
+            _mesajOyuncuStil.normal.textColor = new Color(0.68f, 0.95f, 1.0f);
 
             if (_mesajMuhafizStil == null)
             {
@@ -323,11 +352,12 @@ namespace Yazlab.Yonetim
                 {
                     wordWrap = true,
                     fontStyle = FontStyle.Bold,
-                    alignment = TextAnchor.UpperLeft,
-                    padding = new RectOffset(12, 12, 8, 8)
+                    alignment = TextAnchor.UpperLeft
                 };
             }
-            GoruntuKalitesiYoneticisi.StiliKeskinlestir(_mesajMuhafizStil, Mathf.RoundToInt(15 * olcek));
+            _mesajMuhafizStil.normal.background = _texMesajMuhafiz;
+            _mesajMuhafizStil.padding = new RectOffset(padX, padX, padY, padY);
+            GoruntuKalitesiYoneticisi.StiliKeskinlestir(_mesajMuhafizStil, Mathf.RoundToInt(14 * olcek));
             _mesajMuhafizStil.normal.textColor = new Color(1.0f, 0.97f, 0.88f);
 
             if (_mesajHataStil == null)
@@ -336,12 +366,13 @@ namespace Yazlab.Yonetim
                 {
                     wordWrap = true,
                     fontStyle = FontStyle.Bold,
-                    alignment = TextAnchor.UpperLeft,
-                    padding = new RectOffset(12, 12, 8, 8)
+                    alignment = TextAnchor.UpperLeft
                 };
             }
-            GoruntuKalitesiYoneticisi.StiliKeskinlestir(_mesajHataStil, Mathf.RoundToInt(15 * olcek));
-            _mesajHataStil.normal.textColor = new Color(1.0f, 0.48f, 0.48f);
+            _mesajHataStil.normal.background = _texMesajHata;
+            _mesajHataStil.padding = new RectOffset(padX, padX, padY, padY);
+            GoruntuKalitesiYoneticisi.StiliKeskinlestir(_mesajHataStil, Mathf.RoundToInt(14 * olcek));
+            _mesajHataStil.normal.textColor = new Color(1.0f, 0.52f, 0.52f);
 
             if (_girdiStil == null)
             {
@@ -349,19 +380,20 @@ namespace Yazlab.Yonetim
                 {
                     fontStyle = FontStyle.Bold,
                     alignment = TextAnchor.MiddleLeft,
-                    padding = new RectOffset(10, 10, 8, 8)
+                    padding = new RectOffset(10, 10, 6, 6)
                 };
             }
-            GoruntuKalitesiYoneticisi.StiliKeskinlestir(_girdiStil, Mathf.RoundToInt(16 * olcek));
+            GoruntuKalitesiYoneticisi.StiliKeskinlestir(_girdiStil, Mathf.RoundToInt(15 * olcek));
 
             if (_butonStil == null)
             {
                 _butonStil = new GUIStyle(GUI.skin.button)
                 {
-                    fontStyle = FontStyle.Bold
+                    fontStyle = FontStyle.Bold,
+                    alignment = TextAnchor.MiddleCenter
                 };
             }
-            GoruntuKalitesiYoneticisi.StiliKeskinlestir(_butonStil, Mathf.RoundToInt(15 * olcek));
+            GoruntuKalitesiYoneticisi.StiliKeskinlestir(_butonStil, Mathf.RoundToInt(14 * olcek));
         }
 
         private Texture2D RenkDokusu(Color c)
@@ -376,102 +408,125 @@ namespace Yazlab.Yonetim
         {
             if (!DiyalogAcikMi) return;
 
-            float olcek = Mathf.Clamp(Screen.height / 650f, 0.95f, 1.3f);
+            // Hem genişlik hem yüksekliğe göre esnek ölçekleme (hiçbir çözünürlükte pencere dışına taşmaz)
+            float olcek = Mathf.Clamp(Mathf.Min((Screen.width - 28f) / 860f, (Screen.height - 24f) / 600f), 0.75f, 1.25f);
             DokulariVeStilleriHazirla(olcek);
 
             Color eskiRenk = GUI.color;
 
             // Arka plan karartması
-            GUI.color = new Color(0f, 0f, 0f, 0.68f);
+            GUI.color = new Color(0f, 0f, 0f, 0.72f);
             GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), Texture2D.whiteTexture);
             GUI.color = Color.white;
 
-            float w = Mathf.Min(Screen.width - 24f, 820f * olcek);
-            float h = Mathf.Min(Screen.height - 20f, 520f * olcek);
-            float x = (Screen.width - w) * 0.5f;
-            float y = (Screen.height - h) * 0.5f;
+            float w = Mathf.Min(Screen.width - 20f, 860f * olcek);
+            float h = Mathf.Min(Screen.height - 16f, 600f * olcek);
+            float x = Mathf.Round((Screen.width - w) * 0.5f);
+            float y = Mathf.Round((Screen.height - h) * 0.5f);
+            float kenar = Mathf.Round(16f * olcek);
+            float icGenislikTam = w - kenar * 2f;
 
             // Ana Çerçeve
             GUI.DrawTexture(new Rect(x, y, w, h), _texArkaPlan);
-            GUI.DrawTexture(new Rect(x, y, w, 52f * olcek), _texPanelUst);
+            float ustBarH = Mathf.Round(46f * olcek);
+            GUI.DrawTexture(new Rect(x, y, w, ustBarH), _texPanelUst);
 
             GUI.color = new Color(0.95f, 0.76f, 0.20f, 1f);
-            GUI.DrawTexture(new Rect(x, y + 52f * olcek, w, 2f * olcek), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(x, y + ustBarH, w, Mathf.Max(2f, 2f * olcek)), Texture2D.whiteTexture);
             GUI.color = Color.white;
 
-            // Başlık
-            GUI.Label(new Rect(x + 18f * olcek, y + 10f * olcek, w * 0.72f, 32f * olcek),
+            // 1. Üst Başlık ve Kapat Butonu
+            float kapatBtnW = Mathf.Round(114f * olcek);
+            float kapatBtnH = Mathf.Round(30f * olcek);
+            GUI.Label(new Rect(x + kenar, y + 7f * olcek, icGenislikTam - kapatBtnW - 10f * olcek, 32f * olcek),
                 $"🛡️ KIDEMLİ MUHAFIZ KOMUTAN VARG — YEREL LLM ({_llmServisi.AktifModelAdi})", _baslikStil);
 
-            // Sağ Üst Kapat Butonu
-            if (GUI.Button(new Rect(x + w - 125f * olcek, y + 10f * olcek, 108f * olcek, 32f * olcek), "✕ KAPAT [ESC]", _butonStil))
+            if (GUI.Button(new Rect(x + w - kenar - kapatBtnW, y + 8f * olcek, kapatBtnW, kapatBtnH), "✕ KAPAT [ESC]", _butonStil))
             {
                 DiyalogPenceresiniKapat();
                 GUI.color = eskiRenk;
                 return;
             }
 
-            // Üst Bilgi: Güven Skoru, İkna Aşaması ve Son JSON Tepki Türü
-            float barY = y + 62f * olcek;
+            // 2. Üst Bilgi: Güven Skoru, İkna Aşaması ve Son JSON Tepki Türü
+            float barY = y + ustBarH + 8f * olcek;
             string durumBilgisi = $"Güven Skoru: %{_mevcutGuvenSkoru}/100 (Hedef: %80+)   |   İkna Aşaması: {Mathf.Min(_basariliIknaAdimi, 2)}/2   |   Son Analiz: {_sonTepkiTuru}";
-            GUI.Label(new Rect(x + 18f * olcek, barY, w - 36f * olcek, 22f * olcek), durumBilgisi, _altBaslikStil);
+            GUI.Label(new Rect(x + kenar, barY, icGenislikTam, 22f * olcek), durumBilgisi, _altBaslikStil);
 
-            float barX = x + 18f * olcek;
-            float barW = w - 36f * olcek;
-            float barH = 12f * olcek;
-            GUI.DrawTexture(new Rect(barX, barY + 24f * olcek, barW, barH), _texGuvenBarArka);
+            float barH = Mathf.Round(10f * olcek);
+            GUI.DrawTexture(new Rect(x + kenar, barY + 22f * olcek, icGenislikTam, barH), _texGuvenBarArka);
 
-            float dolguW = barW * Mathf.Clamp01(_mevcutGuvenSkoru / 100f);
+            float dolguW = icGenislikTam * Mathf.Clamp01(_mevcutGuvenSkoru / 100f);
             if (_mevcutGuvenSkoru >= 80) GUI.color = new Color(0.2f, 0.95f, 0.4f);
             else if (_mevcutGuvenSkoru <= 25) GUI.color = new Color(0.95f, 0.25f, 0.2f);
             else GUI.color = new Color(0.95f, 0.75f, 0.2f);
 
-            GUI.DrawTexture(new Rect(barX, barY + 24f * olcek, dolguW, barH), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(x + kenar, barY + 22f * olcek, dolguW, barH), Texture2D.whiteTexture);
             GUI.color = Color.white;
 
-            // Sohbet Geçmişi Kutusu
-            float sohbetY = y + 106f * olcek;
-            float sohbetH = 290f * olcek;
-            Rect disAlani = new Rect(x + 18f * olcek, sohbetY, w - 36f * olcek, sohbetH);
+            // 3. Alt İpucu & İkna Rehberi Kutusu (Dinamik yükseklik ile yazının sığmaması %100 engellenir!)
+            string ipucuMetni =
+                "💡 NASIL İKNA EDİLİR? (Gece Parolası & 2 Aşamalı İkna Rehberi):\n" +
+                "• 1. Adım (Gece Parolası & Emir): Gece parolasının \"Kızıl Şahin\" (veya \"Gece Kuzgunu\") olduğunu ve Başkomutanın gizli istihbarat emriyle geldiğinizi yazın.\n" +
+                "• 2. Adım (Kanıt veya Rüşvet): Muhafız kanıt sorunca kraliyet mührünü/belgesini gösterin ya da 500+ altın dolu kese teklif edin. (Hakaret/tehdit savaşı başlatır!)";
+
+            float ipucuIcGenislik = icGenislikTam - 16f * olcek;
+            float ipucuMetinYuk = _ipucuStil.CalcHeight(new GUIContent(ipucuMetni), ipucuIcGenislik);
+            float ipucuKutuH = Mathf.Max(68f * olcek, ipucuMetinYuk + 14f * olcek);
+            float ipucuY = y + h - ipucuKutuH - 10f * olcek;
+
+            // 4. Serbest Metin Giriş Alanı (İpucu kutusunun hemen üstünde)
+            float girdiH = Mathf.Round(38f * olcek);
+            float girdiY = ipucuY - girdiH - 8f * olcek;
+            float gonderBtnW = Mathf.Round(145f * olcek);
+
+            // 5. Sohbet Geçmişi Kutusu (Üst bar ile giriş alanı arasındaki tüm boşluğa tam oturur)
+            float sohbetY = barY + barH + 28f * olcek;
+            float sohbetH = Mathf.Max(110f * olcek, girdiY - sohbetY - 10f * olcek);
+            Rect disAlani = new Rect(x + kenar, sohbetY, icGenislikTam, sohbetH);
             GUI.DrawTexture(disAlani, _texSohbetKutu);
 
-            float icGenislik = disAlani.width - 28f * olcek;
-            float toplamYukseklik = 16f * olcek;
+            float scrollIcGenislik = disAlani.width - 22f * olcek;
+            float mesajKutuGenislik = scrollIcGenislik - 12f * olcek;
+            float toplamYukseklik = 12f * olcek;
+
             foreach (var satir in _sohbetKayitlari)
             {
                 GUIStyle s = satir.hataMi ? _mesajHataStil : (satir.oyuncuMu ? _mesajOyuncuStil : _mesajMuhafizStil);
                 string tamMetin = string.IsNullOrEmpty(satir.etiketBilgisi)
                     ? $"{satir.konusan}:\n{satir.mesaj}"
                     : $"{satir.konusan}:\n{satir.mesaj}\n{satir.etiketBilgisi}";
-                toplamYukseklik += s.CalcHeight(new GUIContent(tamMetin), icGenislik - 10f * olcek) + 10f * olcek;
+                float kutuYuk = s.CalcHeight(new GUIContent(tamMetin), mesajKutuGenislik) + 8f * olcek;
+                toplamYukseklik += kutuYuk + 8f * olcek;
             }
             if (_llmServisi.IstekDevamEdiyorMu)
             {
-                toplamYukseklik += 48f * olcek;
+                toplamYukseklik += 52f * olcek;
             }
 
-            Rect icAlani = new Rect(0, 0, icGenislik, Mathf.Max(sohbetH - 8f, toplamYukseklik));
+            Rect icAlani = new Rect(0, 0, scrollIcGenislik, Mathf.Max(sohbetH - 6f, toplamYukseklik));
             _kaydirmaPozisyonu = GUI.BeginScrollView(disAlani, _kaydirmaPozisyonu, icAlani);
 
-            float curY = 8f * olcek;
+            float curY = 6f * olcek;
             foreach (var satir in _sohbetKayitlari)
             {
                 GUIStyle s = satir.hataMi ? _mesajHataStil : (satir.oyuncuMu ? _mesajOyuncuStil : _mesajMuhafizStil);
                 string tamMetin = string.IsNullOrEmpty(satir.etiketBilgisi)
                     ? $"{satir.konusan}:\n{satir.mesaj}"
                     : $"{satir.konusan}:\n{satir.mesaj}\n{satir.etiketBilgisi}";
-                float kutuYuk = s.CalcHeight(new GUIContent(tamMetin), icGenislik - 10f * olcek);
-                GUI.Box(new Rect(6f * olcek, curY, icGenislik - 12f * olcek, kutuYuk), tamMetin, s);
+                float kutuYuk = s.CalcHeight(new GUIContent(tamMetin), mesajKutuGenislik) + 8f * olcek;
+                GUI.Box(new Rect(6f * olcek, curY, mesajKutuGenislik, kutuYuk), tamMetin, s);
                 curY += kutuYuk + 8f * olcek;
             }
 
             // Madde 3.2: Modelin yanıt üretme süresi (latency) boyunca görsel geri bildirim ("Düşünüyor...")
             if (_llmServisi.IstekDevamEdiyorMu)
             {
-                float noktaSayisi = Mathf.FloorToInt(Time.time * 3f) % 4;
-                string noktalar = new string('.', (int)noktaSayisi);
-                GUI.Box(new Rect(6f * olcek, curY, icGenislik - 12f * olcek, 38f * olcek),
-                    $"⏳ Komutan Varg düşünüyor{noktalar} (Yerel LLM JSON yanıtı üretiyor, oyun akışı asenkron devam ediyor)", _mesajMuhafizStil);
+                int noktaSayisi = Mathf.FloorToInt(Time.time * 3f) % 4;
+                string noktalar = new string('.', noktaSayisi);
+                string dusunuyorMetni = $"⏳ Komutan Varg düşünüyor{noktalar} (Yerel LLM JSON yanıtı üretiyor, oyun akışı asenkron devam ediyor)";
+                float dusYuk = _mesajMuhafizStil.CalcHeight(new GUIContent(dusunuyorMetni), mesajKutuGenislik) + 8f * olcek;
+                GUI.Box(new Rect(6f * olcek, curY, mesajKutuGenislik, dusYuk), dusunuyorMetni, _mesajMuhafizStil);
             }
 
             GUI.EndScrollView();
@@ -487,14 +542,10 @@ namespace Yazlab.Yonetim
                 }
             }
 
-            // Serbest Metin Giriş Alanı
-            float girdiY = sohbetY + sohbetH + 14f * olcek;
-            float girdiH = 44f * olcek;
-            float gonderBtnW = 145f * olcek;
-
+            // Giriş Kutusu Çizimi
             GUI.SetNextControlName("OllamaSerbestMetinKutusu");
             _oyuncuGirdisi = GUI.TextField(
-                new Rect(x + 18f * olcek, girdiY, w - 48f * olcek - gonderBtnW, girdiH),
+                new Rect(x + kenar, girdiY, icGenislikTam - gonderBtnW - 10f * olcek, girdiH),
                 _oyuncuGirdisi, 350, _girdiStil);
 
             if (!_odakVerildi)
@@ -505,7 +556,7 @@ namespace Yazlab.Yonetim
 
             GUI.enabled = !_llmServisi.IstekDevamEdiyorMu && !_iknaTamamlandi && !_savasBasladi;
             GUI.color = new Color(0.20f, 0.80f, 0.40f, 1f);
-            if (GUI.Button(new Rect(x + w - 18f * olcek - gonderBtnW, girdiY, gonderBtnW, girdiH),
+            if (GUI.Button(new Rect(x + w - kenar - gonderBtnW, girdiY, gonderBtnW, girdiH),
                 _llmServisi.IstekDevamEdiyorMu ? "DÜŞÜNÜYOR..." : "GÖNDER [ENTER]", _butonStil))
             {
                 MesajiGonder();
@@ -513,11 +564,17 @@ namespace Yazlab.Yonetim
             GUI.color = Color.white;
             GUI.enabled = true;
 
-            // Alt Bilgi Notu (Serbest Metin İpucu)
-            float ipucuY = girdiY + girdiH + 8f * olcek;
-            GUI.Label(new Rect(x + 18f * olcek, ipucuY, w - 36f * olcek, 38f * olcek),
-                "💡 İpucu (Serbest Metin): Muhafız tek cümleyle ikna olmaz! En az 2 aşamada gece parolasını ('Kızıl Şahin'), Başkomutanın gizli emrini veya 500+ altınlık kese teklifinizi kendi cümlelerinizle yazın. Hakaret/tehdit ederseniz muhafız size ateş açar!",
-                _ipucuStil);
+            // Alt İpucu & Gece Parolası Rehber Kutusu Çizimi
+            Rect ipucuKutuRect = new Rect(x + kenar, ipucuY, icGenislikTam, ipucuKutuH);
+            GUI.DrawTexture(ipucuKutuRect, _texIpucuKutu);
+
+            // İpucu kutusu sol altın şeridi
+            GUI.color = new Color(1.0f, 0.82f, 0.22f, 1f);
+            GUI.DrawTexture(new Rect(ipucuKutuRect.x, ipucuKutuRect.y, 4f * olcek, ipucuKutuRect.height), Texture2D.whiteTexture);
+            GUI.color = Color.white;
+
+            GUI.Label(new Rect(ipucuKutuRect.x + 10f * olcek, ipucuKutuRect.y + 5f * olcek, ipucuIcGenislik, ipucuKutuH - 8f * olcek),
+                ipucuMetni, _ipucuStil);
 
             GUI.color = eskiRenk;
         }

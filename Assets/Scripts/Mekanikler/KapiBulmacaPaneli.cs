@@ -49,9 +49,12 @@ namespace Yazlab.Mekanikler
         private Texture2D texSiyah;
         private GUIStyle baslikStili;
         private GUIStyle altBaslikStili;
-        private GUIStyle durumStili;
-        private GUIStyle dugmeStili;
-        private GUIStyle salterDugmeStili;
+        private GUIStyle aciklamaStili;
+        private GUIStyle ledDurumStili;
+        private GUIStyle sigortaNoStili;
+        private GUIStyle kolButonStili;
+        private GUIStyle anaButonStili;
+        private GUIStyle cikisButonStili;
 
         // Sesler (Prosedürel)
         private AudioSource audioSource;
@@ -252,7 +255,7 @@ namespace Yazlab.Mekanikler
             DokulariOlustur();
 
             // 1. DÜNYA İÇİNDE [E] ETKİLEŞİM İPUCU (Konsola Yakındayken)
-            if (!MinigameAcik && !bulmacaCozuldu && oyuncuTransform != null)
+            if (!MinigameAcik && !bulmacaCozuldu && !OllamaNpcDiyalogUI.DiyalogAcikMi && oyuncuTransform != null)
             {
                 float mesafe = Vector3.Distance(transform.position, oyuncuTransform.position);
                 if (mesafe <= etkilesimMenzili)
@@ -274,43 +277,121 @@ namespace Yazlab.Mekanikler
             if (cam == null) return;
 
             Vector3 hedefNokta = transform.position + Vector3.up * 1.45f;
-            Vector3 ekran = cam.WorldToScreenPoint(hedefNokta);
-            if (ekran.z <= 0.1f) return;
+            if (!GoruntuKalitesiYoneticisi.DunyaNoktasiniEkranaCevir(cam, hedefNokta, out Vector2 ekran))
+                return;
 
-            float x = ekran.x;
-            float y = Screen.height - ekran.y;
-
-            float w = 320f;
-            float h = 50f;
+            float olcek = GoruntuKalitesiYoneticisi.KeskinOlcek;
+            float w = Mathf.Round(330f * olcek);
+            float h = Mathf.Round(46f * olcek);
+            float kutuX = Mathf.Clamp(ekran.x - w * 0.5f, 12f, Screen.width - w - 12f);
+            float kutuY = Mathf.Clamp(ekran.y - h * 0.5f, 12f, Screen.height - h - 12f);
 
             Color eski = GUI.color;
 
             // Koyu yüksek kontrastlı zemin
             GUI.color = new Color(0.06f, 0.08f, 0.12f, 0.94f);
-            GUI.DrawTexture(new Rect(x - w * 0.5f, y - h * 0.5f, w, h), texBeyaz);
+            GUI.DrawTexture(new Rect(kutuX, kutuY, w, h), texBeyaz);
 
             // Altın sarısı parlak çerçeve
             GUI.color = new Color(1.0f, 0.80f, 0.15f, 1f);
-            GUI.DrawTexture(new Rect(x - w * 0.5f, y - h * 0.5f, w, 3), texBeyaz);
-            GUI.DrawTexture(new Rect(x - w * 0.5f, y + h * 0.5f - 3, w, 3), texBeyaz);
-            GUI.DrawTexture(new Rect(x - w * 0.5f, y - h * 0.5f, 3, h), texBeyaz);
-            GUI.DrawTexture(new Rect(x + w * 0.5f - 3, y - h * 0.5f, 3, h), texBeyaz);
+            GUI.DrawTexture(new Rect(kutuX, kutuY, w, 2f), texBeyaz);
+            GUI.DrawTexture(new Rect(kutuX, kutuY + h - 2f, w, 2f), texBeyaz);
+            GUI.DrawTexture(new Rect(kutuX, kutuY, 2f, h), texBeyaz);
+            GUI.DrawTexture(new Rect(kutuX + w - 2f, kutuY, 2f, h), texBeyaz);
 
             if (altBaslikStili == null)
             {
                 altBaslikStili = new GUIStyle(GUI.skin.label)
                 {
-                    fontSize = 15,
                     fontStyle = FontStyle.Bold,
                     alignment = TextAnchor.MiddleCenter
                 };
             }
+            GoruntuKalitesiYoneticisi.StiliKeskinlestir(altBaslikStili, Mathf.RoundToInt(14 * olcek));
             altBaslikStili.normal.textColor = Color.white;
 
             GUI.color = Color.white;
-            GUI.Label(new Rect(x - w * 0.5f, y - h * 0.5f, w, h), "⚡ [E] ELEKTRİK ŞALTERİNİ AÇ", altBaslikStili);
+            GoruntuKalitesiYoneticisi.KeskinEtiketCiz(new Rect(kutuX, kutuY, w, h), "⚡ [E] ELEKTRİK ŞALTERİNİ AÇ", altBaslikStili);
 
             GUI.color = eski;
+        }
+
+        private void StilleriHazirla(float olcek)
+        {
+            if (baslikStili == null)
+            {
+                baslikStili = new GUIStyle(GUI.skin.label)
+                {
+                    fontStyle = FontStyle.Bold,
+                    alignment = TextAnchor.MiddleCenter,
+                    wordWrap = false
+                };
+            }
+            GoruntuKalitesiYoneticisi.StiliKeskinlestir(baslikStili, Mathf.RoundToInt(18 * olcek));
+            baslikStili.normal.textColor = new Color(1.0f, 0.85f, 0.20f);
+
+            if (aciklamaStili == null)
+            {
+                aciklamaStili = new GUIStyle(GUI.skin.label)
+                {
+                    fontStyle = FontStyle.Bold,
+                    alignment = TextAnchor.MiddleCenter,
+                    wordWrap = true
+                };
+            }
+            GoruntuKalitesiYoneticisi.StiliKeskinlestir(aciklamaStili, Mathf.RoundToInt(12.5f * olcek));
+            aciklamaStili.normal.textColor = new Color(0.85f, 0.90f, 0.95f);
+
+            if (ledDurumStili == null)
+            {
+                ledDurumStili = new GUIStyle(GUI.skin.label)
+                {
+                    fontStyle = FontStyle.Bold,
+                    alignment = TextAnchor.MiddleCenter
+                };
+            }
+            GoruntuKalitesiYoneticisi.StiliKeskinlestir(ledDurumStili, Mathf.RoundToInt(14 * olcek));
+
+            if (sigortaNoStili == null)
+            {
+                sigortaNoStili = new GUIStyle(GUI.skin.label)
+                {
+                    fontStyle = FontStyle.Bold,
+                    alignment = TextAnchor.MiddleCenter
+                };
+            }
+            GoruntuKalitesiYoneticisi.StiliKeskinlestir(sigortaNoStili, Mathf.RoundToInt(12.5f * olcek));
+            sigortaNoStili.normal.textColor = new Color(0.70f, 0.75f, 0.82f);
+
+            if (kolButonStili == null)
+            {
+                kolButonStili = new GUIStyle(GUI.skin.button)
+                {
+                    fontStyle = FontStyle.Bold,
+                    alignment = TextAnchor.MiddleCenter
+                };
+            }
+            GoruntuKalitesiYoneticisi.StiliKeskinlestir(kolButonStili, Mathf.RoundToInt(14 * olcek));
+
+            if (anaButonStili == null)
+            {
+                anaButonStili = new GUIStyle(GUI.skin.button)
+                {
+                    fontStyle = FontStyle.Bold,
+                    alignment = TextAnchor.MiddleCenter
+                };
+            }
+            GoruntuKalitesiYoneticisi.StiliKeskinlestir(anaButonStili, Mathf.RoundToInt(15 * olcek));
+
+            if (cikisButonStili == null)
+            {
+                cikisButonStili = new GUIStyle(GUI.skin.button)
+                {
+                    fontStyle = FontStyle.Bold,
+                    alignment = TextAnchor.MiddleCenter
+                };
+            }
+            GoruntuKalitesiYoneticisi.StiliKeskinlestir(cikisButonStili, Mathf.RoundToInt(13 * olcek));
         }
 
         private void CizYuksekCozunurlukluAmongUsPaneli()
@@ -321,13 +402,14 @@ namespace Yazlab.Mekanikler
             GUI.color = new Color(0f, 0f, 0f, 0.75f);
             GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), texBeyaz);
 
-            // Ekran boyutuna göre duyarlı ölçekleme (Responsive Scaling)
-            float olcek = Mathf.Clamp(Screen.height / 650f, 0.95f, 1.35f);
+            // Hem genişlik hem yüksekliğe göre duyarlı ölçekleme (Responsive Scaling - hiçbir ekranda taşmaz!)
+            float olcek = Mathf.Clamp(Mathf.Min((Screen.width - 28f) / 820f, (Screen.height - 24f) / 550f), 0.70f, 1.30f);
+            StilleriHazirla(olcek);
 
-            float panelW = 820f * olcek;
-            float panelH = 550f * olcek;
-            float panelX = (Screen.width - panelW) * 0.5f;
-            float panelY = (Screen.height - panelH) * 0.5f;
+            float panelW = Mathf.Round(820f * olcek);
+            float panelH = Mathf.Round(550f * olcek);
+            float panelX = Mathf.Round((Screen.width - panelW) * 0.5f);
+            float panelY = Mathf.Round((Screen.height - panelH) * 0.5f);
 
             // 1. Dış Metal Kutu Gövdesi (Among Us Endüstriyel Çelik)
             GUI.color = new Color(0.14f, 0.16f, 0.20f, 0.98f);
@@ -335,57 +417,40 @@ namespace Yazlab.Mekanikler
 
             // 2. Sarı/Siyah Endüstriyel Tehlike Kenarlıkları
             GUI.color = new Color(0.95f, 0.75f, 0.10f, 1f);
-            GUI.DrawTexture(new Rect(panelX, panelY, panelW, 8 * olcek), texBeyaz);
-            GUI.DrawTexture(new Rect(panelX, panelY + panelH - 8 * olcek, panelW, 8 * olcek), texBeyaz);
-            GUI.DrawTexture(new Rect(panelX, panelY, 8 * olcek, panelH), texBeyaz);
-            GUI.DrawTexture(new Rect(panelX + panelW - 8 * olcek, panelY, 8 * olcek, panelH), texBeyaz);
+            GUI.DrawTexture(new Rect(panelX, panelY, panelW, 6 * olcek), texBeyaz);
+            GUI.DrawTexture(new Rect(panelX, panelY + panelH - 6 * olcek, panelW, 6 * olcek), texBeyaz);
+            GUI.DrawTexture(new Rect(panelX, panelY, 6 * olcek, panelH), texBeyaz);
+            GUI.DrawTexture(new Rect(panelX + panelW - 6 * olcek, panelY, 6 * olcek, panelH), texBeyaz);
 
             // 3. Başlık Kartı
-            float baslikH = 65f * olcek;
+            float baslikH = 68f * olcek;
             GUI.color = new Color(0.09f, 0.10f, 0.13f, 1f);
             GUI.DrawTexture(new Rect(panelX + 12 * olcek, panelY + 12 * olcek, panelW - 24 * olcek, baslikH), texBeyaz);
 
-            // Başlık Yazısı (Büyük, Kalın ve Çok Net)
-            if (baslikStili == null)
-            {
-                baslikStili = new GUIStyle(GUI.skin.label)
-                {
-                    fontStyle = FontStyle.Bold,
-                    alignment = TextAnchor.MiddleCenter
-                };
-            }
-            GoruntuKalitesiYoneticisi.StiliKeskinlestir(baslikStili, Mathf.RoundToInt(20 * olcek));
-            baslikStili.normal.textColor = new Color(1.0f, 0.85f, 0.20f);
+            float cikisBtnW = 105 * olcek;
+            float cikisBtnH = 38 * olcek;
+            float baslikMetinW = panelW - cikisBtnW - 44 * olcek;
 
             GUI.color = Color.white;
-            GUI.Label(new Rect(panelX + 20 * olcek, panelY + 14 * olcek, panelW - 140 * olcek, 32 * olcek), "⚡ ELEKTRİK KONTROL ÜNİTESİ // 1. KAPI SİGORTALARI", baslikStili);
+            GUI.Label(new Rect(panelX + 18 * olcek, panelY + 14 * olcek, baslikMetinW, 28 * olcek),
+                "⚡ ELEKTRİK KONTROL ÜNİTESİ // 1. KAPI SİGORTALARI", baslikStili);
 
-            // Alt Açıklama
-            if (durumStili == null)
-            {
-                durumStili = new GUIStyle(GUI.skin.label)
-                {
-                    alignment = TextAnchor.MiddleCenter
-                };
-            }
-            GoruntuKalitesiYoneticisi.StiliKeskinlestir(durumStili, Mathf.RoundToInt(14 * olcek));
-            durumStili.normal.textColor = new Color(0.85f, 0.90f, 0.95f);
-            GUI.Label(new Rect(panelX + 20 * olcek, panelY + 44 * olcek, panelW - 140 * olcek, 26 * olcek), "Tüm sigortaları (Fare veya [1-5] tuşlarıyla) AÇIK konuma getirerek ana jeneratörü devreye sokun. [ESC: Çıkış]", durumStili);
+            GUI.Label(new Rect(panelX + 18 * olcek, panelY + 42 * olcek, baslikMetinW, 32 * olcek),
+                "Tüm sigortaları (Fare veya [1-5] tuşlarıyla) AÇIK konuma getirerek ana jeneratörü devreye sokun.", aciklamaStili);
 
             // Sağ Üst [X] ÇIKIŞ Butonu
-            float cikisBtnW = 95 * olcek;
-            float cikisBtnH = 42 * olcek;
             GUI.color = new Color(0.85f, 0.22f, 0.22f, 1f);
-            if (GUI.Button(new Rect(panelX + panelW - cikisBtnW - 20 * olcek, panelY + 22 * olcek, cikisBtnW, cikisBtnH), "✕ ÇIKIŞ (ESC)"))
+            if (GUI.Button(new Rect(panelX + panelW - cikisBtnW - 18 * olcek, panelY + 24 * olcek, cikisBtnW, cikisBtnH), "✕ ÇIKIŞ [ESC]", cikisButonStili))
             {
                 PaneliKapat();
+                GUI.color = eski;
                 return;
             }
 
             // 4. 5 ADET BÜYÜK VE NET ŞALTER KARTI
             float alanY = panelY + 90 * olcek;
             float alanH = 320 * olcek;
-            float paddingX = 25 * olcek;
+            float paddingX = 24 * olcek;
             float toplamSalterAlani = panelW - (paddingX * 2);
             float salterW = toplamSalterAlani / 5f;
 
@@ -409,37 +474,31 @@ namespace Yazlab.Mekanikler
                 GUI.DrawTexture(new Rect(sx + salterW - 9 * olcek, alanY, 3 * olcek, alanH), texBeyaz);
 
                 // LED Gösterge Işığı (Büyük ve Parlak)
-                float ledBoyut = 28 * olcek;
+                float ledBoyut = 26 * olcek;
                 float ledX = sx + (salterW - ledBoyut) * 0.5f;
                 Color ledRenk = acik ? new Color(0.10f, 1.0f, 0.30f) : new Color(1.0f, 0.15f, 0.15f);
                 GUI.color = ledRenk;
-                GUI.DrawTexture(new Rect(ledX, alanY + 16 * olcek, ledBoyut, ledBoyut), texBeyaz);
+                GUI.DrawTexture(new Rect(ledX, alanY + 14 * olcek, ledBoyut, ledBoyut), texBeyaz);
 
                 // LED Durum Yazısı (AÇIK / KAPALI)
-                durumStili.fontSize = Mathf.RoundToInt(15 * olcek);
-                durumStili.fontStyle = FontStyle.Bold;
-                durumStili.normal.textColor = acik ? new Color(0.25f, 1.0f, 0.40f) : new Color(1.0f, 0.35f, 0.35f);
+                ledDurumStili.normal.textColor = acik ? new Color(0.25f, 1.0f, 0.40f) : new Color(1.0f, 0.35f, 0.35f);
                 GUI.color = Color.white;
-                GUI.Label(new Rect(sx, alanY + 48 * olcek, salterW, 26 * olcek), acik ? "AÇIK (ON)" : "KAPALI (OFF)", durumStili);
+                GUI.Label(new Rect(sx + 6 * olcek, alanY + 46 * olcek, salterW - 12 * olcek, 24 * olcek), acik ? "AÇIK (ON)" : "KAPALI (OFF)", ledDurumStili);
 
                 // Şalter Numarası
-                durumStili.fontSize = Mathf.RoundToInt(13 * olcek);
-                durumStili.fontStyle = FontStyle.Normal;
-                durumStili.normal.textColor = Color.gray;
-                GUI.Label(new Rect(sx, alanY + alanH - 35 * olcek, salterW, 24 * olcek), $"SİGORTA #{i + 1}", durumStili);
+                GUI.Label(new Rect(sx + 6 * olcek, alanY + alanH - 32 * olcek, salterW - 12 * olcek, 24 * olcek), $"SİGORTA #{i + 1}", sigortaNoStili);
 
                 // Şalter Kolu (Büyük Tıklanabilir Buton)
                 float kolW = salterW - 28 * olcek;
-                float kolH = 95 * olcek;
+                float kolH = 92 * olcek;
                 float kolX = sx + 14 * olcek;
-                // Açıkken yukarıda (y = alanY + 80), kapalıyken aşağıda (y = alanY + 175)
-                float kolY = acik ? (alanY + 80 * olcek) : (alanY + 175 * olcek);
+                float kolY = acik ? (alanY + 78 * olcek) : (alanY + 172 * olcek);
 
                 Color btnRenk = acik ? new Color(0.18f, 0.65f, 0.30f, 1f) : new Color(0.55f, 0.18f, 0.18f, 1f);
                 GUI.color = btnRenk;
 
-                string butonYazi = acik ? "▲\n\nAÇIK" : "KAPALI\n\n▼";
-                if (GUI.Button(new Rect(kolX, kolY, kolW, kolH), butonYazi))
+                string butonYazi = acik ? "▲\nAÇIK" : "KAPALI\n▼";
+                if (GUI.Button(new Rect(kolX, kolY, kolW, kolH), butonYazi, kolButonStili))
                 {
                     if (!bulmacaCozuldu)
                     {
@@ -450,8 +509,8 @@ namespace Yazlab.Mekanikler
             }
 
             // 5. ALT DURUM VE TAMAMLAMA ALANI
-            float altH = 80 * olcek;
-            float altY = panelY + panelH - altH - 18 * olcek;
+            float altH = 76 * olcek;
+            float altY = panelY + panelH - altH - 16 * olcek;
 
             GUI.color = new Color(0.08f, 0.09f, 0.12f, 1f);
             GUI.DrawTexture(new Rect(panelX + 16 * olcek, altY, panelW - 32 * olcek, altH), texBeyaz);
@@ -459,26 +518,25 @@ namespace Yazlab.Mekanikler
             if (!bulmacaCozuldu && hepsiAcik)
             {
                 BulmacayiTamamla();
+                GUI.color = eski;
                 return;
             }
 
             if (!bulmacaCozuldu)
             {
-                // Büyük Şalter Butonu (Tıklandığı an şalter açılır ve menü anında kapanır)
                 GUI.color = new Color(0.18f, 0.85f, 0.35f, 1f);
                 string anaButonYazi = "⚡ ŞALTERİ AÇ & KAPIYI KALDIR (MENÜYÜ KAPAT)";
-                if (GUI.Button(new Rect(panelX + 24 * olcek, altY + 10 * olcek, panelW - 48 * olcek, altH - 20 * olcek), anaButonYazi))
+                if (GUI.Button(new Rect(panelX + 24 * olcek, altY + 10 * olcek, panelW - 48 * olcek, altH - 20 * olcek), anaButonYazi, anaButonStili))
                 {
                     BulmacayiTamamla();
                 }
             }
             else
             {
-                // Başarı Bildirimi
-                GUI.color = Color.green;
-                GoruntuKalitesiYoneticisi.StiliKeskinlestir(baslikStili, Mathf.RoundToInt(20 * olcek));
+                GUI.color = Color.white;
                 baslikStili.normal.textColor = new Color(0.20f, 1.0f, 0.40f);
-                GUI.Label(new Rect(panelX + 20 * olcek, altY + 22 * olcek, panelW - 40 * olcek, 36 * olcek), "✓ GÜÇ VERİLDİ! GÜNEŞ DOĞUYOR VE 1. KAPI AÇILIYOR...", baslikStili);
+                GUI.Label(new Rect(panelX + 20 * olcek, altY + 18 * olcek, panelW - 40 * olcek, 38 * olcek),
+                    "✓ GÜÇ VERİLDİ! GÜNEŞ DOĞUYOR VE 1. KAPI AÇILIYOR...", baslikStili);
             }
 
             GUI.color = eski;
@@ -742,7 +800,6 @@ namespace Yazlab.Mekanikler
             if (kapiObj != null)
             {
                 GameObject konsol = new GameObject("ElektrikSalterKonsolu");
-                // 1. Kapının hemen sağ önünde oyuncunun görebileceği konum (Z = 13.8, X = 3.6)
                 konsol.transform.position = new Vector3(-3.2f, 0f, -1.8f);
                 konsol.transform.rotation = Quaternion.Euler(0f, 180f, 0f);
 

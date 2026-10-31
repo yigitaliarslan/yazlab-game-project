@@ -8,9 +8,8 @@ using UnityEngine.Rendering.Universal;
 namespace Yazlab.Yonetim
 {
     /// <summary>
-    /// Oyun içi 3D çözünürlük bulanıklığını, yüksek DPI ölçekleme sorunlarını,
-    /// Unity Editor GameView 1.25x yakınlaştırma / düşük çözünürlük (Low Resolution Aspect Ratios) bulanıklığını
-    /// ve OnGUI yazı keskinliğini otomatik olarak düzelten görüntü kalitesi yöneticisi.
+    /// Oyun içi 3D görüntü netliğini, 1:1 doğal piksel eşleşmesini (WorldToViewportPoint -> OnGUI)
+    /// ve OnGUI yazı keskinliğini / hizalamasını yöneten görüntü kalitesi yöneticisi.
     /// </summary>
     public static class GoruntuKalitesiYoneticisi
     {
@@ -18,14 +17,16 @@ namespace Yazlab.Yonetim
         private static GUIStyle _golgeStil;
 
         /// <summary>
-        /// Küçük pencerelerde (ör. Unity Editor GameView) yazıların küçülüp bulanıklaşmasını engellemek için
-        /// asla 1.0x'in altına düşmeyen keskin UI ölçek çarpanı.
+        /// Ekranın hem genişlik hem yüksekliğine duyarlı, yazıların kutulardan taşmasını veya
+        /// küçük pencerelerde devasa kalmasını önleyen dengeli UI ölçek çarpanı.
         /// </summary>
         public static float KeskinOlcek
         {
             get
             {
-                return Mathf.Clamp(Screen.height / 750f, 1.0f, 1.35f);
+                float wOlcek = Screen.width / 1280f;
+                float hOlcek = Screen.height / 720f;
+                return Mathf.Clamp(Mathf.Min(wOlcek, hOlcek), 0.85f, 1.25f);
             }
         }
 
@@ -46,24 +47,13 @@ namespace Yazlab.Yonetim
                 QualitySettings.antiAliasing = 4;
                 QualitySettings.resolutionScalingFixedDPIFactor = 1.0f;
 
-                // Dinamik çözünürlük tamponlarını %100 tam boyuta kilitle
-                ScalableBufferManager.ResizeBuffers(1.0f, 1.0f);
-
-                // 2. Standalone / Tam Ekran modunda monitörün doğal (native) piksel çözünürlüğünü zorla
-#if !UNITY_EDITOR
-                int hedefGenislik = Display.main != null ? Display.main.systemWidth : Screen.currentResolution.width;
-                int hedefYukseklik = Display.main != null ? Display.main.systemHeight : Screen.currentResolution.height;
-                if (hedefGenislik >= 1280 && hedefYukseklik >= 720)
-                {
-                    Screen.SetResolution(hedefGenislik, hedefYukseklik, Screen.fullScreenMode);
-                }
-#endif
-
-                // 3. URP Render Pipeline Varlıklarında (PC_RPAsset / Mobile_RPAsset) Süper Örnekleme (1.25x) ve MSAA 4x
+                // 2. URP Render Pipeline Varlıklarında RenderScale = 1.0f (1:1 Koordinat Eşleşmesi!)
+                // RenderScale 1.0f olduğunda Camera.WorldToScreenPoint/ViewportPoint ile OnGUI koordinatları birebir örtüşür,
+                // hiçbir yazı veya can barı ekranda kaymaz!
                 UygulaUrpVarlikAyarlari(GraphicsSettings.currentRenderPipeline as UniversalRenderPipelineAsset);
                 UygulaUrpVarlikAyarlari(QualitySettings.renderPipeline as UniversalRenderPipelineAsset);
 
-                // 4. Sahnedeki Tüm Kameralarda Dinamik Çözünürlük Bulanıklığını Kapat ve SMAA + MSAA Aç
+                // 3. Sahnedeki Tüm Kameralarda Dinamik Çözünürlüğü Kapat ve SMAA + MSAA Aç
                 Camera[] kameralar = UnityEngine.Object.FindObjectsByType<Camera>(FindObjectsInactive.Include);
                 foreach (Camera cam in kameralar)
                 {
@@ -80,21 +70,20 @@ namespace Yazlab.Yonetim
                     }
                 }
 
-                // 5. Unity Editor GameView penceresindeki 1.25x bulanık yakınlaştırmayı ve Low-Res DPI modunu sıfırla
 #if UNITY_EDITOR
-                EditorGameViewBulanikliginiDuzelt();
+                EditorGameViewKoordinatlariniDuzelt();
 #endif
             }
             catch (Exception e)
             {
-                Debug.LogWarning($"[GoruntuKalitesiYoneticisi] Görüntü keskinleştirme uyarısı: {e.Message}");
+                Debug.LogWarning($"[GoruntuKalitesiYoneticisi] Görüntü ayar uyarısı: {e.Message}");
             }
         }
 
         private static void UygulaUrpVarlikAyarlari(UniversalRenderPipelineAsset urp)
         {
             if (urp == null) return;
-            urp.renderScale = 1.25f; // %125 Süper Örnekleme (Supersampling) ile jilet gibi net görüntü
+            urp.renderScale = 1.0f; // 1:1 doğal piksel ölçeği (UI kaymasını %100 engeller)
             urp.msaaSampleCount = 4;
             urp.upscalingFilter = UpscalingFilterSelection.Linear;
         }
@@ -103,15 +92,16 @@ namespace Yazlab.Yonetim
         [UnityEditor.InitializeOnLoadMethod]
         private static void EditorBaslangicindaDuzelt()
         {
-            UnityEditor.EditorApplication.delayCall += EditorGameViewBulanikliginiDuzelt;
-            UnityEditor.EditorApplication.playModeStateChanged += _ => EditorGameViewBulanikliginiDuzelt();
+            UnityEditor.EditorApplication.delayCall += EditorGameViewKoordinatlariniDuzelt;
+            UnityEditor.EditorApplication.playModeStateChanged += _ => EditorGameViewKoordinatlariniDuzelt();
         }
 
         /// <summary>
-        /// Unity Editor'de Windows %125/%150 ölçekleme açıkken GameView'un düşük çözünürlükte render alıp
-        /// 1.25x yakınlaştırma (m_Scale: 1.25) yaparak tüm yazıları ve oyunu bulanıklaştırmasını Reflection ile engeller.
+        /// Unity Editor'de Windows DPI ölçeklemesi (%125/%150) aktifken OnGUI koordinatlarıyla
+        /// Screen.width/Screen.height değerlerinin birebir (1:1) örtüşmesi ve yazıların kaymaması için
+        /// GameView'un standart koordinat modunu ve pencere içi sığdırma (fit) ölçeğini korur.
         /// </summary>
-        public static void EditorGameViewBulanikliginiDuzelt()
+        public static void EditorGameViewKoordinatlariniDuzelt()
         {
             try
             {
@@ -122,16 +112,17 @@ namespace Yazlab.Yonetim
                 BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
 
                 FieldInfo lowResField = gameViewType.GetField("m_LowResolutionForAspectRatios", flags);
-                FieldInfo defaultScaleField = gameViewType.GetField("m_defaultScale", flags);
-                FieldInfo zoomAreaField = gameViewType.GetField("m_ZoomArea", flags);
                 MethodInfo updateZoomMethod = gameViewType.GetMethod("UpdateZoomAreaAndParent", flags);
+                MethodInfo snapZoomMethod = gameViewType.GetMethod("SnapZoom", flags, null, new[] { typeof(float) }, null);
+                PropertyInfo minScaleProp = gameViewType.GetProperty("minScale", flags);
                 MethodInfo repaintMethod = gameViewType.GetMethod("Repaint", flags);
 
                 foreach (UnityEngine.Object gv in gameViews)
                 {
                     if (gv == null) continue;
 
-                    // 1. Low Resolution Aspect Ratios seçeneğini tüm görünüm oranları için KAPAT (Tam High-DPI 1:1 piksel!)
+                    // Windows High-DPI ekranlarda OnGUI (logical points) ile Screen.width/height değerlerinin
+                    // kaymaması için standart aspect ratio modunu (true) geri yükle
                     if (lowResField != null)
                     {
                         object lowResVal = lowResField.GetValue(gv);
@@ -139,29 +130,17 @@ namespace Yazlab.Yonetim
                         {
                             for (int i = 0; i < list.Count; i++)
                             {
-                                if (list[i] is bool) list[i] = false;
+                                if (list[i] is bool) list[i] = true;
                             }
                         }
                     }
 
-                    // 2. Varsayılan ölçeği 1.0x yap
-                    if (defaultScaleField != null)
-                    {
-                        defaultScaleField.SetValue(gv, 1.0f);
-                    }
+                    updateZoomMethod?.Invoke(gv, null);
 
-                    // 3. ZoomArea içindeki m_Scale değerini {1, 1} (1.0x doğal piksel) yap
-                    if (zoomAreaField != null)
+                    if (snapZoomMethod != null && minScaleProp != null)
                     {
-                        object zoomArea = zoomAreaField.GetValue(gv);
-                        if (zoomArea != null)
-                        {
-                            FieldInfo scaleField = zoomArea.GetType().GetField("m_Scale", flags);
-                            if (scaleField != null)
-                            {
-                                scaleField.SetValue(zoomArea, Vector2.one);
-                            }
-                        }
+                        float minScale = (float)minScaleProp.GetValue(gv);
+                        snapZoomMethod.Invoke(gv, new object[] { minScale });
                     }
 
                     updateZoomMethod?.Invoke(gv, null);
@@ -170,13 +149,29 @@ namespace Yazlab.Yonetim
             }
             catch
             {
-                // Reflection hatası olursa sessizce geç
+                // Reflection desteklenmiyorsa sessizce geç
             }
         }
 #endif
 
         /// <summary>
-        /// İşletim sisteminden yüksek çözünürlüklü dinamik TrueType font (Segoe UI / Arial Bold) yükler.
+        /// 3D dünya koordinatını (ör. düşman/taret can barı, etkileşim ipucu) URP renderScale veya
+        /// DPI farklarından etkilenmeden doğrudan OnGUI ekran koordinatına (sol-üst orijinli) çevirir.
+        /// </summary>
+        public static bool DunyaNoktasiniEkranaCevir(Camera cam, Vector3 dunyaKonumu, out Vector2 guiKonumu)
+        {
+            guiKonumu = Vector2.zero;
+            if (cam == null) return false;
+
+            Vector3 vp = cam.WorldToViewportPoint(dunyaKonumu);
+            if (vp.z <= 0.1f) return false;
+
+            guiKonumu = new Vector2(vp.x * Screen.width, (1f - vp.y) * Screen.height);
+            return true;
+        }
+
+        /// <summary>
+        /// İşletim sisteminden yüksek çözünürlüklü dinamik TrueType font (Segoe UI / Arial) yükler.
         /// </summary>
         public static Font KeskinFontAl()
         {
@@ -184,7 +179,7 @@ namespace Yazlab.Yonetim
             {
                 try
                 {
-                    _keskinFont = Font.CreateDynamicFontFromOSFont(new[] { "Segoe UI Semibold", "Segoe UI", "Arial", "Tahoma" }, 16);
+                    _keskinFont = Font.CreateDynamicFontFromOSFont(new[] { "Segoe UI", "Arial", "Tahoma" }, 16);
                 }
                 catch { }
             }
@@ -192,41 +187,52 @@ namespace Yazlab.Yonetim
         }
 
         /// <summary>
-        /// Verilen GUIStyle nesnesine işletim sisteminin keskin TrueType fontunu atar ve tam sayı boyuta yuvarlar.
+        /// Verilen GUIStyle nesnesine işletim sisteminin keskin TrueType fontunu atar,
+        /// taşma/kesilme (clipping) sorunlarını önler ve tam sayı boyuta yuvarlar.
         /// </summary>
         public static void StiliKeskinlestir(GUIStyle stil, int fontBoyutu)
         {
             if (stil == null) return;
             Font f = KeskinFontAl();
             if (f != null) stil.font = f;
-            stil.fontSize = Mathf.Max(12, fontBoyutu);
+            stil.fontSize = Mathf.Max(11, fontBoyutu);
+            stil.clipping = TextClipping.Overflow;
         }
 
         /// <summary>
-        /// OnGUI yazılarını arka plan üzerinde çok daha net ve okunaklı kılmak için 1px koyu kontrast gölgeyle çizer.
+        /// OnGUI yazılarını arka plan üzerinde çok daha net ve okunaklı kılmak için
+        /// stilin tüm hizalama/padding özelliklerini birebir koruyarak 1px koyu kontrast gölgeyle çizer.
         /// </summary>
         public static void KeskinEtiketCiz(Rect rect, string metin, GUIStyle stil)
         {
             if (string.IsNullOrEmpty(metin) || stil == null) return;
 
+            stil.clipping = TextClipping.Overflow;
+
             if (_golgeStil == null)
             {
-                _golgeStil = new GUIStyle();
+                _golgeStil = new GUIStyle(stil);
+            }
+            else
+            {
+                _golgeStil.font = stil.font;
+                _golgeStil.fontSize = stil.fontSize;
+                _golgeStil.fontStyle = stil.fontStyle;
+                _golgeStil.alignment = stil.alignment;
+                _golgeStil.wordWrap = stil.wordWrap;
+                _golgeStil.clipping = TextClipping.Overflow;
+                _golgeStil.padding = stil.padding;
+                _golgeStil.margin = stil.margin;
+                _golgeStil.contentOffset = stil.contentOffset;
             }
 
-            _golgeStil.font = stil.font;
-            _golgeStil.fontSize = stil.fontSize;
-            _golgeStil.fontStyle = stil.fontStyle;
-            _golgeStil.alignment = stil.alignment;
-            _golgeStil.wordWrap = stil.wordWrap;
-            _golgeStil.padding = stil.padding;
-            _golgeStil.normal.textColor = new Color(0f, 0f, 0f, 0.92f);
+            _golgeStil.normal.textColor = new Color(0f, 0f, 0f, 0.90f);
 
             Color eski = GUI.color;
             GUI.color = Color.white;
-            GUI.Label(new Rect(rect.x + 1f, rect.y + 1f, rect.width, rect.height), metin, _golgeStil);
+            GUI.Label(new Rect(Mathf.Round(rect.x) + 1f, Mathf.Round(rect.y) + 1f, rect.width, rect.height), metin, _golgeStil);
             GUI.color = eski;
-            GUI.Label(rect, metin, stil);
+            GUI.Label(new Rect(Mathf.Round(rect.x), Mathf.Round(rect.y), rect.width, rect.height), metin, stil);
         }
     }
 }

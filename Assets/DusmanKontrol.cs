@@ -521,37 +521,35 @@ public class DusmanKontrol : MonoBehaviour
 
     protected virtual void OnGUI()
     {
-        // Öldüyse veya oyuncu düşmanı doğrudan görmüyorsa (ör. duvar/engel arkasındaysa) can barı çizilmez
+        // Öldüyse, arayüz açıksa veya oyuncu düşmanı doğrudan görmüyorsa can barı çizilmez
         if (oldu || !oyuncuBeniGoruyorMu) return;
+        if (Yazlab.Mekanikler.KapiBulmacaPaneli.MinigameAcik || Yazlab.Yonetim.OllamaNpcDiyalogUI.DiyalogAcikMi) return;
 
         Camera cam = Camera.main;
         if (cam == null) return;
 
-        // Düşmanın başının üzerindeki 3D dünya noktası
+        // Düşmanın başının üzerindeki 3D dünya noktası (1:1 Viewport dönüşümü ile kayma olmaz)
         Vector3 dunyaKonumu = transform.position + Vector3.up * canBariYukseklikOfseti;
+        if (!Yazlab.Yonetim.GoruntuKalitesiYoneticisi.DunyaNoktasiniEkranaCevir(cam, dunyaKonumu, out Vector2 ekranKonumu))
+            return;
 
-        // Kameranın önünde mi kontrol et
-        Vector3 ekranNoktasi = cam.WorldToScreenPoint(dunyaKonumu);
-        if (ekranNoktasi.z <= 0.1f) return; // Kamera arkasında, çizme
+        float guiX = ekranKonumu.x;
+        float guiY = ekranKonumu.y;
 
-        // Unity GUI Y koordinatı ters olduğundan (0 üsttedir):
-        float guiY = Screen.height - ekranNoktasi.y;
-        float guiX = ekranNoktasi.x;
-
-        // Mesafe perspektifine göre hafif ölçekleme (uzaktayken çok devasa olmasın)
+        // Mesafe perspektifine göre hafif ölçekleme
         float mesafe = Vector3.Distance(cam.transform.position, dunyaKonumu);
-        float olcek = Mathf.Clamp(15f / Mathf.Max(mesafe, 5f), 0.75f, 1.35f);
+        float olcek = Mathf.Clamp(15f / Mathf.Max(mesafe, 5f), 0.85f, 1.30f);
 
-        float genislik = canBariGenislik * olcek;
-        float yukseklik = canBariYukseklik * olcek;
+        float genislik = Mathf.Round(Mathf.Max(96f, canBariGenislik) * olcek);
+        float yukseklik = Mathf.Round(Mathf.Max(16f, canBariYukseklik) * olcek);
 
-        float solX = guiX - (genislik * 0.5f);
-        float ustY = guiY - yukseklik;
+        float solX = Mathf.Round(guiX - (genislik * 0.5f));
+        float ustY = Mathf.Round(guiY - yukseklik);
 
         Color eskiRenk = GUI.color;
 
         // 1. Arka Plan Siyah Çerçeve Paneli
-        GUI.color = new Color(0.05f, 0.05f, 0.05f, 0.85f);
+        GUI.color = new Color(0.05f, 0.05f, 0.05f, 0.88f);
         GUI.DrawTexture(new Rect(solX - 2, ustY - 2, genislik + 4, yukseklik + 4), beyazDokusu);
 
         // 2. Boş Bar Zemini (Koyu kırmızı zemin)
@@ -586,29 +584,32 @@ public class DusmanKontrol : MonoBehaviour
         {
             dusmanBaslikStili = new GUIStyle(GUI.skin.label)
             {
-                fontSize = Mathf.Max(13, Mathf.RoundToInt(13 * olcek)),
                 fontStyle = FontStyle.Bold,
-                alignment = TextAnchor.LowerCenter
+                alignment = TextAnchor.MiddleCenter
             };
-            dusmanBaslikStili.normal.textColor = new Color(1f, 0.4f, 0.4f, 0.95f);
         }
-        GUI.color = Color.white;
-        GUI.Label(new Rect(solX - 20, ustY - 16 * olcek, genislik + 40, 16 * olcek), "⚔ DÜŞMAN", dusmanBaslikStili);
+        Yazlab.Yonetim.GoruntuKalitesiYoneticisi.StiliKeskinlestir(dusmanBaslikStili, Mathf.RoundToInt(12 * olcek));
+        dusmanBaslikStili.normal.textColor = new Color(1f, 0.4f, 0.4f, 0.98f);
 
-        // 6. Can Miktarı Metni: "75 / 100" (Barın ortasında)
+        GUI.color = Color.white;
+        float baslikH = Mathf.Max(20f, 20f * olcek);
+        Yazlab.Yonetim.GoruntuKalitesiYoneticisi.KeskinEtiketCiz(
+            new Rect(solX - 30f, ustY - baslikH - 2f, genislik + 60f, baslikH), "⚔ DÜŞMAN", dusmanBaslikStili);
+
+        // 6. Can Miktarı Metni: "140 / 140" (Barın ortasında)
         if (canMetniStili == null)
         {
             canMetniStili = new GUIStyle(GUI.skin.label)
             {
-                fontSize = Mathf.Max(12, Mathf.RoundToInt(12 * olcek)),
                 fontStyle = FontStyle.Bold,
                 alignment = TextAnchor.MiddleCenter
             };
-            canMetniStili.normal.textColor = Color.white;
         }
+        Yazlab.Yonetim.GoruntuKalitesiYoneticisi.StiliKeskinlestir(canMetniStili, Mathf.RoundToInt(11 * olcek));
+        canMetniStili.normal.textColor = Color.white;
 
         string canYazisi = $"{Mathf.CeilToInt(mevcutCan)} / {Mathf.CeilToInt(maksimumCan)}";
-        GUI.Label(new Rect(solX, ustY, genislik, yukseklik), canYazisi, canMetniStili);
+        GUI.Label(new Rect(solX, ustY - 2f, genislik, yukseklik + 4f), canYazisi, canMetniStili);
 
         GUI.color = eskiRenk;
     }

@@ -3,6 +3,7 @@ using UnityEngine;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
+using Yazlab.Yonetim;
 
 namespace Yazlab.Mekanikler
 {
@@ -78,6 +79,7 @@ namespace Yazlab.Mekanikler
         private void Update()
         {
             if (_cozuldu) return;
+            if (KapiBulmacaPaneli.MinigameAcik || OllamaNpcDiyalogUI.DiyalogAcikMi) return;
 
             ReferanslariBul();
             if (_oyuncu == null) return;
@@ -209,6 +211,7 @@ namespace Yazlab.Mekanikler
         private void OnGUI()
         {
             if (_oyuncu == null) return;
+            if (KapiBulmacaPaneli.MinigameAcik || OllamaNpcDiyalogUI.DiyalogAcikMi) return;
 
             // Sadece 1. Bölümde (Kale dışında / hendek çevresinde) veya bildirim varken göster
             bool hendekBolgesinde = !_cozuldu && (_oyuncu.position.z < -7.5f);
@@ -219,7 +222,7 @@ namespace Yazlab.Mekanikler
             if (_panelTex == null)
             {
                 _panelTex = new Texture2D(1, 1);
-                _panelTex.SetPixel(0, 0, new Color(0.06f, 0.09f, 0.14f, 0.88f));
+                _panelTex.SetPixel(0, 0, new Color(0.06f, 0.09f, 0.14f, 0.92f));
                 _panelTex.Apply();
             }
 
@@ -233,49 +236,60 @@ namespace Yazlab.Mekanikler
             {
                 _baslikStil = new GUIStyle(GUI.skin.label)
                 {
-                    fontSize = 16,
                     fontStyle = FontStyle.Bold,
-                    alignment = TextAnchor.MiddleCenter
+                    alignment = TextAnchor.MiddleCenter,
+                    wordWrap = true
                 };
-                _baslikStil.normal.textColor = new Color(1.0f, 0.82f, 0.28f);
             }
+            _baslikStil.normal.textColor = new Color(1.0f, 0.84f, 0.28f);
 
             if (_altStil == null)
             {
                 _altStil = new GUIStyle(GUI.skin.label)
                 {
-                    fontSize = 14,
                     fontStyle = FontStyle.Bold,
-                    alignment = TextAnchor.MiddleCenter
+                    alignment = TextAnchor.MiddleCenter,
+                    wordWrap = true
                 };
-                _altStil.normal.textColor = Color.white;
             }
+            _altStil.normal.textColor = Color.white;
 
-            float olcek = Yazlab.Yonetim.GoruntuKalitesiYoneticisi.KeskinOlcek;
-            Yazlab.Yonetim.GoruntuKalitesiYoneticisi.StiliKeskinlestir(_baslikStil, Mathf.RoundToInt(16 * olcek));
-            Yazlab.Yonetim.GoruntuKalitesiYoneticisi.StiliKeskinlestir(_altStil, Mathf.RoundToInt(14 * olcek));
-            float genislik = Mathf.Min(Screen.width - 30f, 700f * olcek);
-            float yukseklik = 82f * olcek;
-            Rect kutu = new Rect((Screen.width - genislik) * 0.5f, 16f, genislik, yukseklik);
-            GUI.Box(kutu, GUIContent.none, _panelStil);
+            float olcek = GoruntuKalitesiYoneticisi.KeskinOlcek;
+            GoruntuKalitesiYoneticisi.StiliKeskinlestir(_baslikStil, Mathf.RoundToInt(14 * olcek));
+            GoruntuKalitesiYoneticisi.StiliKeskinlestir(_altStil, Mathf.RoundToInt(13 * olcek));
+
+            string ustYazi;
+            string altYazi;
 
             if (bildirimAktif)
             {
-                GUI.Label(new Rect(kutu.x, kutu.y + 8f, kutu.width, 26f), "★ 1. BÖLÜM: KALE DIŞI & HENDEK GEÇİDİ ★", _baslikStil);
-                GUI.Label(new Rect(kutu.x, kutu.y + 38f, kutu.width, 28f), _bildirimMesaji, _altStil);
+                ustYazi = "★ 1. BÖLÜM: KALE DIŞI & HENDEK GEÇİDİ ★";
+                altYazi = _bildirimMesaji;
             }
-            else if (hendekBolgesinde)
+            else
             {
                 string sagDurum = _sagAnahtarTutuluyor
                     ? "SAĞ ANAHTAR: HAZIR (TUTULUYOR)"
                     : (_yardimciGonderildi ? "SAĞ ANAHTAR: YOLDAŞ GİDİYOR..." : "SAĞ ANAHTAR: BEKLİYOR ([G] YOLDAŞI GÖNDER)");
 
-                GUI.Label(new Rect(kutu.x, kutu.y + 8f, kutu.width, 26f),
-                    "1. BÖLÜM: HENDEK ÜZERİ ASKI KAPIYI İNDİR (EŞZAMANLI 2 ANAHTAR)", _baslikStil);
-
-                GUI.Label(new Rect(kutu.x, kutu.y + 38f, kutu.width, 28f),
-                    $"{sagDurum}   |   SOL ANAHTAR: YAKLAŞIP [E] BASIN", _altStil);
+                ustYazi = "1. BÖLÜM: HENDEK ÜZERİ ASKI KAPIYI İNDİR (EŞZAMANLI 2 ANAHTAR)";
+                altYazi = $"{sagDurum}   |   SOL ANAHTAR: YAKLAŞIP [E] BASIN";
             }
+
+            // Sol üstteki BolumYoneticisi görev kutusuyla ASLA çakışmaması için ekranın orta-alt kısmında konumlandırılır
+            float genislik = Mathf.Min(Screen.width - 40f, 660f * olcek);
+            float icGenislik = genislik - 24f * olcek;
+            float ustH = Mathf.Max(22f * olcek, _baslikStil.CalcHeight(new GUIContent(ustYazi), icGenislik) + 4f);
+            float altH = Mathf.Max(24f * olcek, _altStil.CalcHeight(new GUIContent(altYazi), icGenislik) + 6f);
+            float yukseklik = ustH + altH + 18f * olcek;
+
+            float kutuX = Mathf.Round((Screen.width - genislik) * 0.5f);
+            float kutuY = Mathf.Round(Screen.height - yukseklik - 56f * olcek);
+            Rect kutu = new Rect(kutuX, kutuY, genislik, yukseklik);
+
+            GUI.Box(kutu, GUIContent.none, _panelStil);
+            GoruntuKalitesiYoneticisi.KeskinEtiketCiz(new Rect(kutu.x + 12f * olcek, kutu.y + 6f * olcek, icGenislik, ustH), ustYazi, _baslikStil);
+            GoruntuKalitesiYoneticisi.KeskinEtiketCiz(new Rect(kutu.x + 12f * olcek, kutu.y + 8f * olcek + ustH, icGenislik, altH), altYazi, _altStil);
         }
     }
 }
