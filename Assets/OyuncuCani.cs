@@ -10,10 +10,10 @@ public class OyuncuCani : MonoBehaviour
 {
     [Header("Sağlık Değerleri")]
     [Tooltip("Karakterin başlangıçtaki maksimum canı.")]
-    public float maksimumCan = 100f;
+    public float maksimumCan = 260f;
 
     [Tooltip("Karakterin şu anki güncel canı.")]
-    public float mevcutCan = 100f;
+    public float mevcutCan = 260f;
 
     [Header("HUD Tasarım Ayarları")]
     public float hudGenisligi = 290f;
@@ -21,15 +21,15 @@ public class OyuncuCani : MonoBehaviour
 
     [Header("Hasar Koruması ve Ölüm")]
     [Tooltip("Tek bir mermiden alınabilecek maksimum hasar.")]
-    public float mermiHasarLimiti = 8f;
+    public float mermiHasarLimiti = 5f;
 
     [Tooltip("Mermi spamını engelleyen hasar koruması.")]
-    public float hasarKorumasi = 0.20f;
+    public float hasarKorumasi = 0.30f;
 
     [Tooltip("Öldükten sonra yeniden başlama süresi.")]
     public float yenidenBaslamaGecikmesi = 1.8f;
 
-    private float ghostCan = 100f; // Yumuşak azalan hasar izi (Ghost bar)
+    private float ghostCan = 260f; // Yumuşak azalan hasar izi (Ghost bar)
     private float sonHasarAlmaZamani = -1f;
     private float hasarFlasSure = 0f;
     private bool oldu = false;
@@ -42,6 +42,10 @@ public class OyuncuCani : MonoBehaviour
 
     void Awake()
     {
+        // Sahnedeki eski serialize edilmiş düşük can değerlerini ezerek yüksek dayanıklılık uygula
+        if (maksimumCan < 260f) maksimumCan = 260f;
+        mermiHasarLimiti = 5f;
+        hasarKorumasi = 0.30f;
         mevcutCan = maksimumCan;
         ghostCan = maksimumCan;
     }

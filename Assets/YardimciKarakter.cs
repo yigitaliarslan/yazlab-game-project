@@ -31,13 +31,13 @@ public class YardimciKarakter : MonoBehaviour
 
     [Header("Ateş ve Çatışma Ayarları")]
     [Tooltip("Düşmanı görebileceği ve ateş edebileceği maksimum menzil.")]
-    public float atesMenzili = 34f;
+    public float atesMenzili = 44f;
 
     [Tooltip("İki atış arasındaki süre.")]
-    public float atesAraligi = 0.85f;
+    public float atesAraligi = 0.62f;
 
     [Tooltip("Düşmana her vuruşunda vereceği hasar.")]
-    public float atesHasari = 20f;
+    public float atesHasari = 34f;
 
     [Header("Görsel Ayarlar")]
     public Color kiyafetRengi = new Color(0.2f, 0.50f, 0.95f, 1f); // Taktiksel Mavi Müttefik
@@ -74,6 +74,11 @@ public class YardimciKarakter : MonoBehaviour
         maksimumCan = 999999f;
         mevcutCan = 999999f;
 
+        // Sahnedeki eski serialize edilmiş değerleri ezerek dengeli-güçlü ajan değerlerini uygula
+        atesMenzili = 44f;
+        atesAraligi = 0.62f;
+        atesHasari = 34f;
+
         animator = GetComponent<Animator>();
         if (animator == null) animator = GetComponentInChildren<Animator>();
         HazirlaAnimator();
@@ -85,6 +90,10 @@ public class YardimciKarakter : MonoBehaviour
             audioSource.playOnAwake = false;
             audioSource.spatialBlend = 0.7f;
             audioSource.maxDistance = 35f;
+        }
+        if (audioSource.clip == null)
+        {
+            audioSource.clip = UretAtesSesi();
         }
 
         col = GetComponent<CapsuleCollider>();
@@ -259,8 +268,8 @@ public class YardimciKarakter : MonoBehaviour
                 ZeminYuksekliginiHizala(hedef.position.y);
                 suKaredeYurudu = true;
 
-                // Düşman yoksa veya oyuncudan çok uzaklaştıysa yürüdüğü yöne baksın
-                if (hedefDusman == null || oyuncuMesafe > 6.5f)
+                // Düşman yoksa veya oyuncudan çok uzaklaştıysa yürüdüğü yöne baksın; düşman varsa düşmana dönecek
+                if (hedefDusman == null || oyuncuMesafe > 9.5f)
                 {
                     if (hareketYonu.sqrMagnitude > 0.001f)
                     {
@@ -278,20 +287,20 @@ public class YardimciKarakter : MonoBehaviour
         // 4. Yürüme / Bekleme Animasyonunu Güncelle
         HareketAnimasyonuGuncelle(suKaredeYurudu);
 
-        // 5. Düşman Varsa Nişan Al ve Ateş Et (Yürürken de ateş edebilir!)
+        // 5. Düşman Varsa Doğrudan Düşmana Yönel ve Ateş Et (Yürürken de ateş edebilir!)
         if (hedefDusman != null)
         {
             Vector3 dusmanYon = hedefDusman.transform.position - transform.position;
             dusmanYon.y = 0f;
-            if (dusmanYon.sqrMagnitude > 0.01f)
+            if (dusmanYon.sqrMagnitude > 0.001f)
             {
-                Quaternion hedefRot = Quaternion.LookRotation(dusmanYon);
-                transform.rotation = Quaternion.Slerp(transform.rotation, hedefRot, Time.deltaTime * donusHizi * 1.6f);
+                Quaternion hedefRot = Quaternion.LookRotation(dusmanYon.normalized);
+                transform.rotation = Quaternion.Slerp(transform.rotation, hedefRot, Time.deltaTime * donusHizi * 2.4f);
             }
 
             if (Time.time >= sonrakiAtesZamani)
             {
-                sonrakiAtesZamani = Time.time + atesAraligi + Random.Range(-0.08f, 0.15f);
+                sonrakiAtesZamani = Time.time + atesAraligi + Random.Range(-0.05f, 0.10f);
                 DusmanaAtesEt(hedefDusman, suKaredeYurudu);
             }
         }
@@ -416,25 +425,101 @@ public class YardimciKarakter : MonoBehaviour
         {
             if (d == null || d.IsDead) continue;
 
-            float mesafe = Vector3.Distance(transform.position, d.transform.position);
-            if (mesafe <= enKisaMesafe)
+            // Taret odasının kapısı (FizikselEngelKapisi) henüz kapalıysa tarete duvar arkasından kilitlenme
+            if (d is Yazlab.Mekanikler.TaretKontrol)
             {
-                Vector3 goz = transform.position + Vector3.up * 1.3f;
-                float hedefYukseklik = (d is Yazlab.Mekanikler.TaretKontrol) ? 2.8f : 1.0f;
-                Vector3 hedefGovde = d.transform.position + Vector3.up * hedefYukseklik;
-                RaycastHit hit;
-                if (Physics.Raycast(goz, (hedefGovde - goz).normalized, out hit, atesMenzili))
+                GameObject kapiObj = GameObject.Find("FizikselEngelKapisi");
+                if (kapiObj != null)
                 {
-                    if (hit.transform == d.transform || hit.transform.IsChildOf(d.transform) || hit.collider.GetComponentInParent<DusmanKontrol>() == d)
-                    {
-                        enKisaMesafe = mesafe;
-                        enYakin = d;
-                    }
+                    var kapi = kapiObj.GetComponent<Yazlab.Mekanikler.KapiKontrol>();
+                    if (kapi != null && !kapi.AcikMi) continue;
                 }
+            }
+
+            float mesafe = Vector3.Distance(transform.position, d.transform.position);
+            if (mesafe <= enKisaMesafe && DusmanaAtisHattiAcikMi(d))
+            {
+                enKisaMesafe = mesafe;
+                enYakin = d;
             }
         }
 
         return enYakin;
+    }
+
+    /// <summary>
+    /// Yardımcının kendi collider'ını, oyuncuyu ve alçak siperleri yok sayarak düşmana ateş hattı olup olmadığını kontrol eder.
+    /// </summary>
+    private bool DusmanaAtisHattiAcikMi(DusmanKontrol d)
+    {
+        Vector3 goz = transform.position + Vector3.up * 1.45f;
+        bool taretMi = d is Yazlab.Mekanikler.TaretKontrol;
+        float[] testYukseklikleri = taretMi ? new float[] { 3.1f, 2.2f } : new float[] { 1.55f, 1.05f };
+
+        foreach (float yuk in testYukseklikleri)
+        {
+            Vector3 hedefNokta = d.transform.position + Vector3.up * yuk;
+            Vector3 yon = hedefNokta - goz;
+            float mesafe = yon.magnitude;
+            if (mesafe <= 0.1f) return true;
+
+            RaycastHit[] hits = Physics.RaycastAll(goz, yon.normalized, mesafe, ~0, QueryTriggerInteraction.Ignore);
+            if (hits == null || hits.Length == 0) return true;
+
+            System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+
+            bool duvarEngeliVar = false;
+            foreach (var hit in hits)
+            {
+                if (hit.transform == null) continue;
+                // Kendi collider'ımızı yok say
+                if (hit.transform == transform || hit.transform.IsChildOf(transform)) continue;
+                // Oyuncuyu yok say
+                if (hedef != null && (hit.transform == hedef || hit.transform.IsChildOf(hedef))) continue;
+                if (hit.transform.CompareTag("Player")) continue;
+
+                // Hedef düşmanın kendisine ulaştıysak görüş açıktır!
+                if (hit.transform == d.transform || hit.transform.IsChildOf(d.transform) || hit.collider.GetComponentInParent<DusmanKontrol>() == d)
+                {
+                    return true;
+                }
+
+                // Diğer düşmanları engel sayma
+                if (hit.collider.GetComponentInParent<DusmanKontrol>() != null) continue;
+
+                // Kum torbası / alçak siper (yüksekliği 1.45m'den alçak olan siperler) üstünden ateş edebilir
+                if (hit.collider.bounds.max.y < transform.position.y + 1.45f) continue;
+
+                duvarEngeliVar = true;
+                break;
+            }
+
+            if (!duvarEngeliVar) return true;
+        }
+
+        return false;
+    }
+
+    private AudioClip UretAtesSesi()
+    {
+        int sampleRate = 44100;
+        float duration = 0.12f;
+        int totalSamples = (int)(sampleRate * duration);
+        float[] data = new float[totalSamples];
+
+        for (int i = 0; i < totalSamples; i++)
+        {
+            float t = (float)i / sampleRate;
+            float freq = Mathf.Lerp(320f, 85f, (float)i / totalSamples);
+            float noise = (Random.value * 2f - 1f) * 0.4f;
+            float wave = Mathf.Sin(2f * Mathf.PI * freq * t) * 0.6f;
+            float envelope = 1f - ((float)i / totalSamples);
+            data[i] = (wave + noise) * envelope * 0.55f;
+        }
+
+        AudioClip clip = AudioClip.Create("SesYardimciAtes", totalSamples, 1, sampleRate, false);
+        clip.SetData(data, 0);
+        return clip;
     }
 
     private void DusmanaAtesEt(DusmanKontrol hedef, bool yururkenAtesEdiyor)
