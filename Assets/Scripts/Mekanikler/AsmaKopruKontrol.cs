@@ -41,11 +41,13 @@ namespace Yazlab.Mekanikler
         private NavMeshObstacle _navEngel;
         private AudioSource _sesKaynagi;
 
+        public static bool KopruAcikMi { get; private set; } = false;
         public bool AcikMi => _acikMi;
         public bool KilitliMi => _kilitliMi;
 
         private void Awake()
         {
+            KopruAcikMi = _acikMi;
             if (kopruMentese == null) kopruMentese = transform;
             _navEngel = GetComponent<NavMeshObstacle>();
 
@@ -110,6 +112,7 @@ namespace Yazlab.Mekanikler
             if (_acikMi) return;
             _kilitliMi = false;
             _acikMi = true;
+            KopruAcikMi = true;
 
             if (_navEngel != null)
             {
@@ -131,6 +134,7 @@ namespace Yazlab.Mekanikler
         {
             if (!_acikMi) return;
             _acikMi = false;
+            KopruAcikMi = false;
 
             if (_navEngel != null)
             {
