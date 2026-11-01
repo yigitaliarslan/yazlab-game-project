@@ -162,12 +162,13 @@ namespace Yazlab.Mekanikler
 
         private IEnumerator YardimciyiAvluyaIlerlet()
         {
-            yield return new WaitForSeconds(2.6f);
+            yield return new WaitForSeconds(0.6f);
             if (_yardimci != null && !_yardimci.IsDead)
             {
-                // Köprü indikten sonra yardımcı karakter de köprüden geçip iç avluya girsin
-                _yardimci.GorevNoktasinaGit(new Vector3(2.8f, 0.05f, -3.5f));
-                yield return new WaitForSeconds(4.0f);
+                // Önce sağ anahtardan (X=3.8) köprünün tam giriş ortasına (X=0.6, Z=-14.6) yürümesini sağla
+                _yardimci.GorevNoktasinaGit(new Vector3(0.6f, 0.05f, -14.6f));
+                yield return new WaitForSeconds(1.4f);
+                // Ardından serbest takip moduna geçsin ki köprüyü oyuncuyla birlikte yan yana/arkasından geçsin!
                 if (_yardimci != null) _yardimci.GoreviBitirVeTakipEt();
             }
         }
