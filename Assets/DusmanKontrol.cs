@@ -649,6 +649,13 @@ public class DusmanKontrol : MonoBehaviour
         if (mermiIziRenderer != null) mermiIziRenderer.enabled = false;
     }
 
+    private void OnDisable()
+    {
+        if (mermiIziRenderer != null) mermiIziRenderer.enabled = false;
+        if (namluIsigi != null) namluIsigi.enabled = false;
+        if (namluFlasRenderer != null) namluFlasRenderer.enabled = false;
+    }
+
     private void OlusturDokular()
     {
         if (beyazDokusu == null)
@@ -662,7 +669,7 @@ public class DusmanKontrol : MonoBehaviour
     protected virtual void OnGUI()
     {
         if (oldu || !oyuncuBeniGoruyorMu) return;
-        if (Yazlab.Mekanikler.KapiBulmacaPaneli.MinigameAcik || Yazlab.Yonetim.OllamaNpcDiyalogUI.DiyalogAcikMi) return;
+        if (Yazlab.Mekanikler.KapiBulmacaPaneli.MinigameAcik || Yazlab.Yonetim.OllamaNpcDiyalogUI.DiyalogAcikMi || Yazlab.Mekanikler.PrensesKurtarmaGorevi.OyunBittiMi) return;
 
         Camera cam = Camera.main;
         if (cam == null) return;

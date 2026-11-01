@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Yazlab.Mekanikler
@@ -6,8 +6,8 @@ namespace Yazlab.Mekanikler
     /// <summary>
     /// 4. BÖLÜM (FİNAL) — "KIZIL KULE":
     /// Komutan Varg'ın koruduğu çıkış kapısının arkasına, Kuzey Burcu'nun yerine içi boş, yuvarlak ve
-    /// çok katmanlı bir "Kızıl Kule" inşa eder. Kulenin içinde Prenses Aylin'in tutulduğu Rün Mühürlü kafes,
-    /// Kehanet Küresi, 3 Rün Kristali (Kızıl / Mavi / Zümrüt), gizli kaçış kapağı ve zincir tekerleği bulunur.
+    /// çok katmanlı bir "Kızıl Kule" inşa eder. Kulenin içinde Prenses Betül'ün tutulduğu Mühürlü Kapsül,
+    /// Kehanet Küresi ve silahla vurularak kırılan 3 Zümrüt Kristali bulunur.
     ///
     /// Sahne dosyasına dokunmadan, oyun başladığında (AfterSceneLoad) çalışma zamanında kurulur; böylece
     /// mevcut harita, ekip arkadaşının sahne değişiklikleri ve NavMesh bozulmadan final bölümü eklenir.
@@ -45,16 +45,16 @@ namespace Yazlab.Mekanikler
             gorev.kehanetKuresi = KehanetKuresiKur(kok.transform, out gorev.kureIsigi);
             gorev.kristaller = new RunKristali[]
             {
-                KristalKur(kok.transform, 0, "Kizil_Run_Kristali", new Vector3(-4.0f, ZeminY, 51.6f), true),
-                KristalKur(kok.transform, 1, "Mavi_Run_Kristali", new Vector3(4.0f, ZeminY, 51.6f), true),
-                KristalKur(kok.transform, 2, "Zumrut_Run_Kristali", new Vector3(0f, 7.3f, 55.35f), false)
+                KristalKur(kok.transform, 0, "Kirmizi_Zumrut_Kristali", new Vector3(-3.6f, ZeminY, 51.2f), true),
+                KristalKur(kok.transform, 1, "Mavi_Zumrut_Kristali", new Vector3(3.6f, ZeminY, 51.2f), true),
+                KristalKur(kok.transform, 2, "Yesil_Zumrut_Kristali", new Vector3(0f, ZeminY + 2.45f, 51.8f), false)
             };
             gorev.kacisKapagi = KacisKapagiKur(kok.transform, out gorev.kapakDeligi);
             gorev.zincirTekerlegi = TekerlekKur(kok.transform);
             gorev.prenses = PrensesKarakteri.Olustur(kok.transform, new Vector3(0f, ZeminY + 0.3f, 53.4f));
             gorev.alarmIsiklari = AlarmIsiklariKur(kok.transform);
 
-            Debug.Log("[PrensesKulesi] 4. Bölüm (Final) — Kızıl Kule ve Prenses Kurtarma görevi kuruldu.");
+            Debug.Log("[PrensesKulesi] 4. Bölüm (Final) — Kızıl Kule, Zümrüt Kristaller ve Prenses Kurtarma görevi kuruldu.");
         }
 
         // ==========================================================
@@ -229,7 +229,7 @@ namespace Yazlab.Mekanikler
             GameObject kursu = Silindir("Muhur_Sunagi", new Vector3(0f, ZeminY + 0.15f, 53.4f), new Vector3(2.9f, 0.15f, 2.9f), _koyuTas, dekor);
             MeshColliderYap(kursu);
             Silindir("Sunak_RunHalkasi", new Vector3(0f, ZeminY + 0.31f, 53.4f), new Vector3(2.4f, 0.01f, 2.4f),
-                ParlakMateryal(new Color(0.75f, 0.35f, 1.0f, 0.55f)), dekor, false);
+                ParlakMateryal(new Color(0.20f, 0.95f, 0.50f, 0.55f)), dekor, false);
 
             // Duvar sancakları (mor-altın kraliyet arması)
             Material morKumas = LitMateryal(new Color(0.32f, 0.12f, 0.45f));
@@ -319,7 +319,7 @@ namespace Yazlab.Mekanikler
         }
 
         // ==========================================================
-        // MÜHÜRLÜ KAFES, KEHANET KÜRESİ, KRİSTALLER, KAÇIŞ KAPAĞI, TEKERLEK
+        // MÜHÜRLÜ KAPSÜL, KEHANET KÜRESİ, 3 ZÜMRÜT KRİSTALİ
         // ==========================================================
         private static Transform[] KafesKur(Transform kok, out GameObject bariyer)
         {
@@ -327,27 +327,27 @@ namespace Yazlab.Mekanikler
             kafes.SetParent(kok);
 
             var cubuklar = new List<Transform>();
-            int adet = 16;
+            int adet = 12;
             Vector3 merkez = new Vector3(0f, ZeminY + 0.3f, 53.4f);
             for (int i = 0; i < adet; i++)
             {
                 float rad = i * Mathf.PI * 2f / adet;
                 Vector3 p = merkez + new Vector3(Mathf.Sin(rad) * 1.3f, 1.4f, Mathf.Cos(rad) * 1.3f);
-                GameObject c = Silindir($"Kafes_Cubugu_{i + 1}", p, new Vector3(0.09f, 1.4f, 0.09f), _metal, kafes);
+                GameObject c = Silindir($"Kafes_Cubugu_{i + 1}", p, new Vector3(0.08f, 1.4f, 0.08f), _metal, kafes, false);
                 cubuklar.Add(c.transform);
             }
             GameObject tepe = Silindir("Kafes_TepeHalkasi", merkez + Vector3.up * 2.82f, new Vector3(2.8f, 0.07f, 2.8f), _metal, kafes, false);
             cubuklar.Add(tepe.transform);
 
-            bariyer = Silindir("Run_Muhur_Bariyeri", merkez + Vector3.up * 1.4f, new Vector3(3.0f, 1.45f, 3.0f),
-                ParlakMateryal(new Color(0.75f, 0.30f, 1.0f, 0.22f)), kafes, false);
+            bariyer = Silindir("Run_Muhur_Bariyeri", merkez + Vector3.up * 1.4f, new Vector3(2.9f, 1.45f, 2.9f),
+                ParlakMateryal(new Color(0.15f, 0.95f, 0.50f, 0.24f)), kafes, false);
             return cubuklar.ToArray();
         }
 
         private static Transform KehanetKuresiKur(Transform kok, out Light isik)
         {
             Vector3 p = new Vector3(0f, 6.6f, 53.4f);
-            GameObject kure = Kure("Kehanet_Kuresi", p, Vector3.one * 0.75f, ParlakMateryal(new Color(0.85f, 0.85f, 0.95f, 0.9f)), kok);
+            GameObject kure = Kure("Kehanet_Kuresi", p, Vector3.one * 0.75f, ParlakMateryal(new Color(0.35f, 1.0f, 0.65f, 0.9f)), kok);
             Kutu("Kure_AsmaZinciri", p + Vector3.up * 2.0f, new Vector3(0.06f, 3.4f, 0.06f), _metal, kok, false);
             GameObject halka = Silindir("Kure_AltinHalka", p, new Vector3(1.15f, 0.03f, 1.15f), LitMateryal(new Color(0.95f, 0.75f, 0.25f)), kok, false);
             halka.transform.SetParent(kure.transform, true);
@@ -355,8 +355,8 @@ namespace Yazlab.Mekanikler
             isik = kure.AddComponent<Light>();
             isik.type = LightType.Point;
             isik.range = 10f;
-            isik.intensity = 0.6f;
-            isik.color = Color.white;
+            isik.intensity = 1.6f;
+            isik.color = new Color(0.25f, 1.0f, 0.55f);
             isik.shadows = LightShadows.None;
             return kure.transform;
         }
@@ -374,8 +374,9 @@ namespace Yazlab.Mekanikler
             }
             else
             {
-                // Duvara gömülü taş konsol (yukarı bakıp nişan almak gerekir)
-                Kutu(ad + "_DuvarKonsolu", taban + new Vector3(0f, -0.55f, 0.15f), new Vector3(0.9f, 0.18f, 0.7f), _koyuTas, kok, false);
+                // Kapsülün hemen ön-üst kısmında havada asılı altın halka kaide
+                Silindir(ad + "_AltinHalka", taban + Vector3.down * 0.38f, new Vector3(0.85f, 0.04f, 0.85f),
+                    LitMateryal(new Color(0.95f, 0.78f, 0.25f)), kok, false);
                 kristalPos = taban;
             }
 
@@ -383,22 +384,21 @@ namespace Yazlab.Mekanikler
             kokObj.transform.SetParent(kok);
             kokObj.transform.position = kristalPos;
             SphereCollider sc = kokObj.AddComponent<SphereCollider>();
-            sc.radius = 0.55f;
+            sc.radius = 0.85f;
 
             GameObject gorsel = GameObject.CreatePrimitive(PrimitiveType.Cube);
             gorsel.name = "Kristal_Gorseli";
-            Object.Destroy(gorsel.GetComponent<Collider>());
             gorsel.transform.SetParent(kokObj.transform, false);
-            gorsel.transform.localScale = new Vector3(0.42f, 0.42f, 0.42f);
+            gorsel.transform.localScale = new Vector3(0.48f, 0.48f, 0.48f);
             gorsel.transform.localRotation = Quaternion.Euler(45f, 0f, 45f);
             MeshRenderer mr = gorsel.GetComponent<MeshRenderer>();
-            mr.sharedMaterial = ParlakMateryal(renk * 0.6f + new Color(0, 0, 0, 0.4f));
+            mr.sharedMaterial = ParlakMateryal(renk);
 
             Light l = kokObj.AddComponent<Light>();
             l.type = LightType.Point;
             l.color = renk;
-            l.range = 4.5f;
-            l.intensity = 0.9f;
+            l.range = 5.5f;
+            l.intensity = 1.6f;
             l.shadows = LightShadows.None;
 
             RunKristali rk = kokObj.AddComponent<RunKristali>();
@@ -414,41 +414,17 @@ namespace Yazlab.Mekanikler
             Vector3 p = new Vector3(3.2f, ZeminY, 47.4f);
             delik = Kutu("Kacis_Tuneli_Agzi", p + Vector3.up * 0.012f, new Vector3(1.5f, 0.02f, 1.5f),
                 ParlakMateryal(new Color(0.02f, 0.06f, 0.12f, 1f)), kok, false);
-            Light tunelIsik = new GameObject("Tunel_SuIsigi").AddComponent<Light>();
-            tunelIsik.transform.SetParent(delik.transform, false);
-            tunelIsik.transform.position = p + Vector3.up * 0.4f;
-            tunelIsik.type = LightType.Point;
-            tunelIsik.color = new Color(0.2f, 0.75f, 1f);
-            tunelIsik.range = 3.5f;
-            tunelIsik.intensity = 0f;
-            tunelIsik.name = "Tunel_SuIsigi";
-
             Kutu("Kapak_DemirCerceve", p + Vector3.up * 0.02f, new Vector3(1.85f, 0.04f, 1.85f), _metal, kok, false);
             GameObject kapak = Kutu("Kacis_Kapagi", p + Vector3.up * 0.08f, new Vector3(1.6f, 0.1f, 1.6f), _ahsap, kok, false);
-            Kutu("Kapak_Halkasi", p + new Vector3(0f, 0.15f, 0.45f), new Vector3(0.3f, 0.04f, 0.08f), _metal, kok, false)
-                .transform.SetParent(kapak.transform, true);
             return kapak.transform;
         }
 
         private static Transform TekerlekKur(Transform kok)
         {
             Vector3 p = new Vector3(5.0f, ZeminY + 1.2f, 49.4f);
-            Kutu("Tekerlek_Diregi", new Vector3(p.x + 0.2f, ZeminY + 0.6f, p.z), new Vector3(0.3f, 1.2f, 0.3f), _ahsap, kok);
             GameObject tekerlek = new GameObject("Zincir_Tekerlegi");
             tekerlek.transform.SetParent(kok);
             tekerlek.transform.position = p;
-            tekerlek.transform.rotation = Quaternion.Euler(0f, 0f, 0f);
-
-            GameObject jant = Silindir("Tekerlek_Jant", p, new Vector3(1.1f, 0.06f, 1.1f), _metal, tekerlek.transform, false);
-            jant.transform.localRotation = Quaternion.Euler(0f, 0f, 90f);
-            for (int i = 0; i < 4; i++)
-            {
-                GameObject kol = Kutu($"Tekerlek_Kolu_{i}", p, new Vector3(0.08f, 1.5f, 0.08f), _ahsap, tekerlek.transform, false);
-                kol.transform.localRotation = Quaternion.Euler(i * 45f, 0f, 0f);
-            }
-            // Zincir (tekerlekten kapağa)
-            Kutu("Kapak_Zinciri", new Vector3(4.1f, ZeminY + 0.05f, 48.4f), new Vector3(0.08f, 0.06f, 2.2f), _metal, kok, false)
-                .transform.rotation = Quaternion.Euler(0f, -40f, 0f);
             return tekerlek.transform;
         }
 

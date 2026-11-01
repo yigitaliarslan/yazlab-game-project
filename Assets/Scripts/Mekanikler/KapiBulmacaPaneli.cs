@@ -566,11 +566,11 @@ namespace Yazlab.Mekanikler
             // GÜNEŞİ VE GÜNDÜZ AYDINLATMASINI BAŞLAT!
             StartCoroutine(GunesiVeAydinligiGetir());
 
-            // Bölüm Yöneticisi durumunu güncelle
+            // Bölüm Yöneticisi durumunu güncelle (1. Kapı açıldı, şimdi Taret / Fiziksel Engel alanına geçiliyor)
             BolumYoneticisi by = BolumYoneticisi.Ornek;
-            if (by != null)
+            if (by != null && by.MevcutDurum == OyunDurumu.Baslangic)
             {
-                by.FizikselEngeliAs();
+                by.DurumuDegistir(OyunDurumu.FizikselEngelAlaninda);
             }
 
             // KULLANICI İSTEĞİ: Şalter açıldığı an menü ekranı önümüzden hemen gitsin!

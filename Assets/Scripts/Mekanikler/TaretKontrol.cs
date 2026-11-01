@@ -740,7 +740,7 @@ namespace Yazlab.Mekanikler
                 if (hdComp != null) DestroyImmediate(hdComp);
 
                 // Şablondan kopyalanan eski namlu/iz alt objelerini temizle
-                string[] silinecekAltObjeler = { "YardimciNamluUcu", "YardimciMermiIzi", "YardimciNamluIsigi", "YardimciNamluFlasi", "NamluUcu", "MermiIzi" };
+                string[] silinecekAltObjeler = { "YardimciNamluUcu", "YardimciMermiIzi", "YardimciNamluIsigi", "YardimciNamluFlasi", "NamluNoktasi", "NamluIsigi", "NamluFlasi", "NamluUcu", "MermiIzi", "DusmanNamluUcu", "DusmanMermiIzi", "DusmanNamluIsigi", "DusmanNamluFlasi" };
                 foreach (string altAd in silinecekAltObjeler)
                 {
                     Transform alt = asker.transform.Find(altAd);

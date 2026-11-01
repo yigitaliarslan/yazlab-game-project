@@ -211,7 +211,7 @@ namespace Yazlab.Mekanikler
         private void OnGUI()
         {
             if (_oyuncu == null) return;
-            if (KapiBulmacaPaneli.MinigameAcik || OllamaNpcDiyalogUI.DiyalogAcikMi) return;
+            if (KapiBulmacaPaneli.MinigameAcik || OllamaNpcDiyalogUI.DiyalogAcikMi || PrensesKurtarmaGorevi.OyunBittiMi) return;
 
             // Sadece 1. Bölümde (Kale dışında / hendek çevresinde) veya bildirim varken göster
             bool hendekBolgesinde = !_cozuldu && (_oyuncu.position.z < -7.5f);

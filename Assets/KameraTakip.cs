@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
@@ -55,7 +55,7 @@ public class KameraTakip : MonoBehaviour
 
     [Header("Açı Sınırları (Dikey)")]
     [Tooltip("Kameranın aşağı bakabilme alt açısı.")]
-    public float minPitch = -32f;
+    public float minPitch = -45f;
 
     [Tooltip("Kameranın yukarı bakabilme üst açısı.")]
     public float maxPitch = 55f;
@@ -83,6 +83,7 @@ public class KameraTakip : MonoBehaviour
         if (bakisYuksekligi < 1.65f) bakisYuksekligi = 1.74f;
         if (omuzSagOfset < 0.55f) omuzSagOfset = 0.72f;
         if (mesafe > 3.8f) mesafe = 3.5f;
+        if (minPitch > -45f) minPitch = -45f;
     }
 
     void Start()
@@ -101,7 +102,16 @@ public class KameraTakip : MonoBehaviour
 
     void Update()
     {
-        if ((Yazlab.Mekanikler.KapiBulmacaPaneli.MinigameAcik || Yazlab.Yonetim.OllamaNpcDiyalogUI.DiyalogAcikMi)) return;
+        if (Yazlab.Mekanikler.KapiBulmacaPaneli.MinigameAcik ||
+            Yazlab.Yonetim.OllamaNpcDiyalogUI.DiyalogAcikMi ||
+            Yazlab.Mekanikler.PrensesKurtarmaGorevi.OyunBittiMi)
+        {
+            if (Yazlab.Mekanikler.PrensesKurtarmaGorevi.OyunBittiMi)
+            {
+                ImleciKilitle(false);
+            }
+            return;
+        }
 
         FareyiOku();
         CurrentYaw = yaw;

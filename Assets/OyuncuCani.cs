@@ -188,8 +188,8 @@ public class OyuncuCani : MonoBehaviour
             return;
         }
 
-        // Bulmaca veya NPC Diyalog penceresi açıkken sağ alt HUD barlarını gizle
-        if (Yazlab.Mekanikler.KapiBulmacaPaneli.MinigameAcik || Yazlab.Yonetim.OllamaNpcDiyalogUI.DiyalogAcikMi)
+        // Bulmaca, NPC Diyalog veya Görev Başarılı kapanış ekranı açıkken sağ alt HUD barlarını gizle
+        if (Yazlab.Mekanikler.KapiBulmacaPaneli.MinigameAcik || Yazlab.Yonetim.OllamaNpcDiyalogUI.DiyalogAcikMi || Yazlab.Mekanikler.PrensesKurtarmaGorevi.OyunBittiMi)
             return;
 
         // 3. GTA 5 Tarzı Sade Küçük Dikdörtgen Can Barları

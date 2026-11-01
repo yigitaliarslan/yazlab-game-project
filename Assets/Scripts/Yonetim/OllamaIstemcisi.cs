@@ -158,6 +158,7 @@ namespace Yazlab.Yonetim
                 _istekDevamEdiyor = false;
 
                 // HATA YÖNETİMİ 1: Sunucu kapalı, bağlantı reddedildi veya zaman aşımı (Madde 4.3)
+                // Oyun akışının kilitlenmemesi için çevrimdışı yapılandırılmış yedek karar mekanizması devreye girer
                 if (istek.result != UnityWebRequest.Result.Success)
                 {
                     if (_konusmaGecmisi.Count > 1)
@@ -165,11 +166,9 @@ namespace Yazlab.Yonetim
                         _konusmaGecmisi.RemoveAt(_konusmaGecmisi.Count - 1);
                     }
 
-                    string detay = istek.error ?? "Bilinmeyen ağ hatası";
-                    onHata?.Invoke(
-                        $"Yerel Ollama sunucusuna ({apiUrl}) ulaşılamadı veya zaman aşımı oluştu.\n" +
-                        $"Teknik Detay: {detay} (HTTP {istek.responseCode}).\n" +
-                        $"Oyun akışı korunmaktadır; lütfen arka planda 'ollama serve' ve '{modelAdi}' modelinin aktif olduğunu doğrulayıp tekrar deneyin.");
+                    MuhafizKararVerisi cevrimdisiKarar = CevrimdisiYedekKararOlustur(oyuncuMesaji, mevcutGuvenSkoru, iknaAdimSayisi);
+                    DenetleVeDengeliPuanla(cevrimdisiKarar, oyuncuMesaji, mevcutGuvenSkoru, iknaAdimSayisi);
+                    onBasarili?.Invoke(cevrimdisiKarar);
                     yield break;
                 }
 
@@ -243,6 +242,73 @@ namespace Yazlab.Yonetim
                     : hamYanit.Replace("{", "").Replace("}", "").Replace("\"", "").Trim(),
                 tepkiTuru = "SupheciRed",
                 guvenDegisimi = 0,
+                kapiyiAc = false,
+                savasTetikle = false
+            };
+        }
+
+        /// <summary>
+        /// Ollama servisi arka planda kapalıysa oyunun 3. Bölümde kilitlenmemesi için devreye giren
+        /// çevrimdışı yapılandırılmış karar üreticisi.
+        /// </summary>
+        private MuhafizKararVerisi CevrimdisiYedekKararOlustur(string oyuncuMesaji, int mevcutGuven, int iknaAdimSayisi)
+        {
+            string m = (oyuncuMesaji ?? "").ToLowerInvariant();
+            bool tehditVar = m.Contains("öldür") || m.Contains("oldur") || m.Contains("vururum") ||
+                             m.Contains("aptal") || m.Contains("salak") || m.Contains("ahmak") ||
+                             m.Contains("gebert") || m.Contains("çekil") || m.Contains("cekil") ||
+                             m.Contains("kafana sık") || m.Contains("hain");
+
+            if (tehditVar)
+            {
+                return new MuhafizKararVerisi
+                {
+                    cevap = "Bana hakaret ve tehdit etmeye nasıl cüret edersin?! Silah başına, buradan sağ çıkamayacaksın!",
+                    tepkiTuru = "SaldirganKizdiran",
+                    guvenDegisimi = -35,
+                    kapiyiAc = false,
+                    savasTetikle = true
+                };
+            }
+
+            bool gucluArgumanVar = m.Contains("kızıl şahin") || m.Contains("kizil sahin") ||
+                                   m.Contains("gece kuzgunu") || m.Contains("parola") ||
+                                   m.Contains("komutan") || m.Contains("başkomutan") || m.Contains("baskomutan") ||
+                                   m.Contains("mühür") || m.Contains("muhur") || m.Contains("istihbarat") ||
+                                   m.Contains("500") || m.Contains("1000") || m.Contains("altın") || m.Contains("altin") ||
+                                   m.Contains("kese") || m.Contains("maaş") || m.Contains("maas") || m.Contains("ganimet");
+
+            if (gucluArgumanVar && oyuncuMesaji.Trim().Length >= 12)
+            {
+                if (iknaAdimSayisi < 1)
+                {
+                    return new MuhafizKararVerisi
+                    {
+                        cevap = "Hmm... 'Kızıl Şahin' parolasını biliyorsun demek! Ama tek sözle kapıyı açmam. Bana Başkomutanın mührünü, emrin detayını veya en az 500 altınlık ikramiyeyi kanıtla!",
+                        tepkiTuru = "IknaEdici",
+                        guvenDegisimi = 30,
+                        kapiyiAc = false,
+                        savasTetikle = false
+                    };
+                }
+                else
+                {
+                    return new MuhafizKararVerisi
+                    {
+                        cevap = "Pekâlâ, hem gece parolasını hem de Başkomutanın emrini doğruladın. Güvenimi kazandın asker, Kızıl Kule kapısını açıyorum. Geçebilirsin!",
+                        tepkiTuru = "IknaEdici",
+                        guvenDegisimi = 30,
+                        kapiyiAc = true,
+                        savasTetikle = false
+                    };
+                }
+            }
+
+            return new MuhafizKararVerisi
+            {
+                cevap = "Bu sözlerin beni ikna etmeye yetmez yabancı! Gece parolasını ('Kızıl Şahin') ve Başkomutanın emrini açıkça söylemeden bu kapıdan adım atamazsın!",
+                tepkiTuru = "YetersizTeklif",
+                guvenDegisimi = -5,
                 kapiyiAc = false,
                 savasTetikle = false
             };

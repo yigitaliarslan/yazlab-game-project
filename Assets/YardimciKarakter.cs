@@ -636,6 +636,13 @@ public class YardimciKarakter : MonoBehaviour
         if (mermiIziRenderer != null) mermiIziRenderer.enabled = false;
     }
 
+    private void OnDisable()
+    {
+        if (mermiIziRenderer != null) mermiIziRenderer.enabled = false;
+        if (namluIsigi != null) namluIsigi.enabled = false;
+        if (namluFlasRenderer != null) namluFlasRenderer.enabled = false;
+    }
+
     private void HedefiBul()
     {
         if (hedef != null) return;

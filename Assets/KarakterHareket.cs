@@ -177,7 +177,9 @@ public class KarakterHareket : MonoBehaviour
 
     void Update()
     {
-        if ((Yazlab.Mekanikler.KapiBulmacaPaneli.MinigameAcik || Yazlab.Yonetim.OllamaNpcDiyalogUI.DiyalogAcikMi))
+        if (Yazlab.Mekanikler.KapiBulmacaPaneli.MinigameAcik ||
+            Yazlab.Yonetim.OllamaNpcDiyalogUI.DiyalogAcikMi ||
+            Yazlab.Mekanikler.PrensesKurtarmaGorevi.OyunBittiMi)
         {
             if (animator != null && hasIsRunningParam)
             {

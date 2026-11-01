@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using UnityEngine;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
@@ -48,7 +48,7 @@ public class KarakterAtes : MonoBehaviour
     [Tooltip("Normal nişangah rengi (Taktiksel Camgöbeği/Yeşil).")]
     public Color nisangahRengi = new Color(0.25f, 1.0f, 0.65f, 0.90f);
 
-    [Tooltip("Düşman/Taret üzerine gelindiğinde nişangah rengi.")]
+    [Tooltip("Düşman/Taret/Zümrüt üzerine gelindiğinde nişangah rengi.")]
     public Color hedefKilitRengi = new Color(1.0f, 0.22f, 0.20f, 0.95f);
 
     [Tooltip("Mermi izi (Tracer) rengi.")]
@@ -78,6 +78,9 @@ public class KarakterAtes : MonoBehaviour
 
     void Awake()
     {
+        vurulabilirKatmanlar = ~0;
+        if (menzil < 100f) menzil = 100f;
+
         animator = GetComponent<Animator>();
         if (animator == null)
         {
@@ -147,7 +150,12 @@ public class KarakterAtes : MonoBehaviour
 
     void Update()
     {
-        if ((Yazlab.Mekanikler.KapiBulmacaPaneli.MinigameAcik || Yazlab.Yonetim.OllamaNpcDiyalogUI.DiyalogAcikMi)) return;
+        if (Yazlab.Mekanikler.KapiBulmacaPaneli.MinigameAcik ||
+            Yazlab.Yonetim.OllamaNpcDiyalogUI.DiyalogAcikMi ||
+            Yazlab.Mekanikler.PrensesKurtarmaGorevi.OyunBittiMi)
+        {
+            return;
+        }
 
         HedefKilitKontrolEt();
 
@@ -191,11 +199,44 @@ public class KarakterAtes : MonoBehaviour
             {
                 hedefteDusmanVar = true;
             }
-            else if (enYakinCol.GetComponentInParent<Yazlab.Mekanikler.RunKristali>() != null)
+            else
+            {
+                Yazlab.Mekanikler.RunKristali rk = enYakinCol.GetComponentInParent<Yazlab.Mekanikler.RunKristali>();
+                if (rk != null && !rk.VurulduMu)
+                {
+                    hedefteDusmanVar = true;
+                }
+            }
+        }
+
+        // Zümrüt kristaller için hafif nişan yardımı kontrolü
+        if (!hedefteDusmanVar)
+        {
+            Yazlab.Mekanikler.RunKristali yakinKristal = NisanHattindakiZumrutuBul(ray, enYakin);
+            if (yakinKristal != null)
             {
                 hedefteDusmanVar = true;
             }
         }
+    }
+
+    private Yazlab.Mekanikler.RunKristali NisanHattindakiZumrutuBul(Ray ray, float maksMesafe)
+    {
+        RaycastHit[] kureVuruslar = Physics.SphereCastAll(ray, 0.42f, Mathf.Min(menzil, maksMesafe + 0.5f), ~0, QueryTriggerInteraction.Ignore);
+        Yazlab.Mekanikler.RunKristali enYakinKristal = null;
+        float enYakin = float.MaxValue;
+
+        foreach (var kh in kureVuruslar)
+        {
+            if (kh.collider == null) continue;
+            Yazlab.Mekanikler.RunKristali rk = kh.collider.GetComponentInParent<Yazlab.Mekanikler.RunKristali>();
+            if (rk != null && !rk.VurulduMu && kh.distance < enYakin)
+            {
+                enYakin = kh.distance;
+                enYakinKristal = rk;
+            }
+        }
+        return enYakinKristal;
     }
 
     void LateUpdate()
@@ -319,7 +360,24 @@ public class KarakterAtes : MonoBehaviour
             }
         }
 
-        if (hasHit)
+        // Önce nişan hattındaki Zümrüt Kristali kontrol et (doğrudan isabet veya hafif nişan yardımı)
+        Yazlab.Mekanikler.RunKristali vurulanZumrut = null;
+        if (hasHit && hit.collider != null)
+        {
+            vurulanZumrut = hit.collider.GetComponentInParent<Yazlab.Mekanikler.RunKristali>();
+        }
+        if (vurulanZumrut == null || vurulanZumrut.VurulduMu)
+        {
+            vurulanZumrut = NisanHattindakiZumrutuBul(kameraRay, enYakinMesafe);
+        }
+
+        if (vurulanZumrut != null && !vurulanZumrut.VurulduMu)
+        {
+            hedefNokta = vurulanZumrut.transform.position;
+            vurulanZumrut.SilahlaVuruldu();
+            CarpmaEfektiGoster(hedefNokta, -kameraRay.direction);
+        }
+        else if (hasHit)
         {
             hedefNokta = hit.point;
 
@@ -330,6 +388,15 @@ public class KarakterAtes : MonoBehaviour
             }
 
             DusmanKontrol dusman = hit.collider.GetComponentInParent<DusmanKontrol>();
+            if (dusman == null && (hit.collider.name == "NPC_Muhafiz" || (hit.collider.transform.parent != null && hit.collider.transform.parent.name == "NPC_Muhafiz")))
+            {
+                if (Yazlab.Yonetim.BolumYoneticisi.Ornek != null)
+                {
+                    Yazlab.Yonetim.BolumYoneticisi.Ornek.MuhafizSavasBaslat();
+                    dusman = hit.collider.GetComponentInParent<DusmanKontrol>();
+                }
+            }
+
             if (dusman != null)
             {
                 dusman.HasarAl(25f);
@@ -460,7 +527,13 @@ public class KarakterAtes : MonoBehaviour
 
     void OnGUI()
     {
-        if (!nisangahGoster || (Yazlab.Mekanikler.KapiBulmacaPaneli.MinigameAcik || Yazlab.Yonetim.OllamaNpcDiyalogUI.DiyalogAcikMi)) return;
+        if (!nisangahGoster ||
+            Yazlab.Mekanikler.KapiBulmacaPaneli.MinigameAcik ||
+            Yazlab.Yonetim.OllamaNpcDiyalogUI.DiyalogAcikMi ||
+            Yazlab.Mekanikler.PrensesKurtarmaGorevi.OyunBittiMi)
+        {
+            return;
+        }
 
         if (beyazTexture == null)
         {
@@ -479,7 +552,7 @@ public class KarakterAtes : MonoBehaviour
         float gap = (KameraTakip.IsFirstPerson ? 4f : 5.5f) + atesAcilma;
 
         Color aktifRenk = hedefteDusmanVar
-            ? new Color(1.0f, 0.22f, 0.20f, 0.95f) // Düşman/Taret üstündeyken Kırmızı
+            ? new Color(1.0f, 0.22f, 0.20f, 0.95f) // Düşman/Taret/Zümrüt üstündeyken Kırmızı
             : new Color(0.25f, 1.0f, 0.65f, 0.90f); // Normalde Taktiksel Yeşil/Camgöbeği
 
         Color eskiRenk = GUI.color;

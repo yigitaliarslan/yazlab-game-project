@@ -1,43 +1,37 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+using System.Collections;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using Yazlab.Yonetim;
-#if ENABLE_INPUT_SYSTEM
-using UnityEngine.InputSystem;
-#endif
 
 namespace Yazlab.Mekanikler
 {
     /// <summary>
-    /// 4. BÖLÜM (FİNAL) GÖREV YÖNETİCİSİ — PRENSES AYLIN'I KURTARMA:
+    /// 4. BÖLÜM (FİNAL) GÖREV YÖNETİCİSİ — ZÜMRÜTLERİ SIRASIYLA VURMA & PRENSES BETÜL'Ü KURTARMA:
     ///
     /// SENARYO AKIŞI:
-    /// 1. Kuleye Giriş: Kapı açıldıktan sonra oyuncu Kızıl Kule'ye adım atar (Z > 45).
-    /// 2. İlk Diyalog: Prenses Aylin ("Beyaz Kuzgun") oyuncuyu karşılar; Komutan Varg'ın onu
-    ///    kadim bir Rün Mühürüne hapsettiğini söyler.
-    /// 3. Rün Bulmacası: Kehanet Küresi sırayla 3 renk (Kızıl / Mavi / Zümrüt) yanıp söner.
-    ///    Oyuncu silahıyla bu 3 kristali doğru sırada vurmalıdır.
-    /// 4. Mühür Kırılışı: Rün perdesi söner, kafes parmaklıkları tavana çekilir.
-    /// 5. Kale Baskını & Savunma: Mühür kırılınca kalede kırmızı alarm çalar. Prenses hendek su tüneline
-    ///    açılan kaçış kapağının zincir tekerleğini çevirirken kule kapısından muhafız askerler baskın yapar.
-    ///    Oyuncu ve Yoldaş askerleri püskürtür.
-    /// 6. Tünelden Kaçış & Zafer: Kapak açılır; oyuncu tünele atlayarak Prenses ile hendek şelalesine
-    ///    ulaşır ve operasyonu başarıyla tamamlar.
+    /// 1. Komutanı Geçiş & Kuleye Giriş: Çıkış kapısı açıldığında ekranın altında
+    ///    "Sırasıyla KIRMIZI → MAVİ → YEŞİL zümrütü vur!" talimatı gösterilir.
+    /// 2. Zümrütlere Sırasıyla Vurma Görevi: Oyuncu kendi silahıyla (Sol Tık / F)
+    ///    sırasıyla 1. KIRMIZI, 2. MAVİ ve 3. YEŞİL zümrütü vurmalıdır.
+    ///    Yanlış sırada vurursa zümrütler sıfırlanır ve tekrar denemesi gerektiği söylenir.
+    /// 3. Kapsülden Kurtuluş: 3 zümrüt doğru sırayla vurulduğunda kapsül açılır.
+    /// 4. Yanımıza Gelip Teşekkür Etmesi: Prenses Betül kapsülden çıkar, oyuncunun yanına yürür,
+    ///    oyuncuya dönüp teşekkür konuşmasını yapar.
+    /// 5. Kapanış Ekranı ("GÖREV BAŞARILI"): Teşekkürün ardından "GÖREV BAŞARILI" kapanış ekranı açılır.
     /// </summary>
     public class PrensesKurtarmaGorevi : MonoBehaviour
     {
         public static PrensesKurtarmaGorevi Ornek { get; private set; }
 
+        public static bool OyunBittiMi => Ornek != null && Ornek.mevcutAsama == Asama.Zafer;
+
         public enum Asama
         {
             KuleyeGirisBekleniyor,
-            PrensesleIlkDiyalog,
-            RunBulmacasiGosterim,
-            RunBulmacasiAtis,
-            MuhurKirildi,
-            BaskinSavunmasi,
-            KacisaHazir,
+            ZumrutleriVurmaGorevi,
+            KapsulAciliyor,
+            PrensesYaninaGeliyor,
+            PrensesTesekkurEdiyor,
             Zafer
         }
 
@@ -49,27 +43,26 @@ namespace Yazlab.Mekanikler
         public GameObject muhurBariyeri;
         public Transform kehanetKuresi;
         public Light kureIsigi;
-        public RunKristali[] kristaller; // 0: Kızıl, 1: Mavi, 2: Zümrüt
+        public RunKristali[] kristaller; // 0: Kırmızı, 1: Mavi, 2: Yeşil
         public Transform kacisKapagi;
         public GameObject kapakDeligi;
         public Transform zincirTekerlegi;
         public PrensesKarakteri prenses;
         public Light[] alarmIsiklari;
 
-        // Bulmaca Durumu
-        private readonly int[] _hedefSira = new int[] { 0, 1, 2 }; // Kızıl -> Mavi -> Zümrüt
+        // Doğru Vuruş Sırası: 0 (Kırmızı) -> 1 (Mavi) -> 2 (Yeşil)
+        private readonly int[] _hedefSira = new int[] { 0, 1, 2 };
         private int _vurulanAdim = 0;
-        private bool _gosterimYapiliyor = false;
+        private int _vurulanZumrutSayisi = 0;
+        private bool _ilkMesajGosterildi = false;
 
-        // Savunma Durumu
-        private readonly List<DusmanKontrol> _saldirganlar = new List<DusmanKontrol>();
-        private float _kapakAcilmaOrani = 0f;
-        private float _savunmaZamani = 0f;
+        public int VurulanZumrutSayisi => _vurulanZumrutSayisi;
+        public int ToplamZumrutSayisi => kristaller != null ? kristaller.Length : 3;
 
         // Diyalog & UI
         private string _altYazi = "";
         private float _altYaziBitis = 0f;
-        private string _konusan = "PRENSES AYLİN";
+        private string _konusan = "PRENSES BETÜL";
         private Color _konusanRenk = new Color(0.85f, 0.75f, 1.0f);
         private Texture2D _texKoyu;
         private AudioSource _ses;
@@ -108,190 +101,210 @@ namespace Yazlab.Mekanikler
             switch (mevcutAsama)
             {
                 case Asama.KuleyeGirisBekleniyor:
-                    if (_oyuncu != null && _oyuncu.position.z >= 45.0f)
+                    bool kapiAcildi = BolumYoneticisi.Ornek != null && BolumYoneticisi.Ornek.MevcutDurum == OyunDurumu.PrensesKurtarma;
+                    if (_oyuncu != null && (_oyuncu.position.z >= 42.5f || kapiAcildi))
                     {
-                        GirisTetiklendi();
+                        GoreviBaslat();
                     }
                     break;
 
-                case Asama.PrensesleIlkDiyalog:
+                case Asama.ZumrutleriVurmaGorevi:
+                    if (prenses != null && _oyuncu != null)
+                    {
+                        prenses.BakisYonu(_oyuncu.position);
+                    }
+                    if (!_ilkMesajGosterildi && _oyuncu != null && _oyuncu.position.z >= 44.0f)
+                    {
+                        _ilkMesajGosterildi = true;
+                        DiyalogGoster("PRENSES BETÜL",
+                            "Sonunda geldin! Kapsülü açmak için silahınla sırasıyla 1. KIRMIZI, 2. MAVİ ve 3. YEŞİL zümrütü vur!",
+                            8.0f, new Color(1.0f, 0.88f, 0.30f));
+                        SesCal(540f, 0.25f);
+                    }
+                    break;
+
+                case Asama.PrensesYaninaGeliyor:
+                    if (prenses != null && _oyuncu != null)
+                    {
+                        Vector3 hedefKonum = OyuncuYaniHedefKonumu();
+                        prenses.HedefeGit(hedefKonum);
+                    }
+                    break;
+
+                case Asama.PrensesTesekkurEdiyor:
                     if (prenses != null && _oyuncu != null)
                     {
                         prenses.BakisYonu(_oyuncu.position);
                     }
                     break;
 
-                case Asama.RunBulmacasiAtis:
-                    if (prenses != null && _oyuncu != null)
-                    {
-                        prenses.BakisYonu(_oyuncu.position);
-                    }
-                    break;
-
-                case Asama.BaskinSavunmasi:
-                    GuncelleBaskinSavunmasi();
-                    break;
-
-                case Asama.KacisaHazir:
-                    GuncelleKacisKontrolu();
+                case Asama.Zafer:
+                    Cursor.lockState = CursorLockMode.None;
+                    Cursor.visible = true;
                     break;
             }
+        }
 
-            // Kırmızı alarm ışıkları yanıp sönsün
-            if (mevcutAsama == Asama.BaskinSavunmasi && alarmIsiklari != null)
+        private Vector3 OyuncuYaniHedefKonumu()
+        {
+            if (_oyuncu == null) return new Vector3(0f, PrensesKulesiInsaci.ZeminY, 49.0f);
+
+            Vector3 oyuncuPos = _oyuncu.position;
+            Vector3 prensesPos = prenses != null ? prenses.transform.position : new Vector3(0f, PrensesKulesiInsaci.ZeminY, 53.4f);
+
+            Vector3 yon = prensesPos - oyuncuPos;
+            yon.y = 0f;
+            if (yon.sqrMagnitude < 0.01f)
             {
-                float t = Mathf.Sin(Time.time * 6f) * 0.5f + 0.5f;
-                foreach (var l in alarmIsiklari)
-                {
-                    if (l != null) l.intensity = t * 3.5f;
-                }
+                yon = _oyuncu.forward;
+                yon.y = 0f;
             }
+            yon.Normalize();
+
+            Vector3 hedef = oyuncuPos + yon * 1.75f;
+            hedef.y = PrensesKulesiInsaci.ZeminY;
+            return hedef;
         }
 
-        // ==========================================================
-        // 1. AŞAMA: KULEYE GİRİŞ & İLK DİYALOG
-        // ==========================================================
-        private void GirisTetiklendi()
+        public void GoreviBaslat()
         {
-            mevcutAsama = Asama.PrensesleIlkDiyalog;
-            // BolumYoneticisi'ne görev bilgisini güncelle
-            Yonetim.BolumYoneticisi by = Yonetim.BolumYoneticisi.Ornek;
-            if (by != null)
+            if (mevcutAsama != Asama.KuleyeGirisBekleniyor) return;
+
+            mevcutAsama = Asama.ZumrutleriVurmaGorevi;
+
+            BolumYoneticisi by = BolumYoneticisi.Ornek;
+            if (by != null && by.MevcutDurum != OyunDurumu.PrensesKurtarma && by.MevcutDurum != OyunDurumu.BolumTamamlandi)
             {
-                by.DurumuDegistir(Yonetim.OyunDurumu.SosyalEngelAlaninda);
-            }
-
-            StartCoroutine(IlkDiyalogAkisi());
-        }
-
-        private IEnumerator IlkDiyalogAkisi()
-        {
-            DiyalogGoster("PRENSES AYLİN", "Sonunda geldin! Ben Prenses Aylin — 'Beyaz Kuzgun'. Gece parolasıyla muhafızı geçtiğini duydum!", 6.0f,
-                new Color(0.92f, 0.78f, 1.0f));
-            SesCal(520f, 0.25f);
-            yield return new WaitForSeconds(6.2f);
-
-            DiyalogGoster("PRENSES AYLİN", "Komutan Varg beni bu Rün Kafesi'ne kilitledi. Mührü kırmak için Kehanet Küresi'nin gösterdiği sırayla kristalleri vurmalısın!", 6.5f,
-                new Color(0.92f, 0.78f, 1.0f));
-            SesCal(580f, 0.25f);
-            yield return new WaitForSeconds(6.6f);
-
-            StartCoroutine(BulmacaGosterimAkisi());
-        }
-
-        // ==========================================================
-        // 2. AŞAMA: RÜN BULMACASI GÖSTERİMİ & ATIŞ KONTROLÜ
-        // ==========================================================
-        public void BulmacayiYenidenGoster()
-        {
-            if (_gosterimYapiliyor || mevcutAsama != Asama.RunBulmacasiAtis) return;
-            StartCoroutine(BulmacaGosterimAkisi());
-        }
-
-        private IEnumerator BulmacaGosterimAkisi()
-        {
-            _gosterimYapiliyor = true;
-            mevcutAsama = Asama.RunBulmacasiGosterim;
-            _vurulanAdim = 0;
-
-            DiyalogGoster("KEHANET KÜRESİ", "Rün dizilimi parlıyor... Sırayı dikkatle izle!", 3.2f, new Color(0.4f, 0.85f, 1.0f));
-            yield return new WaitForSeconds(1.5f);
-
-            for (int i = 0; i < _hedefSira.Length; i++)
-            {
-                int kIdx = _hedefSira[i];
-                Color c = RunKristali.RenkAl(kIdx);
-                string renkAdi = RunKristali.Adlar[kIdx];
-
-                // Küre parlasın
-                if (kureIsigi != null)
-                {
-                    kureIsigi.color = c;
-                    kureIsigi.intensity = 5.0f;
-                }
-                // İlgili kristal parlasın
-                if (kristaller != null && kIdx < kristaller.Length && kristaller[kIdx] != null)
-                {
-                    kristaller[kIdx].Parla();
-                }
-
-                DiyalogGoster("KEHANET KÜRESİ", $"{i + 1}. RÜN: {renkAdi} KRİSTAL!", 1.2f, c);
-                SesCal(400f + kIdx * 160f, 0.35f);
-                yield return new WaitForSeconds(1.3f);
-
-                if (kureIsigi != null) kureIsigi.intensity = 0.6f;
-                yield return new WaitForSeconds(0.4f);
+                by.DurumuDegistir(OyunDurumu.PrensesKurtarma);
             }
 
-            _gosterimYapiliyor = false;
-            mevcutAsama = Asama.RunBulmacasiAtis;
-            DiyalogGoster("GÖREV", "Silahınla kristalleri kürenin gösterdiği sırayla VUR: 1. KIZIL  →  2. MAVİ  →  3. ZÜMRÜT", 8.0f,
-                new Color(1.0f, 0.90f, 0.30f));
+            DiyalogGoster("GÖREV — ZÜMRÜTLERİ SIRASIYLA VUR",
+                "Prenses Betül'ü kurtarmak için silahınla sırasıyla 1. KIRMIZI  →  2. MAVİ  →  3. YEŞİL zümrütü vur!",
+                9.0f, new Color(1.0f, 0.88f, 0.30f));
         }
 
+        // ==========================================================
+        // SİLAHLA ZÜMRÜT VURULDUĞUNDA SIRA KONTROLÜ (KIRMIZI -> MAVİ -> YEŞİL)
+        // ==========================================================
         public void KristalVuruldu(RunKristali kristal)
         {
-            if (mevcutAsama != Asama.RunBulmacasiAtis || _gosterimYapiliyor) return;
+            if (kristal == null || kristal.VurulduMu) return;
 
-            int beklenen = _hedefSira[_vurulanAdim];
-            kristal.Parla();
-
-            if (kristal.indeks == beklenen)
+            if (mevcutAsama == Asama.KapsulAciliyor ||
+                mevcutAsama == Asama.PrensesYaninaGeliyor ||
+                mevcutAsama == Asama.PrensesTesekkurEdiyor ||
+                mevcutAsama == Asama.Zafer)
             {
-                // Doğru kristal vuruldu
+                return;
+            }
+
+            if (mevcutAsama == Asama.KuleyeGirisBekleniyor)
+            {
+                mevcutAsama = Asama.ZumrutleriVurmaGorevi;
+                if (BolumYoneticisi.Ornek != null)
+                {
+                    BolumYoneticisi.Ornek.DurumuDegistir(OyunDurumu.PrensesKurtarma);
+                }
+            }
+
+            int beklenenIndeks = _hedefSira[_vurulanAdim];
+
+            if (kristal.indeks == beklenenIndeks)
+            {
+                // DOĞRU SIRA!
+                kristal.DogruVurusKapat();
                 _vurulanAdim++;
-                SesCal(600f + _vurulanAdim * 150f, 0.28f);
+                _vurulanZumrutSayisi = _vurulanAdim;
+                SesCal(580f + _vurulanAdim * 160f, 0.30f);
+
+                if (kureIsigi != null)
+                {
+                    kureIsigi.color = RunKristali.RenkAl(kristal.indeks);
+                    kureIsigi.intensity = 4.0f;
+                }
 
                 if (_vurulanAdim >= _hedefSira.Length)
                 {
-                    // Bulmaca tamamlandı!
-                    StartCoroutine(MuhurKirilisAkisi());
+                    // Kırmızı -> Mavi -> Yeşil sırasıyla tamamlandı!
+                    StartCoroutine(KurtulusVeTesekkurAkisi());
                 }
                 else
                 {
-                    string sonraki = RunKristali.Adlar[_hedefSira[_vurulanAdim]];
-                    DiyalogGoster("GÖREV", $"✓ DOĞRU! Sıradaki: {sonraki} KRİSTAL ({_vurulanAdim}/{_hedefSira.Length})", 3.0f,
-                        new Color(0.35f, 0.95f, 0.45f));
+                    string vurulanAd = RunKristali.Adlar[kristal.indeks];
+                    string siradakiAd = RunKristali.Adlar[_hedefSira[_vurulanAdim]];
+                    DiyalogGoster("DOĞRU SIRA!",
+                        $"✓ {_vurulanAdim}. {vurulanAd} ZÜMRÜT VURULDU! ({_vurulanAdim}/3) — Şimdi sırada: {_vurulanAdim + 1}. {siradakiAd} ZÜMRÜT!",
+                        6.0f, new Color(0.35f, 1.0f, 0.55f));
                 }
             }
             else
             {
-                // Yanlış kristal vuruldu — dizilim sıfırlanır ve tekrar izletilir
-                SesCal(220f, 0.5f);
-                DiyalogGoster("MÜHÜR", "✗ YANLIŞ SIRA! Rün dizilimi sıfırlandı, küre tekrar gösteriyor...", 3.5f,
-                    new Color(1.0f, 0.25f, 0.25f));
-                StartCoroutine(BulmacaGosterimAkisi());
+                // YANLIŞ SIRA! Zümrütleri sıfırla ve oyuncuya tekrar denemesi gerektiğini söyle
+                _vurulanAdim = 0;
+                _vurulanZumrutSayisi = 0;
+
+                if (kristaller != null)
+                {
+                    foreach (var k in kristaller)
+                    {
+                        if (k != null) k.Sifirla();
+                    }
+                }
+
+                if (kureIsigi != null)
+                {
+                    kureIsigi.color = new Color(1.0f, 0.25f, 0.25f);
+                    kureIsigi.intensity = 3.5f;
+                }
+
+                SesCal(210f, 0.48f);
+                string yanlisAd = RunKristali.Adlar[kristal.indeks];
+                DiyalogGoster("✗ YANLIŞ SIRA — TEKRAR DENE!",
+                    $"Yanlışlıkla {yanlisAd} zümrütü vurdun! Tekrar denemelisin! Sırasıyla: 1. KIRMIZI  →  2. MAVİ  →  3. YEŞİL zümrütü vur!",
+                    7.5f, new Color(1.0f, 0.30f, 0.30f));
             }
         }
 
         // ==========================================================
-        // 3. AŞAMA: MÜHÜR KIRILIŞI & ALARM / BASKIN BAŞLANGICI
+        // KAPSÜLDEN KURTULUŞ -> YANIMIZA GELİŞ -> TEŞEKKÜR -> GÖREV BAŞARILI
         // ==========================================================
-        private IEnumerator MuhurKirilisAkisi()
+        private IEnumerator KurtulusVeTesekkurAkisi()
         {
-            mevcutAsama = Asama.MuhurKirildi;
-            SesCal(880f, 0.6f);
+            mevcutAsama = Asama.KapsulAciliyor;
+            SesCal(880f, 0.55f);
 
-            DiyalogGoster("PRENSES AYLİN", "Harika atış! Rün mührü çözülüyor!", 4.0f, new Color(0.95f, 0.85f, 1.0f));
+            DiyalogGoster("PRENSES BETÜL",
+                "Harika atış! Kırmızı, Mavi ve Yeşil zümrütleri doğru sırayla vurdun, kapsülün mührü kırıldı!",
+                3.5f, new Color(0.45f, 1.0f, 0.65f));
 
-            // Mühür perdesi sönsün
+            // 1. Kapsül enerji bariyeri sönsün
             if (muhurBariyeri != null)
             {
                 muhurBariyeri.SetActive(false);
             }
             if (kureIsigi != null)
             {
-                kureIsigi.color = new Color(0.3f, 1.0f, 0.45f);
-                kureIsigi.intensity = 4.0f;
+                kureIsigi.color = new Color(0.3f, 1.0f, 0.55f);
+                kureIsigi.intensity = 4.5f;
             }
 
-            // Parmaklıklar yukarı tavana doğru kayarak açılsın
-            float sure = 2.2f;
+            // 2. Kapsül parmaklıklarının collider'larını hemen kapat ve yukarı kaydırarak aç
+            if (kafesCubuklari != null)
+            {
+                foreach (var c in kafesCubuklari)
+                {
+                    if (c == null) continue;
+                    Collider col = c.GetComponent<Collider>();
+                    if (col != null) col.enabled = false;
+                }
+            }
+
+            float acilmaSuresi = 1.2f;
             float gecen = 0f;
-            while (gecen < sure)
+            while (gecen < acilmaSuresi)
             {
                 gecen += Time.deltaTime;
-                float adim = (4.5f / sure) * Time.deltaTime;
+                float adim = (4.8f / acilmaSuresi) * Time.deltaTime;
                 if (kafesCubuklari != null)
                 {
                     foreach (var c in kafesCubuklari)
@@ -302,216 +315,69 @@ namespace Yazlab.Mekanikler
                 yield return null;
             }
 
-            yield return new WaitForSeconds(0.6f);
-
-            // Prenses kürsüden öne doğru bir adım atsın
-            if (prenses != null)
+            if (kafesCubuklari != null)
             {
-                prenses.HedefeGit(new Vector3(0f, PrensesKulesiInsaci.ZeminY + 0.05f, 50.8f));
-            }
-
-            DiyalogGoster("PRENSES AYLİN", "Mühür kırıldı! Ama kaledeki muhafızlar alarmı duydu! Hendek su tüneline açılan kaçış kapağını açmalıyız!", 6.5f,
-                new Color(1.0f, 0.35f, 0.35f));
-            yield return new WaitForSeconds(3.5f);
-
-            // Baskın aşamasına geç
-            BaslatBaskinSavunmasi();
-        }
-
-        // ==========================================================
-        // 4. AŞAMA: KALE BASKINI & TEKERLEK SAVUNMASI
-        // ==========================================================
-        private void BaslatBaskinSavunmasi()
-        {
-            mevcutAsama = Asama.BaskinSavunmasi;
-            _savunmaZamani = 0f;
-            _kapakAcilmaOrani = 0f;
-
-            // Prenses tekerleğe koşsun
-            if (prenses != null)
-            {
-                prenses.HedefeGit(new Vector3(4.3f, PrensesKulesiInsaci.ZeminY + 0.05f, 49.4f));
-            }
-
-            // 4 Muhafız Asker spawn et (Kule girişinden saldıranlar)
-            DusmanAskerleriSpawnla();
-
-            DiyalogGoster("PRENSES AYLİN", "Ben zincir tekerleğini çeviriyorum, muhafızları durdurun!", 6.0f,
-                new Color(1.0f, 0.85f, 0.25f));
-            SesCal(350f, 0.5f);
-        }
-
-        private void DusmanAskerleriSpawnla()
-        {
-            _saldirganlar.Clear();
-            GameObject sablon = null;
-            if (YardimciKarakter.Instance != null) sablon = YardimciKarakter.Instance.gameObject;
-            if (sablon == null && _oyuncu != null) sablon = _oyuncu.gameObject;
-            if (sablon == null) return;
-
-            Vector3[] spawnNoktalari = new Vector3[]
-            {
-                new Vector3(-2.2f, PrensesKulesiInsaci.ZeminY, 43.5f),
-                new Vector3( 2.2f, PrensesKulesiInsaci.ZeminY, 43.5f),
-                new Vector3(-1.0f, PrensesKulesiInsaci.ZeminY, 41.5f),
-                new Vector3( 1.0f, PrensesKulesiInsaci.ZeminY, 41.5f)
-            };
-
-            bool aktif = sablon.activeSelf;
-            sablon.SetActive(false);
-
-            for (int i = 0; i < spawnNoktalari.Length; i++)
-            {
-                GameObject asker = Instantiate(sablon, spawnNoktalari[i], Quaternion.Euler(0f, 0f, 0f));
-                asker.name = $"KuleMuhafizi_Baskin_{i + 1}";
-                asker.tag = "Untagged";
-                asker.transform.localScale = Vector3.one;
-
-                // Eski oyuncu/müttefik bileşenlerini temizle
-                TemizleBilesen<YardimciKarakter>(asker);
-                TemizleBilesen<KarakterHareket>(asker);
-                TemizleBilesen<KarakterAtes>(asker);
-                TemizleBilesen<OyuncuCani>(asker);
-                TemizleBilesen<CharacterController>(asker);
-                TemizleBilesen<HendekDusmeKontrolu>(asker);
-
-                string[] silinecekler = { "YardimciNamluUcu", "YardimciMermiIzi", "YardimciNamluIsigi", "YardimciNamluFlasi", "NamluUcu", "MermiIzi" };
-                foreach (string ad in silinecekler)
+                foreach (var c in kafesCubuklari)
                 {
-                    Transform c = asker.transform.Find(ad);
-                    if (c != null) DestroyImmediate(c.gameObject);
-                }
-
-                DusmanKontrol dk = asker.GetComponent<DusmanKontrol>() ?? asker.AddComponent<DusmanKontrol>();
-                dk.maksimumCan = 95f;
-                dk.mevcutCan = 95f;
-                dk.oyuncuyaDogruYuru = true;
-                dk.herZamanOyuncuyuTakipEt = true;
-                dk.yurumeHizi = 3.1f + i * 0.2f;
-                dk.durmaMesafesi = 3.5f;
-                dk.gorusMenzili = 50f;
-                dk.atesAraligi = 1.05f;
-                dk.atesHasari = 5.5f;
-                dk.kiyafetRengi = new Color(0.85f, 0.15f, 0.15f); // Koyu Kızıl Muhafız
-                dk.RengiUygula();
-
-                asker.SetActive(true);
-                _saldirganlar.Add(dk);
-            }
-
-            sablon.SetActive(aktif);
-        }
-
-        private static void TemizleBilesen<T>(GameObject go) where T : Component
-        {
-            T c = go.GetComponent<T>();
-            if (c != null) DestroyImmediate(c);
-        }
-
-        private void GuncelleBaskinSavunmasi()
-        {
-            _savunmaZamani += Time.deltaTime;
-
-            // Prenses tekerleğe vardığında çevirme animasyonunu başlat
-            if (prenses != null && prenses.HedefeUlasti)
-            {
-                prenses.TekerlekCevir(true);
-                prenses.BakisYonu(zincirTekerlegi != null ? zincirTekerlegi.position : prenses.transform.position + Vector3.right);
-            }
-
-            // Tekerlek dönsün ve kaçış kapağı açılsın (12 saniyede tam açılır)
-            _kapakAcilmaOrani = Mathf.Clamp01(_savunmaZamani / 12.0f);
-
-            if (zincirTekerlegi != null)
-            {
-                zincirTekerlegi.Rotate(0f, 0f, 90f * Time.deltaTime, Space.Self);
-            }
-
-            if (kacisKapagi != null)
-            {
-                // Kapak menteşesi üzerinde 90 derece yana kayarak/açılarak kalkar
-                Vector3 menteşe = new Vector3(3.2f, PrensesKulesiInsaci.ZeminY + 0.08f, 48.2f);
-                kacisKapagi.position = menteşe + new Vector3(0f, Mathf.Sin(_kapakAcilmaOrani * Mathf.PI * 0.5f) * 0.8f, 0f);
-                kacisKapagi.rotation = Quaternion.Euler(-_kapakAcilmaOrani * 85f, 0f, 0f);
-            }
-
-            // Tünelin içindeki su ışığı parlasın
-            if (kapakDeligi != null)
-            {
-                Light tl = kapakDeligi.GetComponentInChildren<Light>();
-                if (tl != null) tl.intensity = _kapakAcilmaOrani * 3.0f;
-            }
-
-            // Düşmanlar temizlendi mi ve kapak açıldı mı kontrol et
-            int hayatta = 0;
-            foreach (var dk in _saldirganlar)
-            {
-                if (dk != null && !dk.IsDead) hayatta++;
-            }
-
-            if (_kapakAcilmaOrani >= 1.0f && hayatta == 0)
-            {
-                KacisiHazirla();
-            }
-        }
-
-        // ==========================================================
-        // 5. AŞAMA: KAÇIŞA HAZIR & TÜNEL ETKİLEŞİMİ
-        // ==========================================================
-        private void KacisiHazirla()
-        {
-            mevcutAsama = Asama.KacisaHazir;
-            if (prenses != null)
-            {
-                prenses.TekerlekCevir(false);
-                // Prenses kapağın kenarına gelsin ve oyuncuyu beklesin
-                prenses.HedefeGit(new Vector3(2.4f, PrensesKulesiInsaci.ZeminY + 0.05f, 47.4f));
-            }
-
-            // Alarm ışıklarını kapat
-            if (alarmIsiklari != null)
-            {
-                foreach (var l in alarmIsiklari)
-                {
-                    if (l != null) l.intensity = 0f;
+                    if (c != null) c.gameObject.SetActive(false);
                 }
             }
 
-            DiyalogGoster("PRENSES AYLİN", "Geçit açık! Bu tünel doğrudan hendek şelalesine ve özgürlüğe açılıyor! Kapağa yaklaş ve [E] ile atla!", 10.0f,
-                new Color(0.35f, 0.95f, 0.55f));
-            SesCal(660f, 0.4f);
-        }
+            // 3. Prenses Betül kapsülden çıkıp oyuncunun yanına gelsin
+            mevcutAsama = Asama.PrensesYaninaGeliyor;
+            DiyalogGoster("PRENSES BETÜL",
+                "Kapsülden kurtuldum! Yanına geliyorum...",
+                3.5f, new Color(0.92f, 0.82f, 1.0f));
 
-        private void GuncelleKacisKontrolu()
-        {
-            if (_oyuncu == null) return;
-            Vector3 kapakPos = new Vector3(3.2f, PrensesKulesiInsaci.ZeminY, 47.4f);
-            float mesafe = Vector3.Distance(_oyuncu.position, kapakPos);
-
-            if (mesafe <= 2.8f)
+            float maksYurumeSuresi = 5.0f;
+            float yurumeGecen = 0f;
+            while (yurumeGecen < maksYurumeSuresi)
             {
-                if (EBasildiMi() || mesafe <= 1.4f)
+                yurumeGecen += Time.deltaTime;
+                if (prenses == null || _oyuncu == null) break;
+
+                Vector3 yatayFark = _oyuncu.position - prenses.transform.position;
+                yatayFark.y = 0f;
+                if (yatayFark.magnitude <= 2.15f)
                 {
-                    ZaferiTetikle();
+                    prenses.Dur();
+                    break;
                 }
+                yield return null;
             }
-        }
 
-        private bool EBasildiMi()
-        {
-#if ENABLE_INPUT_SYSTEM
-            if (Keyboard.current != null && Keyboard.current.eKey.wasPressedThisFrame) return true;
-#endif
-            try
+            // Eğer oyuncu çok uzaktaysa Prenses tam yanına yetişsin
+            if (prenses != null && _oyuncu != null)
             {
-                if (Input.GetKeyDown(KeyCode.E)) return true;
+                Vector3 yatayFark = _oyuncu.position - prenses.transform.position;
+                yatayFark.y = 0f;
+                if (yatayFark.magnitude > 2.6f)
+                {
+                    prenses.Isinla(OyuncuYaniHedefKonumu());
+                }
+                prenses.Dur();
             }
-            catch { }
-            return false;
+
+            // 4. Prenses Betül yanımıza ulaştı -> Bize dönüp teşekkür etsin
+            mevcutAsama = Asama.PrensesTesekkurEdiyor;
+            if (prenses != null)
+            {
+                prenses.TesekkurEt(true);
+            }
+
+            SesCal(740f, 0.35f);
+            DiyalogGoster("PRENSES BETÜL",
+                "Beni o kapsülden kurtardığın için çok teşekkür ederim! Zümrütleri doğru sırayla kırıp hayatımı kurtardın, sana minnettarım!",
+                4.2f, new Color(0.45f, 1.0f, 0.65f));
+
+            yield return new WaitForSeconds(4.0f);
+
+            // 5. Kapanış Ekranı: "GÖREV BAŞARILI"
+            ZaferiTetikle();
         }
 
         // ==========================================================
-        // 6. AŞAMA: ZAFER EKRANI & OPERASYON SONU
+        // FİNAL KAPANIŞ EKRANI ("GÖREV BAŞARILI")
         // ==========================================================
         private void ZaferiTetikle()
         {
@@ -519,21 +385,14 @@ namespace Yazlab.Mekanikler
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
 
-            // BolumYoneticisi zaferini tetikle
-            Yonetim.BolumYoneticisi by = Yonetim.BolumYoneticisi.Ornek;
+            BolumYoneticisi by = BolumYoneticisi.Ornek;
             if (by != null)
             {
-                by.DurumuDegistir(Yonetim.OyunDurumu.BolumTamamlandi);
+                by.DurumuDegistir(OyunDurumu.BolumTamamlandi);
             }
 
-            // Prenses tünele adım atıp kaybolsun
-            if (prenses != null)
-            {
-                prenses.Isinla(new Vector3(3.2f, PrensesKulesiInsaci.ZeminY - 1.2f, 47.4f));
-            }
-
-            SesCal(880f, 0.8f);
-            Debug.Log("[PrensesKurtarma] OPERASYON TAMAMLANDI! Prenses Aylin başarıyla kurtarıldı.");
+            SesCal(880f, 0.7f);
+            Debug.Log("[PrensesKurtarma] GÖREV BAŞARILI! Zümrütler sırasıyla kırıldı, Prenses Betül kapsülden kurtarıldı.");
         }
 
         // ==========================================================
@@ -559,7 +418,7 @@ namespace Yazlab.Mekanikler
                 float env = 1f - (float)i / samples;
                 data[i] = Mathf.Sin(2f * Mathf.PI * frekans * t) * env * 0.28f;
             }
-            AudioClip clip = AudioClip.Create("RunBip", samples, 1, sampleRate, false);
+            AudioClip clip = AudioClip.Create("ZumrutSes", samples, 1, sampleRate, false);
             clip.SetData(data, 0);
             _ses.PlayOneShot(clip);
         }
@@ -573,12 +432,88 @@ namespace Yazlab.Mekanikler
             if (_texKoyu == null)
             {
                 _texKoyu = new Texture2D(1, 1);
-                _texKoyu.SetPixel(0, 0, new Color(0.04f, 0.06f, 0.10f, 0.94f));
+                _texKoyu.SetPixel(0, 0, new Color(0.04f, 0.07f, 0.11f, 0.94f));
                 _texKoyu.Apply();
             }
 
-            // 1. DİYALOG / HEDEF KUTUSU (Ekranın alt ortası)
-            if (Time.time < _altYaziBitis && !string.IsNullOrEmpty(_altYazi))
+            // 1. FİNAL KAPANIŞ EKRANI ("GÖREV BAŞARILI")
+            if (mevcutAsama == Asama.Zafer)
+            {
+                CizGorevBasariliEkrani(olcek);
+                return;
+            }
+
+            // 2. VURULMAMIŞ ZÜMRÜT KRİSTALLERİN ÜZERİNDE RENKLİ HEDEF İŞARETÇİSİ
+            if (mevcutAsama == Asama.ZumrutleriVurmaGorevi && kristaller != null && Camera.main != null)
+            {
+                GUIStyle hedefStil = new GUIStyle(GUI.skin.label)
+                {
+                    fontStyle = FontStyle.Bold,
+                    alignment = TextAnchor.MiddleCenter
+                };
+                GoruntuKalitesiYoneticisi.StiliKeskinlestir(hedefStil, Mathf.RoundToInt(12 * olcek));
+
+                for (int i = 0; i < kristaller.Length; i++)
+                {
+                    RunKristali k = kristaller[i];
+                    if (k == null || k.VurulduMu) continue;
+
+                    Vector3 ustNokta = k.transform.position + Vector3.up * 0.65f;
+                    if (GoruntuKalitesiYoneticisi.DunyaNoktasiniEkranaCevir(Camera.main, ustNokta, out Vector2 scr))
+                    {
+                        float bw = 165f * olcek;
+                        float bh = 26f * olcek;
+                        Rect r = new Rect(scr.x - bw * 0.5f, scr.y - bh * 0.5f, bw, bh);
+                        GUI.DrawTexture(r, _texKoyu);
+                        hedefStil.normal.textColor = RunKristali.RenkAl(k.indeks);
+                        GoruntuKalitesiYoneticisi.KeskinEtiketCiz(r, $"💎 {RunKristali.Adlar[k.indeks]} ZÜMRÜT", hedefStil);
+                    }
+                }
+            }
+
+            // 3. PRENSES BETÜL TEŞEKKÜR EDERKEN BAŞININ ÜZERİNDE KONUŞMA BALONU
+            if (mevcutAsama == Asama.PrensesTesekkurEdiyor && prenses != null && Camera.main != null)
+            {
+                Vector3 tepe = prenses.transform.position + Vector3.up * 2.15f;
+                if (GoruntuKalitesiYoneticisi.DunyaNoktasiniEkranaCevir(Camera.main, tepe, out Vector2 scr))
+                {
+                    float bw = 340f * olcek;
+                    float bh = 44f * olcek;
+                    Rect r = new Rect(
+                        Mathf.Clamp(scr.x - bw * 0.5f, 12f, Screen.width - bw - 12f),
+                        Mathf.Clamp(scr.y - bh * 0.5f, 12f, Screen.height - bh - 12f),
+                        bw, bh);
+                    GUI.DrawTexture(r, _texKoyu);
+
+                    GUIStyle balonStil = new GUIStyle(GUI.skin.label)
+                    {
+                        fontStyle = FontStyle.Bold,
+                        alignment = TextAnchor.MiddleCenter,
+                        wordWrap = true
+                    };
+                    GoruntuKalitesiYoneticisi.StiliKeskinlestir(balonStil, Mathf.RoundToInt(13 * olcek));
+                    balonStil.normal.textColor = new Color(0.45f, 1.0f, 0.65f);
+                    GoruntuKalitesiYoneticisi.KeskinEtiketCiz(r, "👑 Prenses Betül: \"Beni kurtardığın için çok teşekkür ederim!\"", balonStil);
+                }
+            }
+
+            // 4. ALT ORTA DİYALOG / SIRA TALİMATI KUTUSU
+            // Komutanı geçtikten sonra zümrüt vurma aşaması boyunca altta her zaman sıra talimatı veya son geri bildirim görünür
+            string gosterilecekBaslik = _konusan;
+            string gosterilecekMetin = _altYazi;
+            Color gosterilecekRenk = _konusanRenk;
+            bool kutuGoster = Time.time < _altYaziBitis && !string.IsNullOrEmpty(_altYazi);
+
+            if (!kutuGoster && mevcutAsama == Asama.ZumrutleriVurmaGorevi)
+            {
+                kutuGoster = true;
+                string siradaki = RunKristali.Adlar[_hedefSira[Mathf.Clamp(_vurulanAdim, 0, _hedefSira.Length - 1)]];
+                gosterilecekBaslik = "GÖREV — ZÜMRÜTLERİ SIRASIYLA VUR";
+                gosterilecekMetin = $"Sırasıyla KIRMIZI → MAVİ → YEŞİL zümrütü silahınla vur!  (Şu an vurulacak: {_vurulanAdim + 1}. {siradaki})";
+                gosterilecekRenk = new Color(1.0f, 0.88f, 0.30f);
+            }
+
+            if (kutuGoster)
             {
                 GUIStyle baslik = new GUIStyle(GUI.skin.label)
                 {
@@ -586,7 +521,7 @@ namespace Yazlab.Mekanikler
                     alignment = TextAnchor.MiddleCenter
                 };
                 GoruntuKalitesiYoneticisi.StiliKeskinlestir(baslik, Mathf.RoundToInt(13 * olcek));
-                baslik.normal.textColor = _konusanRenk;
+                baslik.normal.textColor = gosterilecekRenk;
 
                 GUIStyle metin = new GUIStyle(GUI.skin.label)
                 {
@@ -597,128 +532,109 @@ namespace Yazlab.Mekanikler
                 GoruntuKalitesiYoneticisi.StiliKeskinlestir(metin, Mathf.RoundToInt(14 * olcek));
                 metin.normal.textColor = Color.white;
 
-                float w = Mathf.Min(Screen.width - 40f, 720f * olcek);
+                float w = Mathf.Min(Screen.width - 40f, 740f * olcek);
                 float icW = w - 24f * olcek;
                 float bH = 20f * olcek;
-                float mH = Mathf.Max(36f * olcek, metin.CalcHeight(new GUIContent(_altYazi), icW) + 6f);
+                float mH = Mathf.Max(36f * olcek, metin.CalcHeight(new GUIContent(gosterilecekMetin), icW) + 6f);
                 float h = bH + mH + 18f * olcek;
                 float x = (Screen.width - w) * 0.5f;
                 float y = Screen.height - h - 56f * olcek;
 
                 GUI.DrawTexture(new Rect(x, y, w, h), _texKoyu);
-                GoruntuKalitesiYoneticisi.KeskinEtiketCiz(new Rect(x + 12f * olcek, y + 6f * olcek, icW, bH), $"◆ {_konusan} ◆", baslik);
-                GoruntuKalitesiYoneticisi.KeskinEtiketCiz(new Rect(x + 12f * olcek, y + 6f * olcek + bH, icW, mH), _altYazi, metin);
-            }
-
-            // 2. KAÇIŞ KAPAĞI YAKININDA [E] İPUCU
-            if (mevcutAsama == Asama.KacisaHazir && _oyuncu != null && Camera.main != null)
-            {
-                Vector3 kapakPos = new Vector3(3.2f, PrensesKulesiInsaci.ZeminY + 0.6f, 47.4f);
-                if (GoruntuKalitesiYoneticisi.DunyaNoktasiniEkranaCevir(Camera.main, kapakPos, out Vector2 scr))
-                {
-                    float bw = 320f * olcek;
-                    float bh = 38f * olcek;
-                    Rect r = new Rect(scr.x - bw * 0.5f, scr.y - bh * 0.5f, bw, bh);
-                    GUI.DrawTexture(r, _texKoyu);
-                    GUIStyle st = new GUIStyle(GUI.skin.label)
-                    {
-                        fontStyle = FontStyle.Bold,
-                        alignment = TextAnchor.MiddleCenter
-                    };
-                    GoruntuKalitesiYoneticisi.StiliKeskinlestir(st, Mathf.RoundToInt(14 * olcek));
-                    st.normal.textColor = new Color(0.35f, 1.0f, 0.55f);
-                    GoruntuKalitesiYoneticisi.KeskinEtiketCiz(r, "🌊 [E] TÜNELE ATLA & PRENSESLE KAÇ!", st);
-                }
-            }
-
-            // 3. FİNAL ZAFER EKRANI (AAA Taktiksel Operasyon Raporu & Epilog)
-            if (mevcutAsama == Asama.Zafer)
-            {
-                CizZaferEkrani(olcek);
+                GoruntuKalitesiYoneticisi.KeskinEtiketCiz(new Rect(x + 12f * olcek, y + 6f * olcek, icW, bH), $"◆ {gosterilecekBaslik} ◆", baslik);
+                GoruntuKalitesiYoneticisi.KeskinEtiketCiz(new Rect(x + 12f * olcek, y + 6f * olcek + bH, icW, mH), gosterilecekMetin, metin);
             }
         }
 
-        private void CizZaferEkrani(float olcek)
+        private void CizGorevBasariliEkrani(float olcek)
         {
             // Karartma arka planı
-            GUI.color = new Color(0f, 0f, 0f, 0.88f);
+            GUI.color = new Color(0f, 0.02f, 0.05f, 0.88f);
             GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), Texture2D.whiteTexture);
             GUI.color = Color.white;
 
-            float panelW = Mathf.Min(Screen.width - 60f, 760f * olcek);
-            float panelH = Mathf.Min(Screen.height - 60f, 540f * olcek);
+            float panelW = Mathf.Min(Screen.width - 60f, 740f * olcek);
+            float panelH = Mathf.Min(Screen.height - 60f, 500f * olcek);
             float px = (Screen.width - panelW) * 0.5f;
             float py = (Screen.height - panelH) * 0.5f;
 
             GUI.DrawTexture(new Rect(px, py, panelW, panelH), _texKoyu);
 
-            // Altın sarısı çerçeve çizgisi
-            Color altin = new Color(1.0f, 0.82f, 0.28f);
-            GUI.color = altin;
-            GUI.DrawTexture(new Rect(px, py, panelW, 3f), Texture2D.whiteTexture);
-            GUI.DrawTexture(new Rect(px, py + panelH - 3f, panelW, 3f), Texture2D.whiteTexture);
+            // Zümrüt yeşili & altın üst-alt çerçeve çizgisi
+            Color zumrut = new Color(0.25f, 0.98f, 0.55f);
+            Color altin = new Color(1.0f, 0.84f, 0.28f);
+            GUI.color = zumrut;
+            GUI.DrawTexture(new Rect(px, py, panelW, 4f), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(px, py + panelH - 4f, panelW, 4f), Texture2D.whiteTexture);
             GUI.color = Color.white;
 
-            GUIStyle baslikStil = new GUIStyle(GUI.skin.label)
+            GUIStyle anaBaslikStil = new GUIStyle(GUI.skin.label)
             {
                 fontStyle = FontStyle.Bold,
                 alignment = TextAnchor.MiddleCenter
             };
-            GoruntuKalitesiYoneticisi.StiliKeskinlestir(baslikStil, Mathf.RoundToInt(22 * olcek));
-            baslikStil.normal.textColor = altin;
+            GoruntuKalitesiYoneticisi.StiliKeskinlestir(anaBaslikStil, Mathf.RoundToInt(28 * olcek));
+            anaBaslikStil.normal.textColor = zumrut;
 
             GUIStyle altBaslik = new GUIStyle(GUI.skin.label)
             {
                 fontStyle = FontStyle.Bold,
                 alignment = TextAnchor.MiddleCenter
             };
-            GoruntuKalitesiYoneticisi.StiliKeskinlestir(altBaslik, Mathf.RoundToInt(13 * olcek));
-            altBaslik.normal.textColor = new Color(0.45f, 0.85f, 1.0f);
+            GoruntuKalitesiYoneticisi.StiliKeskinlestir(altBaslik, Mathf.RoundToInt(14 * olcek));
+            altBaslik.normal.textColor = altin;
 
-            GUIStyle epilogStil = new GUIStyle(GUI.skin.label)
+            GUIStyle ozetStil = new GUIStyle(GUI.skin.label)
             {
+                fontStyle = FontStyle.Bold,
                 wordWrap = true,
                 alignment = TextAnchor.UpperLeft
             };
-            GoruntuKalitesiYoneticisi.StiliKeskinlestir(epilogStil, Mathf.RoundToInt(13 * olcek));
-            epilogStil.normal.textColor = new Color(0.92f, 0.94f, 0.98f);
+            GoruntuKalitesiYoneticisi.StiliKeskinlestir(ozetStil, Mathf.RoundToInt(13 * olcek));
+            ozetStil.normal.textColor = new Color(0.92f, 0.95f, 0.98f);
 
-            float pad = 24f * olcek;
+            float pad = 28f * olcek;
             float icW = panelW - pad * 2f;
-            float cy = py + 20f * olcek;
+            float cy = py + 24f * olcek;
 
-            GoruntuKalitesiYoneticisi.KeskinEtiketCiz(new Rect(px + pad, cy, icW, 32f * olcek),
-                "★ OPERASYON BAŞARIYLA TAMAMLANDI ★", baslikStil);
-            cy += 36f * olcek;
+            GoruntuKalitesiYoneticisi.KeskinEtiketCiz(new Rect(px + pad, cy, icW, 38f * olcek),
+                "★ GÖREV BAŞARILI ★", anaBaslikStil);
+            cy += 42f * olcek;
 
-            GoruntuKalitesiYoneticisi.KeskinEtiketCiz(new Rect(px + pad, cy, icW, 22f * olcek),
-                "KOCAELİ ÜNİVERSİTESİ YAZLAB-I PROJE 1 — TAKTİKSEL İSTİHBARAT OPERASYONU", altBaslik);
-            cy += 32f * olcek;
+            GoruntuKalitesiYoneticisi.KeskinEtiketCiz(new Rect(px + pad, cy, icW, 24f * olcek),
+                "PRENSES BETÜL KAPSÜLDEN KURTARILDI & OPERASYON TAMAMLANDI", altBaslik);
+            cy += 34f * olcek;
 
             string epilog =
-                "Kraliyet Baş İstihbarat Ajanı \"Beyaz Kuzgun\" — Prenses Aylin, Komutan Varg'ın elindeki kadim Rün Mührü'nden " +
-                "başarıyla kurtarıldı.\n\n" +
+                "Prenses Betül (\"Beyaz Kuzgun\"): \"Beni o kapsülden kurtardığın için çok teşekkür ederim! Silahınla Kırmızı, Mavi ve Yeşil zümrütleri doğru sırayla kırıp bana özgürlüğümü geri verdin.\"\n\n" +
                 "TAMAMLANAN GÖREV ADIMLARI:\n" +
-                "  ✓ 1. BÖLÜM: Hendek Kanyonu & Yoldaş ile Eşzamanlı 2 Anahtarlı Askı Kapı ([G] + [E])\n" +
-                "  ✓ 2. BÖLÜM: Bağımsız Kablo Odası Şalter Bulmacası & Otomatik Savunma Tareti\n" +
-                "  ✓ 3. BÖLÜM: Çok Katlı İç Kule & Ollama Yerel LLM Muhafız Müzakeresi\n" +
-                "  ✓ 4. BÖLÜM (FİNAL): Kızıl Kule Kehanet Küresi Rün Bulmacası & Prenses Aylin'in Hendek Su Tünelinden Tahliyesi\n\n" +
-                "Prenses Aylin ve Yoldaş Ajan hendek şelalesinin altındaki gizli geçitten güvenli bölgeye ulaştı. Görev başarıyla sonuçlandı!";
+                "  ✓ 1. BÖLÜM: Hendek Kanyonu & Eşzamanlı 2 Anahtarlı Askı Kapı ([G] + [E])\n" +
+                "  ✓ 2. BÖLÜM: Kablo Odası Elektrik Şalteri Bulmacası & Otomatik Savunma Tareti\n" +
+                "  ✓ 3. BÖLÜM: İç Kule Muhafızı (Ollama Yerel LLM) Müzakeresi & Çıkış Kapısı\n" +
+                "  ✓ 4. BÖLÜM (FİNAL): Kırmızı → Mavi → Yeşil Zümrütlerin Vurulması & Prenses Betül'ün Kurtarılması\n\n" +
+                "Tebrikler! Tüm engelleri aşarak oyunu başarıyla tamamladınız.";
 
-            GoruntuKalitesiYoneticisi.KeskinEtiketCiz(new Rect(px + pad, cy, icW, 240f * olcek), epilog, epilogStil);
-            cy += 255f * olcek;
+            GoruntuKalitesiYoneticisi.KeskinEtiketCiz(new Rect(px + pad, cy, icW, 230f * olcek), epilog, ozetStil);
+            cy += 245f * olcek;
 
-            // Butonlar: Tekrar Oyna & Oyundan Çık
-            float btnW = 180f * olcek;
-            float btnH = 42f * olcek;
-            float bx1 = px + panelW * 0.5f - btnW - 12f * olcek;
-            float bx2 = px + panelW * 0.5f + 12f * olcek;
+            // Butonlar: Yeniden Oyna & Oyundan Çık
+            GUIStyle butonStil = new GUIStyle(GUI.skin.button)
+            {
+                fontStyle = FontStyle.Bold,
+                alignment = TextAnchor.MiddleCenter
+            };
+            GoruntuKalitesiYoneticisi.StiliKeskinlestir(butonStil, Mathf.RoundToInt(14 * olcek));
 
-            if (GUI.Button(new Rect(bx1, cy, btnW, btnH), "YENİDEN OYNA"))
+            float btnW = 190f * olcek;
+            float btnH = 44f * olcek;
+            float bx1 = px + panelW * 0.5f - btnW - 14f * olcek;
+            float bx2 = px + panelW * 0.5f + 14f * olcek;
+
+            if (GUI.Button(new Rect(bx1, cy, btnW, btnH), "YENİDEN OYNA", butonStil))
             {
                 SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
             }
-            if (GUI.Button(new Rect(bx2, cy, btnW, btnH), "OYUNDAN ÇIK"))
+            if (GUI.Button(new Rect(bx2, cy, btnW, btnH), "OYUNDAN ÇIK", butonStil))
             {
 #if UNITY_EDITOR
                 UnityEditor.EditorApplication.isPlaying = false;

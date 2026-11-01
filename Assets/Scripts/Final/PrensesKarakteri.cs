@@ -3,27 +3,28 @@ using UnityEngine;
 namespace Yazlab.Mekanikler
 {
     /// <summary>
-    /// Prenses Aylin — "Beyaz Kuzgun" kod adlı kraliyet casusu.
+    /// Prenses Betül — "Beyaz Kuzgun" kod adlı kraliyet casusu.
     /// Kalenin prosedürel/primitif sanat tarzına uygun olarak çalışma zamanında parçalardan oluşturulur
-    /// (çan etekli elbise, pelerin, uzun saç, altın taç). Nefes alma / endişeli bekleme animasyonu yapar
-    /// ve görev yöneticisinin verdiği hedef noktaya yürüyerek gider.
+    /// (çan etekli elbise, pelerin, uzun saç, altın taç). Kapsülden kurtarıldığında oyuncunun
+    /// yanına yürüyerek gelir ve teşekkür animasyonu yapar.
     /// </summary>
     public class PrensesKarakteri : MonoBehaviour
     {
-        public float yurumeHizi = 3.4f;
-        public Transform govde;      // Nefes alma animasyonu için üst gövde kökü
+        public float yurumeHizi = 3.8f;
+        public Transform govde;      // Nefes alma ve selam verme animasyonu için üst gövde kökü
         public Transform pelerin;
         public Transform solKol, sagKol;
 
         private Vector3? _hedef;
         private bool _tekerlekCeviriyor;
+        private bool _tesekkurEdiyor;
         private float _yurumeFazi;
 
         public bool HedefeUlasti => !_hedef.HasValue;
 
         public static PrensesKarakteri Olustur(Transform parent, Vector3 konum)
         {
-            GameObject kok = new GameObject("Prenses_Aylin");
+            GameObject kok = new GameObject("Prenses_Betul");
             kok.transform.SetParent(parent);
             kok.transform.position = konum;
             kok.transform.rotation = Quaternion.Euler(0f, 180f, 0f);
@@ -67,7 +68,7 @@ namespace Yazlab.Mekanikler
                     new Vector3(0.035f, 0.08f, 0.035f), altin);
             }
             Parca(PrimitiveType.Sphere, "Tac_Mucevher", g, new Vector3(0f, 0.93f, 0.105f), Vector3.one * 0.045f,
-                PrensesKulesiInsaci.ParlakMateryal(new Color(0.85f, 0.95f, 1f, 1f)));
+                PrensesKulesiInsaci.ParlakMateryal(new Color(0.25f, 1.0f, 0.55f, 1f)));
 
             // Kollar
             GameObject sol = Parca(PrimitiveType.Capsule, "Kol_Sol", g, new Vector3(-0.24f, 0.22f, 0f), new Vector3(0.09f, 0.22f, 0.09f), elbise);
@@ -76,12 +77,6 @@ namespace Yazlab.Mekanikler
             // Pelerin (Beyaz Kuzgun'un gece mavisi pelerini)
             GameObject pel = Parca(PrimitiveType.Cube, "Pelerin", g, new Vector3(0f, 0.05f, -0.2f), new Vector3(0.46f, 0.85f, 0.03f), pelerinMat);
             pel.transform.localRotation = Quaternion.Euler(-8f, 0f, 0f);
-
-            // Çarpışma: mermiler ve oyuncu için tek kapsül
-            CapsuleCollider cc = kok.AddComponent<CapsuleCollider>();
-            cc.center = new Vector3(0f, 0.85f, 0f);
-            cc.height = 1.75f;
-            cc.radius = 0.35f;
 
             PrensesKarakteri pk = kok.AddComponent<PrensesKarakteri>();
             pk.govde = g;
@@ -107,6 +102,12 @@ namespace Yazlab.Mekanikler
         {
             _hedef = nokta;
             _tekerlekCeviriyor = false;
+            _tesekkurEdiyor = false;
+        }
+
+        public void Dur()
+        {
+            _hedef = null;
         }
 
         public void Isinla(Vector3 nokta)
@@ -120,13 +121,23 @@ namespace Yazlab.Mekanikler
             _tekerlekCeviriyor = aktif;
         }
 
+        public void TesekkurEt(bool aktif)
+        {
+            _tesekkurEdiyor = aktif;
+            if (aktif)
+            {
+                _hedef = null;
+                _tekerlekCeviriyor = false;
+            }
+        }
+
         public void BakisYonu(Vector3 dunyaNoktasi)
         {
             Vector3 yon = dunyaNoktasi - transform.position;
             yon.y = 0f;
             if (yon.sqrMagnitude > 0.01f)
             {
-                transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(yon), Time.deltaTime * 6f);
+                transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(yon), Time.deltaTime * 8f);
             }
         }
 
@@ -139,7 +150,7 @@ namespace Yazlab.Mekanikler
             {
                 Vector3 hedef = _hedef.Value;
                 Vector3 duz = new Vector3(hedef.x - transform.position.x, 0f, hedef.z - transform.position.z);
-                if (duz.magnitude < 0.12f)
+                if (duz.magnitude < 0.14f)
                 {
                     _hedef = null;
                 }
@@ -148,25 +159,33 @@ namespace Yazlab.Mekanikler
                     yuruyor = true;
                     Vector3 adim = duz.normalized * Mathf.Min(yurumeHizi * Time.deltaTime, duz.magnitude);
                     Vector3 yeni = transform.position + adim;
-                    yeni.y = ZeminYuksekligi(yeni, transform.position.y);
+                    yeni.y = ZeminYuksekligi(yeni, PrensesKulesiInsaci.ZeminY);
                     transform.position = yeni;
                     transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(duz), Time.deltaTime * 10f);
                 }
             }
 
-            // Nefes alma, yürüme sallanması ve tekerlek çevirme kol hareketi
+            // Nefes alma, yürüme sallanması ve teşekkür selamı
             if (govde != null)
             {
-                _yurumeFazi += Time.deltaTime * (yuruyor ? 9f : 0f);
+                _yurumeFazi += Time.deltaTime * (yuruyor ? 9.5f : 0f);
                 float nefes = Mathf.Sin(t * 2.2f) * 0.012f;
                 float zipla = yuruyor ? Mathf.Abs(Mathf.Sin(_yurumeFazi)) * 0.05f : 0f;
+                float egilme = _tesekkurEdiyor ? (Mathf.Sin(t * 3.0f) * 0.5f + 0.5f) * 10f : (yuruyor ? 6f : 0f);
                 govde.localPosition = new Vector3(0f, 0.9f + nefes + zipla, 0f);
-                govde.localRotation = Quaternion.Euler(yuruyor ? 6f : 0f, 0f, yuruyor ? Mathf.Sin(_yurumeFazi) * 3f : 0f);
+                govde.localRotation = Quaternion.Euler(egilme, 0f, yuruyor ? Mathf.Sin(_yurumeFazi) * 3f : 0f);
             }
 
             if (solKol != null && sagKol != null)
             {
-                if (_tekerlekCeviriyor)
+                if (_tesekkurEdiyor)
+                {
+                    // Sevinç ve minnetle el sallama / kalbine götürme hareketi
+                    float s = Mathf.Sin(t * 5.5f) * 18f;
+                    solKol.localRotation = Quaternion.Euler(-55f, 0f, -20f);
+                    sagKol.localRotation = Quaternion.Euler(-115f + s, 0f, 18f);
+                }
+                else if (_tekerlekCeviriyor)
                 {
                     float c = Mathf.Sin(t * 5f) * 35f;
                     solKol.localRotation = Quaternion.Euler(-70f + c, 0f, 10f);
@@ -174,13 +193,13 @@ namespace Yazlab.Mekanikler
                 }
                 else if (yuruyor)
                 {
-                    float s = Mathf.Sin(_yurumeFazi) * 25f;
+                    float s = Mathf.Sin(_yurumeFazi) * 26f;
                     solKol.localRotation = Quaternion.Euler(s, 0f, 8f);
                     sagKol.localRotation = Quaternion.Euler(-s, 0f, -8f);
                 }
                 else
                 {
-                    // Endişeyle ellerini birleştirme
+                    // Kapsülde beklerken ellerini birleştirme
                     float e = Mathf.Sin(t * 1.4f) * 4f;
                     solKol.localRotation = Quaternion.Euler(-35f + e, 0f, -22f);
                     sagKol.localRotation = Quaternion.Euler(-35f + e, 0f, 22f);
@@ -195,14 +214,18 @@ namespace Yazlab.Mekanikler
 
         private float ZeminYuksekligi(Vector3 p, float varsayilan)
         {
-            RaycastHit[] vuruslar = Physics.RaycastAll(p + Vector3.up * 1.2f, Vector3.down, 3.5f, ~0, QueryTriggerInteraction.Ignore);
+            RaycastHit[] vuruslar = Physics.RaycastAll(p + Vector3.up * 1.5f, Vector3.down, 3.8f, ~0, QueryTriggerInteraction.Ignore);
             float enYuksek = float.MinValue;
             foreach (var h in vuruslar)
             {
+                if (h.collider == null || h.collider.isTrigger) continue;
                 if (h.collider.transform.IsChildOf(transform)) continue;
                 if (h.collider.GetComponentInParent<CharacterController>() != null) continue;
                 if (h.collider.GetComponentInParent<Animator>() != null) continue;
-                if (h.point.y > enYuksek) enYuksek = h.point.y;
+                if (h.point.y > enYuksek && h.point.y <= PrensesKulesiInsaci.ZeminY + 0.45f)
+                {
+                    enYuksek = h.point.y;
+                }
             }
             return enYuksek > float.MinValue ? enYuksek : varsayilan;
         }

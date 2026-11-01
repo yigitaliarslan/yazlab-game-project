@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using UnityEngine;
 using UnityEngine.Events;
 #if ENABLE_INPUT_SYSTEM
@@ -70,7 +70,7 @@ namespace Yazlab.Yonetim
                 salterMekanizmasi.onSalterIndirildi.AddListener(FizikselEngeliAs);
             }
 
-            // Çıkış kapısı açıldığında oyunu tamamla
+            // Çıkış kapısı açıldığında 4. Bölüm (Zümrütleri vurma ve Prensesi kurtarma) görevini başlat
             if (npsCikisKapisi != null)
             {
                 npsCikisKapisi.onKapiAcildi.AddListener(KizilKuleGoreviniBaslat);
@@ -79,7 +79,7 @@ namespace Yazlab.Yonetim
 
         private void Update()
         {
-            if (OllamaNpcDiyalogUI.DiyalogAcikMi) return;
+            if (OllamaNpcDiyalogUI.DiyalogAcikMi || PrensesKurtarmaGorevi.OyunBittiMi) return;
 
             ReferanslariKontrolEt();
 
@@ -196,7 +196,18 @@ namespace Yazlab.Yonetim
         /// <summary>
         /// Oyuncu NPC Muhafız ile konuşup çok aşamalı müzakere sonunda kapıyı açtırır.
         /// </summary>
-        public void KizilKuleGoreviniBaslat() { if (mevcutDurum == OyunDurumu.PrensesKurtarma || mevcutDurum == OyunDurumu.BolumTamamlandi) return; DurumuDegistir(OyunDurumu.PrensesKurtarma); Debug.Log("[BolumYoneticisi] 4. Bolum: Kizil Kule'ye gecit acildi, Prenses Aylin'i kurtarin!"); }
+        public void KizilKuleGoreviniBaslat()
+        {
+            if (mevcutDurum == OyunDurumu.PrensesKurtarma || mevcutDurum == OyunDurumu.BolumTamamlandi) return;
+            DurumuDegistir(OyunDurumu.PrensesKurtarma);
+            npcDiyalog = "";
+            diyalogBitisZamani = 0f;
+            if (PrensesKurtarmaGorevi.Ornek != null)
+            {
+                PrensesKurtarmaGorevi.Ornek.GoreviBaslat();
+            }
+            Debug.Log("[BolumYoneticisi] 4. Bölüm: Kızıl Kule'ye geçit açıldı, Zümrütleri sırasıyla (Kırmızı -> Mavi -> Yeşil) vurarak Prenses Betül'ü kurtarın!");
+        }
 
         public void MuhafizlaGorusVeKapisiAc()
         {
@@ -206,8 +217,7 @@ namespace Yazlab.Yonetim
                 npsCikisKapisi.KapiyiAc();
             }
 
-            npcDiyalog = "Komutan Varg: 'Pekala, kanıtların ve teklifin geçerli! Kapıyı açıyorum, kimseye görünmeden hızlıca çıkışa ilerle!'";
-            diyalogBitisZamani = Time.time + 7.0f;
+            KizilKuleGoreviniBaslat();
             Debug.Log("[BolumYoneticisi] NPC Muhafız (Ollama LLM) ikna edildi! Çıkış kapısı açılıyor.");
         }
 
@@ -256,8 +266,7 @@ namespace Yazlab.Yonetim
                 npsCikisKapisi.KapiyiAc();
             }
 
-            npcDiyalog = "✓ Muhafız etkisiz hale getirildi ve üzerindeki anahtarla çıkış kapısı açıldı!";
-            diyalogBitisZamani = Time.time + 7.0f;
+            KizilKuleGoreviniBaslat();
         }
 
         /// <summary>
@@ -269,14 +278,14 @@ namespace Yazlab.Yonetim
 
             DurumuDegistir(OyunDurumu.BolumTamamlandi);
             onOyunTamamlandi?.Invoke();
-            npcDiyalog = "OPERASYON BAŞARILI! BÖLÜM VE TÜM ENGELLER TAMAMLANDI!";
+            npcDiyalog = "GÖREV BAŞARILI! BÖLÜM VE TÜM ENGELLER TAMAMLANDI!";
             diyalogBitisZamani = Time.time + 15.0f;
             Debug.Log("[BolumYoneticisi] TEBRİKLER! Operasyon başarıyla tamamlandı.");
         }
 
         private void OnGUI()
         {
-            if (KapiBulmacaPaneli.MinigameAcik || OllamaNpcDiyalogUI.DiyalogAcikMi) return;
+            if (KapiBulmacaPaneli.MinigameAcik || OllamaNpcDiyalogUI.DiyalogAcikMi || PrensesKurtarmaGorevi.OyunBittiMi) return;
 
             float olcek = GoruntuKalitesiYoneticisi.KeskinOlcek;
 
@@ -288,7 +297,7 @@ namespace Yazlab.Yonetim
             }
 
             // Muhafızın yakınına gelindiğinde başının üzerinde "[E] MUHAFIZ İLE KONUŞ (OLLAMA LLM)" ipucu göster
-            if (!_muhafizSaldirganMi && _oyuncuTransform != null && _npcTransform != null && mevcutDurum != OyunDurumu.BolumTamamlandi)
+            if (!_muhafizSaldirganMi && _oyuncuTransform != null && _npcTransform != null && mevcutDurum != OyunDurumu.PrensesKurtarma && mevcutDurum != OyunDurumu.BolumTamamlandi)
             {
                 float npcMesafe = Vector3.Distance(_oyuncuTransform.position, _npcTransform.position);
                 if (npcMesafe <= 4.8f && Camera.main != null)
@@ -345,21 +354,23 @@ namespace Yazlab.Yonetim
                     gorevDetay = "• 1. Bölüm: [G] + [E] ile Askı Kapıyı indirip hendeği geçin.\n• 2. Bölüm: Kablo Odasındaki şalteri açın ve Tareti aşın.";
                     break;
                 case OyunDurumu.FizikselEngelAlaninda:
-                    gorevDetay = "• Kablo Odasındaki elektrik şalteri bulmacasını çözün veya\n• Doğu koridorundaki yedek jeneratör şalterini indirin.";
+                    gorevDetay = "• 2. Bölüm: Avludaki Otomatik Savunma Taretini imha edin veya\n• Doğu koridorundaki yedek jeneratör şalterini indirin.";
                     break;
                 case OyunDurumu.FizikselEngelAsildi:
                     gorevDetay = "• 3. Bölüm: İç Kule merdiven holünden 2. kata çıkın.\n• Nöbetçi Muhafızın koruduğu çıkış odasına ilerleyin.";
                     break;
                 case OyunDurumu.SosyalEngelAlaninda:
-                    gorevDetay = "• [E] Muhafiz Komutan Varg ile konusup kapiyi actirin.\n• Ipucu: Gece parolasi 'Kizil Sahin' + Baskan emri / 500+ altin.";
+                    gorevDetay = "• [E] Muhafız Komutan Varg ile konuşup kapıyı açtırın.\n• İpucu: Gece parolası 'Kızıl Şahin' + Başkan emri / 500+ altın.";
                     break;
                 case OyunDurumu.PrensesKurtarma:
-                    gorevBaslik = "4. BOLUM (FINAL) — PRENSESI KURTAR:";
-                    gorevDetay = "• Kizil Kule'ye girin ve tutsak Prenses Aylin'e ulasin.\n• Kehanet Kuresi'nin run dizilimini vurup kacis tunelini acin.";
+                    int vurulan = PrensesKurtarmaGorevi.Ornek != null ? PrensesKurtarmaGorevi.Ornek.VurulanZumrutSayisi : 0;
+                    int toplam = PrensesKurtarmaGorevi.Ornek != null ? PrensesKurtarmaGorevi.Ornek.ToplamZumrutSayisi : 3;
+                    gorevBaslik = "4. BÖLÜM (FİNAL) — ZÜMRÜTLERİ SIRASIYLA VUR:";
+                    gorevDetay = $"• Silahınızla sırasıyla 1. KIRMIZI → 2. MAVİ → 3. YEŞİL zümrütü vurun ({vurulan}/{toplam}).\n• Sırasıyla vurduğunuzda Prenses Betül kapsülden kurtulacaktır.";
                     break;
                 case OyunDurumu.BolumTamamlandi:
-                    gorevBaslik = "✓ GÖREV TAMAMLANDI!";
-                    gorevDetay = "• Tebrikler! Tüm taktiksel ve sosyal engeller aşıldı.\n• Operasyon başarıyla sona erdi.";
+                    gorevBaslik = "✓ GÖREV BAŞARILI!";
+                    gorevDetay = "• Tebrikler! Tüm zümrütler vuruldu ve Prenses Betül kurtarıldı.\n• Operasyon başarıyla sona erdi.";
                     break;
             }
 
@@ -380,7 +391,7 @@ namespace Yazlab.Yonetim
             GoruntuKalitesiYoneticisi.KeskinEtiketCiz(new Rect(x + padX, y + 8f * olcek + baslikH + 2f, icW, detayH), gorevDetay, aciklamaStil);
 
             // 2. ORTA ALT: MUHAFIZ DİYALOG / BİLDİRİM KUTUSU
-            if (Time.time < diyalogBitisZamani && !string.IsNullOrEmpty(npcDiyalog))
+            if (mevcutDurum != OyunDurumu.PrensesKurtarma && Time.time < diyalogBitisZamani && !string.IsNullOrEmpty(npcDiyalog))
             {
                 GUIStyle dStil = new GUIStyle(GUI.skin.label)
                 {
