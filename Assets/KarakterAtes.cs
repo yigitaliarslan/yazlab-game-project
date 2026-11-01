@@ -387,23 +387,22 @@ public class KarakterAtes : MonoBehaviour
                 rb.AddForceAtPosition(kameraRay.direction * vurusKuvveti, hit.point, ForceMode.Impulse);
             }
 
-            DusmanKontrol dusman = hit.collider.GetComponentInParent<DusmanKontrol>();
-            if (dusman == null && (hit.collider.name == "NPC_Muhafiz" || (hit.collider.transform.parent != null && hit.collider.transform.parent.name == "NPC_Muhafiz")))
-            {
-                if (Yazlab.Yonetim.BolumYoneticisi.Ornek != null)
-                {
-                    Yazlab.Yonetim.BolumYoneticisi.Ornek.MuhafizSavasBaslat();
-                    dusman = hit.collider.GetComponentInParent<DusmanKontrol>();
-                }
-            }
+            // Muhafız Komutan Varg (NPC_Muhafiz) sadece Ollama LLM diyaloğu içindir; silahla vurulamaz ve ölmez
+            bool muhafizMi = hit.collider.name == "NPC_Muhafiz" ||
+                             (hit.collider.transform.parent != null && hit.collider.transform.parent.name == "NPC_Muhafiz") ||
+                             hit.collider.transform.root.name == "NPC_Muhafiz";
 
-            if (dusman != null)
+            if (!muhafizMi)
             {
-                dusman.HasarAl(25f);
-            }
-            else
-            {
-                hit.collider.SendMessageUpwards("HasarAl", 25f, SendMessageOptions.DontRequireReceiver);
+                DusmanKontrol dusman = hit.collider.GetComponentInParent<DusmanKontrol>();
+                if (dusman != null)
+                {
+                    dusman.HasarAl(25f);
+                }
+                else
+                {
+                    hit.collider.SendMessageUpwards("HasarAl", 25f, SendMessageOptions.DontRequireReceiver);
+                }
             }
 
             CarpmaEfektiGoster(hit.point, hit.normal);
