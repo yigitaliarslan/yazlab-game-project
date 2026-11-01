@@ -116,7 +116,9 @@ namespace Yazlab.Mekanikler
                 if (_cc == null) _cc = _oyuncu.GetComponent<CharacterController>();
                 if (_cc != null) _cc.enabled = false;
 
-                _oyuncu.position = yenidenDogusKonumu;
+                // Köprü zaten açıksa oyuncuyu hemen açık köprünün önüne, kapalıysa başlangıç kampına doğur
+                Vector3 hedefDogus = AsmaKopruKontrol.KopruAcikMi ? new Vector3(0f, 0.15f, -15.5f) : yenidenDogusKonumu;
+                _oyuncu.position = hedefDogus;
                 _oyuncu.rotation = Quaternion.identity;
 
                 if (_cc != null) _cc.enabled = true;
