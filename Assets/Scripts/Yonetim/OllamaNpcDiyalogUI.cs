@@ -105,6 +105,7 @@ namespace Yazlab.Yonetim
 
         public void DiyalogPenceresiniKapat()
         {
+            CancelInvoke(nameof(DiyalogPenceresiniKapat));
             DiyalogAcikMi = false;
             Cursor.lockState = CursorLockMode.Locked;
             Cursor.visible = false;
@@ -207,15 +208,16 @@ namespace Yazlab.Yonetim
             });
             _kaydirmaPozisyonu.y = float.MaxValue;
 
-            // DURUM 1: SAVAŞ TETİKLENDİ (Oyuncu muhafızı kızdırdı, tehdit etti veya güven sıfırlandı)
+            // DURUM 1: OYUNCU MUHAFIZI KIZDIRDI (Muhafız vurulmaz/ölmez; güven düşer ve LLM ile ikna edilmesi gerekir)
             if (karar.savasTetikle || _mevcutGuvenSkoru <= 10)
             {
-                _savasBasladi = true;
+                _mevcutGuvenSkoru = 15;
+                _basariliIknaAdimi = 0;
                 _sohbetKayitlari.Add(new SohbetSatiri
                 {
-                    konusan = "⚔️ ALARM - ÇATIŞMA TETİKLENDİ!",
-                    mesaj = "Muhafız Komutan Varg ikna olmadı ve düşmanca tavrınız yüzünden silahına sarıldı! Onu etkisiz hale getirerek kapı kilidini kırın!",
-                    etiketBilgisi = "[Oyun Durumu Değişti: NPC Muhafız -> Saldırgan Düşman]",
+                    konusan = "⚠️ KOMUTAN VARG SERTÇE REDDETTİ!",
+                    mesaj = "Komutan Varg tehdit ve hakaretlerinize öfkelendi! Ona silah işlemez; kapıyı açtırmak için parolayı ('Kızıl Şahin') ve Başkomutanın emrini söyleyerek onu ikna etmelisiniz!",
+                    etiketBilgisi = "[Güven %15'e düştü — Devam etmek için ikna edici bir argüman yazın]",
                     oyuncuMu = false,
                     hataMi = true
                 });
@@ -225,8 +227,6 @@ namespace Yazlab.Yonetim
                 {
                     BolumYoneticisi.Ornek.MuhafizSavasBaslat();
                 }
-
-                Invoke(nameof(DiyalogPenceresiniKapat), 2.5f);
                 return;
             }
 

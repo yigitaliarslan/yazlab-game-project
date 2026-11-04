@@ -191,7 +191,6 @@ namespace Yazlab.Yonetim
         }
 
         private bool _muhafizSaldirganMi = false;
-        private DusmanKontrol _muhafizDusmanBileseni;
 
         /// <summary>
         /// Oyuncu NPC Muhafız ile konuşup çok aşamalı müzakere sonunda kapıyı açtırır.
@@ -222,51 +221,24 @@ namespace Yazlab.Yonetim
         }
 
         /// <summary>
-        /// YazLab-I Proje İsterleri (Bölüm 3.2): Oyuncu LLM diyaloğunda muhafızı kızdırır veya tehdit ederse
-        /// yapılandırılmış JSON çıktısındaki 'savasTetikle: true' verisiyle muhafız düşmana dönüşür ve savaş başlar!
-        /// Muhafız etkisiz hale getirildiğinde üzerinden düşen anahtarla çıkış kapısı açılır.
+        /// Oyuncu LLM diyaloğunda muhafızı kızdırırsa muhafız ölmez/vurulamaz;
+        /// oyuncuyu sertçe uyarır ve kapıyı açmak için tekrar LLM ile ikna edilmeyi bekler.
         /// </summary>
         public void MuhafizSavasBaslat()
         {
-            if (_muhafizSaldirganMi) return;
-            _muhafizSaldirganMi = true;
-
             ReferanslariKontrolEt();
             if (_npcTransform != null)
             {
-                _muhafizDusmanBileseni = _npcTransform.GetComponent<DusmanKontrol>();
-                if (_muhafizDusmanBileseni == null)
+                DusmanKontrol mevcutDk = _npcTransform.GetComponent<DusmanKontrol>();
+                if (mevcutDk != null)
                 {
-                    _muhafizDusmanBileseni = _npcTransform.gameObject.AddComponent<DusmanKontrol>();
+                    Destroy(mevcutDk);
                 }
-                _muhafizDusmanBileseni.maksimumCan = 120f;
-                _muhafizDusmanBileseni.mevcutCan = 120f;
-                _muhafizDusmanBileseni.atesHasari = 6f;
-                _muhafizDusmanBileseni.atesAraligi = 1.1f;
-                _muhafizDusmanBileseni.RengiUygula();
-                StartCoroutine(MuhafizOlumunuIzle());
             }
 
-            npcDiyalog = "⚔️ Komutan Varg: 'Bana hakaret etmenin bedelini canınla ödeyeceksin! Silah başına!' (Muhafızı etkisiz hale getirip kapıyı açın!)";
-            diyalogBitisZamani = Time.time + 8.0f;
-            Debug.Log("[BolumYoneticisi] LLM JSON kararı ile SAVAŞ TETİKLENDİ! NPC Muhafız saldırıya geçti.");
-        }
-
-        private System.Collections.IEnumerator MuhafizOlumunuIzle()
-        {
-            while (_muhafizDusmanBileseni != null && !_muhafizDusmanBileseni.IsDead)
-            {
-                yield return new WaitForSeconds(0.25f);
-            }
-
-            // Muhafız öldürüldüğünde kapı kilidi kırılır ve çıkış açılır
-            if (npsCikisKapisi != null)
-            {
-                npsCikisKapisi.KilidiAc();
-                npsCikisKapisi.KapiyiAc();
-            }
-
-            KizilKuleGoreviniBaslat();
+            npcDiyalog = "🛡️ Komutan Varg: 'Bana hakaret ve tehdit sökmez asker! [E] ile tekrar konuşup gece parolasını ('Kızıl Şahin') ve emri düzgünce söyle!'";
+            diyalogBitisZamani = Time.time + 7.0f;
+            Debug.Log("[BolumYoneticisi] Komutan Varg tehditleri reddetti; geçmek için Ollama LLM diyaloğu ile ikna edilmeli.");
         }
 
         /// <summary>

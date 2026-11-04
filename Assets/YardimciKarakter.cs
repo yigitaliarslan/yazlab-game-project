@@ -177,6 +177,12 @@ public class YardimciKarakter : MonoBehaviour
 
     void Update()
     {
+        if (Yazlab.Mekanikler.KapiBulmacaPaneli.MinigameAcik || Yazlab.Yonetim.OllamaNpcDiyalogUI.DiyalogAcikMi || Yazlab.Mekanikler.PrensesKurtarmaGorevi.OyunBittiMi)
+        {
+            HareketAnimasyonuGuncelle(false);
+            return;
+        }
+
         HedefiBul();
 
         // 1. Co-op Görev Noktası Hareketi (Öncelikli - Asma Köprü Anahtarı vb.)
@@ -229,8 +235,9 @@ public class YardimciKarakter : MonoBehaviour
             noktaFark.y = 0f;
             float noktaMesafe = noktaFark.magnitude;
 
-            // Oyuncu henüz hendeğin güneyindeyse (-13.5'in gerisinde) yardımcı da suya girmesin
-            bool oyuncuHendekGuneyinde = hedef.position.z < -13.5f && transform.position.z < -13.5f;
+            // Oyuncu henüz hendeğin güneyindeyse veya köprü kapalıysa yardımcı da suya girmesin
+            bool kopruKapali = !Yazlab.Mekanikler.AsmaKopruKontrol.KopruAcikMi;
+            bool oyuncuHendekGuneyinde = (hedef.position.z < -13.5f || kopruKapali) && transform.position.z < -13.5f;
             if (oyuncuHendekGuneyinde && arzuEdilenNokta.z > -14.4f)
             {
                 arzuEdilenNokta.z = -14.6f;
@@ -239,10 +246,33 @@ public class YardimciKarakter : MonoBehaviour
                 noktaMesafe = noktaFark.magnitude;
             }
 
-            // Eğer yardımcı karakter çok geride kaldıysa veya bir yere takıldıysa oyuncunun yanına ışınla
-            if (oyuncuMesafe > 13.5f && !oyuncuHendekGuneyinde)
+            // Köprü açıksa ve yardımcı karakter hendeğin güneyinden kuzeyine geçecekse,
+            // yandan (suyun üstünden) yürümemesi için önce köprü girişine/ortasına (X: -1.1 .. +1.1) hizalanmasını sağla
+            if (!kopruKapali && transform.position.z < -7.8f && hedef.position.z > -14.2f)
             {
-                Vector3 kurtarmaKonumu = hedef.position - hedef.forward * 2.0f + hedef.right * 1.0f;
+                if (transform.position.z < -14.1f && Mathf.Abs(transform.position.x) > 1.35f)
+                {
+                    // Henüz köprüye girmediyse ve sağda/solda açıktaysa önce köprü ağzına gel
+                    arzuEdilenNokta = new Vector3(Mathf.Clamp(transform.position.x, -0.9f, 0.9f), hedef.position.y, -14.4f);
+                }
+                else
+                {
+                    // Köprü üzerindeyken hedef X noktasını köprü genişliği (-1.1 .. +1.1) içinde tut
+                    arzuEdilenNokta.x = Mathf.Clamp(arzuEdilenNokta.x, -1.1f, 1.1f);
+                }
+                noktaFark = arzuEdilenNokta - transform.position;
+                noktaFark.y = 0f;
+                noktaMesafe = noktaFark.magnitude;
+            }
+
+            // Eğer yardımcı karakter çok geride kaldıysa veya bir yere takıldıysa oyuncunun yanına ışınla
+            if (oyuncuMesafe > 13.5f && !oyuncuHendekGuneyinde && !kopruKapali)
+            {
+                Vector3 kurtarmaKonumu = hedef.position - hedef.forward * 2.0f + hedef.right * 0.8f;
+                if (kurtarmaKonumu.z > -14.5f && kurtarmaKonumu.z < -8.0f)
+                {
+                    kurtarmaKonumu.x = Mathf.Clamp(kurtarmaKonumu.x, -1.1f, 1.1f);
+                }
                 kurtarmaKonumu.y = hedef.position.y;
                 transform.position = kurtarmaKonumu;
                 oyuncuMesafe = 2.2f;
@@ -254,14 +284,21 @@ public class YardimciKarakter : MonoBehaviour
 
             if (oyuncuMesafe > aktifTakipEsigi && noktaMesafe > 0.65f)
             {
-                Vector3 hareketYonu = EngelsizYonBul(noktaFark.normalized, oyuncuFark.normalized);
+                // Köprü bölgesindeyken (Z: -15 .. -7.5) sağa/sola engel kaçışı yapıp köprü dışına çıkmasını engelle
+                bool kopruBolgesinde = transform.position.z > -15.2f && transform.position.z < -7.5f;
+                Vector3 hareketYonu = kopruBolgesinde ? noktaFark.normalized : EngelsizYonBul(noktaFark.normalized, oyuncuFark.normalized);
                 float anlikHiz = oyuncuMesafe > 5.0f ? (hareketHizi * 1.18f) : hareketHizi;
 
-                // Oyuncu henüz hendeği geçmediyse hendek boşluğuna (-14.3 ile -8.5 arası) girmesini önle
+                // Köprü kapalıysa veya oyuncu henüz hendeği geçmediyse hendek boşluğuna (-14.3 ile -8.5 arası) girmesini önle
                 Vector3 yeniKonum = transform.position + hareketYonu * anlikHiz * Time.deltaTime;
                 if (oyuncuHendekGuneyinde && yeniKonum.z > -14.3f && yeniKonum.z < -8.5f)
                 {
                     yeniKonum.z = transform.position.z;
+                }
+                else if (!kopruKapali && yeniKonum.z > -14.4f && yeniKonum.z < -8.0f)
+                {
+                    // Köprü açıkken hendeği geçiyorsa tam köprü tahtaları ortasında (X: -1.25 .. +1.25) yürümesini sağla
+                    yeniKonum.x = Mathf.Clamp(yeniKonum.x, -1.25f, 1.25f);
                 }
 
                 transform.position = yeniKonum;

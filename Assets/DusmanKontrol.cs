@@ -205,6 +205,11 @@ public class DusmanKontrol : MonoBehaviour
     protected virtual void Update()
     {
         if (oldu) return;
+        if (Yazlab.Mekanikler.KapiBulmacaPaneli.MinigameAcik || Yazlab.Yonetim.OllamaNpcDiyalogUI.DiyalogAcikMi || Yazlab.Mekanikler.PrensesKurtarmaGorevi.OyunBittiMi)
+        {
+            YurumeAnimasyonuGuncelle(false);
+            return;
+        }
 
         // Oyuncunun bu düşmanı görüp görmediğini kontrol et (duvar vb. arkasındaysa can barı gizlensin)
         if (Time.time >= sonGorusKontrolZamani + GORUS_KONTROL_ARALIGI)

@@ -309,6 +309,7 @@ namespace Yazlab.Mekanikler
         protected override void Update()
         {
             if (oldu) return;
+            if (KapiBulmacaPaneli.MinigameAcik || OllamaNpcDiyalogUI.DiyalogAcikMi || PrensesKurtarmaGorevi.OyunBittiMi) return;
 
             HedefleriGuncelle();
 
