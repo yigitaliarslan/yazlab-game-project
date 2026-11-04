@@ -47,6 +47,7 @@ namespace Yazlab.Yonetim
                 return;
             }
             Ornek = this;
+            mevcutDurum = OyunDurumu.Baslangic;
         }
 
         private Transform _oyuncuTransform;
@@ -55,6 +56,13 @@ namespace Yazlab.Yonetim
 
         private void Start()
         {
+            ReferanslariKontrolEt();
+            PrensesKulesiInsaci.FinalKulesiniKur();
+
+            // Sahne yeniden yüklendiğinde eski bölüm sonu tetikleyicisi ve sağır arka duvarın kapalı olduğundan emin ol
+            GameObject eskiTetik = GameObject.Find("BolumSonu_Tetikleyici");
+            if (eskiTetik != null) eskiTetik.SetActive(false);
+
             DurumuDegistir(OyunDurumu.Baslangic);
 
             // Ollama LLM Diyalog bileşenini hazırla
@@ -67,12 +75,14 @@ namespace Yazlab.Yonetim
             // Şalter tetiklendiğinde otomatik olarak durumu güncelle
             if (salterMekanizmasi != null)
             {
+                salterMekanizmasi.onSalterIndirildi.RemoveListener(FizikselEngeliAs);
                 salterMekanizmasi.onSalterIndirildi.AddListener(FizikselEngeliAs);
             }
 
             // Çıkış kapısı açıldığında 4. Bölüm (Zümrütleri vurma ve Prensesi kurtarma) görevini başlat
             if (npsCikisKapisi != null)
             {
+                npsCikisKapisi.onKapiAcildi.RemoveListener(KizilKuleGoreviniBaslat);
                 npsCikisKapisi.onKapiAcildi.AddListener(KizilKuleGoreviniBaslat);
             }
         }
@@ -128,6 +138,26 @@ namespace Yazlab.Yonetim
             {
                 GameObject npc = GameObject.Find("NPC_Muhafiz");
                 if (npc != null) _npcTransform = npc.transform;
+            }
+
+            if (fizikselEngelKapisi == null)
+            {
+                GameObject fk = GameObject.Find("FizikselEngelKapisi");
+                if (fk != null) fizikselEngelKapisi = fk.GetComponent<KapiKontrol>();
+            }
+
+            if (npsCikisKapisi == null)
+            {
+                GameObject nk = GameObject.Find("NpcCikisKapisi");
+                if (nk != null)
+                {
+                    npsCikisKapisi = nk.GetComponent<KapiKontrol>();
+                    if (npsCikisKapisi != null)
+                    {
+                        npsCikisKapisi.onKapiAcildi.RemoveListener(KizilKuleGoreviniBaslat);
+                        npsCikisKapisi.onKapiAcildi.AddListener(KizilKuleGoreviniBaslat);
+                    }
+                }
             }
         }
 
@@ -185,7 +215,7 @@ namespace Yazlab.Yonetim
             if (mevcutDurum == OyunDurumu.FizikselEngelAsildi || mevcutDurum == OyunDurumu.Baslangic)
             {
                 DurumuDegistir(OyunDurumu.SosyalEngelAlaninda);
-                npcDiyalog = "Muhafız Komutan Varg: 'Buradan geçiş iznin yok! [E] tuşuyla konuşup gece parolasını ('Kızıl Şahin') ve kanıtını söyle!'";
+                npcDiyalog = "Muhafız Komutan Varg: 'Buradan geçiş iznin yok ona göre !'";
                 diyalogBitisZamani = Time.time + 7.0f;
             }
         }
@@ -197,8 +227,18 @@ namespace Yazlab.Yonetim
         /// </summary>
         public void KizilKuleGoreviniBaslat()
         {
-            if (mevcutDurum == OyunDurumu.PrensesKurtarma || mevcutDurum == OyunDurumu.BolumTamamlandi) return;
-            DurumuDegistir(OyunDurumu.PrensesKurtarma);
+            PrensesKulesiInsaci.FinalKulesiniKur();
+
+            GameObject arkaDuvar = GameObject.Find("KuleDuvar_Arka");
+            if (arkaDuvar != null && arkaDuvar.activeSelf) arkaDuvar.SetActive(false);
+
+            GameObject eskiTetik = GameObject.Find("BolumSonu_Tetikleyici");
+            if (eskiTetik != null && eskiTetik.activeSelf) eskiTetik.SetActive(false);
+
+            if (mevcutDurum != OyunDurumu.PrensesKurtarma)
+            {
+                DurumuDegistir(OyunDurumu.PrensesKurtarma);
+            }
             npcDiyalog = "";
             diyalogBitisZamani = 0f;
             if (PrensesKurtarmaGorevi.Ornek != null)
@@ -210,6 +250,15 @@ namespace Yazlab.Yonetim
 
         public void MuhafizlaGorusVeKapisiAc()
         {
+            ReferanslariKontrolEt();
+            PrensesKulesiInsaci.FinalKulesiniKur();
+
+            if (npsCikisKapisi == null)
+            {
+                GameObject nk = GameObject.Find("NpcCikisKapisi");
+                if (nk != null) npsCikisKapisi = nk.GetComponent<KapiKontrol>();
+            }
+
             if (npsCikisKapisi != null)
             {
                 npsCikisKapisi.KilidiAc();
@@ -217,7 +266,7 @@ namespace Yazlab.Yonetim
             }
 
             KizilKuleGoreviniBaslat();
-            Debug.Log("[BolumYoneticisi] NPC Muhafız (Ollama LLM) ikna edildi! Çıkış kapısı açılıyor.");
+            Debug.Log("[BolumYoneticisi] NPC Muhafız ikna edildi! Çıkış kapısı açılıyor.");
         }
 
         /// <summary>
@@ -236,9 +285,9 @@ namespace Yazlab.Yonetim
                 }
             }
 
-            npcDiyalog = "🛡️ Komutan Varg: 'Bana hakaret ve tehdit sökmez asker! [E] ile tekrar konuşup gece parolasını ('Kızıl Şahin') ve emri düzgünce söyle!'";
+            npcDiyalog = "Komutan Varg: 'Bana hakaret ve tehdit sökmez asker! [E] ile tekrar konuşup gece parolasını ('Kızıl Şahin') ve emri düzgünce söyle!'";
             diyalogBitisZamani = Time.time + 7.0f;
-            Debug.Log("[BolumYoneticisi] Komutan Varg tehditleri reddetti; geçmek için Ollama LLM diyaloğu ile ikna edilmeli.");
+            Debug.Log("[BolumYoneticisi] Komutan Varg tehditleri reddetti.");
         }
 
         /// <summary>
@@ -289,7 +338,7 @@ namespace Yazlab.Yonetim
                         };
                         GoruntuKalitesiYoneticisi.StiliKeskinlestir(ipucuStil, Mathf.RoundToInt(14 * olcek));
                         ipucuStil.normal.textColor = new Color(1.0f, 0.88f, 0.25f);
-                        GoruntuKalitesiYoneticisi.KeskinEtiketCiz(new Rect(bx, byPos, bw, bh), "💬 [E] MUHAFIZ İLE KONUŞ (OLLAMA LLM)", ipucuStil);
+                        GoruntuKalitesiYoneticisi.KeskinEtiketCiz(new Rect(bx, byPos, bw, bh), "[E] MUHAFIZ İLE KONUŞ", ipucuStil);
                     }
                 }
             }
@@ -329,7 +378,7 @@ namespace Yazlab.Yonetim
                     gorevDetay = "• 2. Bölüm: Avludaki Otomatik Savunma Taretini imha edin veya\n• Doğu koridorundaki yedek jeneratör şalterini indirin.";
                     break;
                 case OyunDurumu.FizikselEngelAsildi:
-                    gorevDetay = "• 3. Bölüm: İç Kule merdiven holünden 2. kata çıkın.\n• Nöbetçi Muhafızın koruduğu çıkış odasına ilerleyin.";
+                    gorevDetay = "• İç Kule Kapısı: [G] ile Yoldaşı 2 açma koluna gönderip kapıyı açtırın.\n• 3. Bölüm: Merdivenlerden 2. kata çıkıp Muhafız Varg'a ilerleyin.";
                     break;
                 case OyunDurumu.SosyalEngelAlaninda:
                     gorevDetay = "• [E] Muhafız Komutan Varg ile konuşup kapıyı açtırın.\n• İpucu: Gece parolası 'Kızıl Şahin' + Başkan emri / 500+ altın.";
@@ -341,7 +390,7 @@ namespace Yazlab.Yonetim
                     gorevDetay = $"• Silahınızla sırasıyla 1. KIRMIZI → 2. MAVİ → 3. YEŞİL zümrütü vurun ({vurulan}/{toplam}).\n• Sırasıyla vurduğunuzda Prenses Betül kapsülden kurtulacaktır.";
                     break;
                 case OyunDurumu.BolumTamamlandi:
-                    gorevBaslik = "✓ GÖREV BAŞARILI!";
+                    gorevBaslik = "GÖREV BAŞARILI!";
                     gorevDetay = "• Tebrikler! Tüm zümrütler vuruldu ve Prenses Betül kurtarıldı.\n• Operasyon başarıyla sona erdi.";
                     break;
             }
