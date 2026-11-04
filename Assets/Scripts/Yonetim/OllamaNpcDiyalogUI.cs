@@ -6,15 +6,7 @@ using UnityEngine.InputSystem;
 
 namespace Yazlab.Yonetim
 {
-    /// <summary>
-    /// Kocaeli Üniversitesi YazLab-I Proje İsterlerine (Bölüm 3.2, 4.2, 4.3, 4.4) uygun
-    /// Serbest Metin Tabanlı Yerel LLM (Ollama) NPC Diyalog ve Karar Arayüzü.
-    /// - Hiçbir hazır/scriptlenmiş ikna butonu içermez; oyuncu tamamen kendi serbest metniyle muhafızı ikna etmeye çalışır.
-    /// - Modelin ürettiği yapılandırılmış JSON çıktısını (Tepki Türü, Güven Değişimi, Kapı Açma, Savaş Tetikleme) canlı gösterir.
-    /// - Muhafız kolay ikna olmaz (en az 2-3 aşamalı sorgulama ve %80+ güven gerekir).
-    /// - Gece parolası ve nasıl ikna edileceğine dair dinamik boyutlu, tam sığan İkna Rehberi (İpucu Kutusu) içerir.
-    /// - Oyuncu muhafızı kızdırır veya tehdit ederse muhafız düşmana dönüşüp oyuncuya ateş açar (`savasTetikle: true`)!
-    /// </summary>
+
     [RequireComponent(typeof(OllamaIstemcisi))]
     public class OllamaNpcDiyalogUI : MonoBehaviour
     {
@@ -63,6 +55,7 @@ namespace Yazlab.Yonetim
 
         private void Awake()
         {
+            DiyalogAcikMi = false;
             _llmServisi = GetComponent<IYerelDilModeliServisi>();
             if (_llmServisi == null)
             {
@@ -70,6 +63,11 @@ namespace Yazlab.Yonetim
             }
 
             BaslangicMesajiniEkle();
+        }
+
+        private void OnDestroy()
+        {
+            DiyalogAcikMi = false;
         }
 
         private void BaslangicMesajiniEkle()
@@ -83,7 +81,7 @@ namespace Yazlab.Yonetim
 
             _sohbetKayitlari.Add(new SohbetSatiri
             {
-                konusan = "🛡️ Kıdemli Muhafız Komutan Varg",
+                konusan = "Kıdemli Muhafız Komutan Varg",
                 mesaj = "Dur bakalım yabancı! Bu kule kapısı doğrudan çıkışa açılır ve Başkomutanın emriyle geçişler tamamen yasaklandı. Kimsin, bu yasak bölgeye nasıl girdin ve gece parolası nedir? Beni ikna edecek çok güçlü bir kanıtın veya teklifin yoksa buradan asla geçemezsin; yanlış bir hareketinde de silahımı ateşlerim!",
                 etiketBilgisi = "[Durum: Nöbetçi Sorgusu | Güven: %30 | İkna Aşaması: 0/2]",
                 oyuncuMu = false,
@@ -162,7 +160,7 @@ namespace Yazlab.Yonetim
 
             _sohbetKayitlari.Add(new SohbetSatiri
             {
-                konusan = "🎖️ Sen (Serbest Metin)",
+                konusan = "Sen (Serbest Metin)",
                 mesaj = gonderilecek,
                 etiketBilgisi = "",
                 oyuncuMu = true,
@@ -200,7 +198,7 @@ namespace Yazlab.Yonetim
 
             _sohbetKayitlari.Add(new SohbetSatiri
             {
-                konusan = $"🛡️ Komutan Varg (Ollama: {_llmServisi.AktifModelAdi})",
+                konusan = $"Komutan Varg",
                 mesaj = karar.cevap,
                 etiketBilgisi = jsonOzeti,
                 oyuncuMu = false,
@@ -215,7 +213,7 @@ namespace Yazlab.Yonetim
                 _basariliIknaAdimi = 0;
                 _sohbetKayitlari.Add(new SohbetSatiri
                 {
-                    konusan = "⚠️ KOMUTAN VARG SERTÇE REDDETTİ!",
+                    konusan = "KOMUTAN VARG SERTÇE REDDETTİ!",
                     mesaj = "Komutan Varg tehdit ve hakaretlerinize öfkelendi! Ona silah işlemez; kapıyı açtırmak için parolayı ('Kızıl Şahin') ve Başkomutanın emrini söyleyerek onu ikna etmelisiniz!",
                     etiketBilgisi = "[Güven %15'e düştü — Devam etmek için ikna edici bir argüman yazın]",
                     oyuncuMu = false,
@@ -236,7 +234,7 @@ namespace Yazlab.Yonetim
                 _iknaTamamlandi = true;
                 _sohbetKayitlari.Add(new SohbetSatiri
                 {
-                    konusan = "✓ MÜZAKERE BAŞARILI - KAPI AÇILIYOR",
+                    konusan = "MÜZAKERE BAŞARILI - KAPI AÇILIYOR",
                     mesaj = "Komutan Varg ikna oldu ve kule çıkış kapısının kilidini açtı! Şimdi kapıdan geçerek operasyonu tamamlayabilirsiniz.",
                     etiketBilgisi = "[Oyun Durumu Değişti: NpcCikisKapisi -> AÇIK]",
                     oyuncuMu = false,
@@ -257,7 +255,7 @@ namespace Yazlab.Yonetim
         {
             _sohbetKayitlari.Add(new SohbetSatiri
             {
-                konusan = "⚠️ HATA YÖNETİMİ (BAĞLANTI / MODEL UYARISI)",
+                konusan = "HATA YÖNETİMİ (BAĞLANTI / MODEL UYARISI)",
                 mesaj = hataMesaji,
                 etiketBilgisi = "[Sistem Çökmeden Güvenli Modda Devam Ediyor - Madde 4.3]",
                 oyuncuMu = false,
@@ -439,9 +437,9 @@ namespace Yazlab.Yonetim
             float kapatBtnW = Mathf.Round(114f * olcek);
             float kapatBtnH = Mathf.Round(30f * olcek);
             GUI.Label(new Rect(x + kenar, y + 7f * olcek, icGenislikTam - kapatBtnW - 10f * olcek, 32f * olcek),
-                $"🛡️ KIDEMLİ MUHAFIZ KOMUTAN VARG — YEREL LLM ({_llmServisi.AktifModelAdi})", _baslikStil);
+                $"KIDEMLİ MUHAFIZ KOMUTAN VARG - YEREL LLM ({_llmServisi.AktifModelAdi})", _baslikStil);
 
-            if (GUI.Button(new Rect(x + w - kenar - kapatBtnW, y + 8f * olcek, kapatBtnW, kapatBtnH), "✕ KAPAT [ESC]", _butonStil))
+            if (GUI.Button(new Rect(x + w - kenar - kapatBtnW, y + 8f * olcek, kapatBtnW, kapatBtnH), "KAPAT [ESC]", _butonStil))
             {
                 DiyalogPenceresiniKapat();
                 GUI.color = eskiRenk;
@@ -466,7 +464,7 @@ namespace Yazlab.Yonetim
 
             // 3. Alt İpucu & İkna Rehberi Kutusu (Dinamik yükseklik ile yazının sığmaması %100 engellenir!)
             string ipucuMetni =
-                "💡 NASIL İKNA EDİLİR? (Gece Parolası & 2 Aşamalı İkna Rehberi):\n" +
+                "NASIL İKNA EDİLİR? (Gece Parolası & 2 Aşamalı İkna Rehberi):\n" +
                 "• 1. Adım (Gece Parolası & Emir): Gece parolasının \"Kızıl Şahin\" (veya \"Gece Kuzgunu\") olduğunu ve Başkomutanın gizli istihbarat emriyle geldiğinizi yazın.\n" +
                 "• 2. Adım (Kanıt veya Rüşvet): Muhafız kanıt sorunca kraliyet mührünü/belgesini gösterin ya da 500+ altın dolu kese teklif edin. (Hakaret/tehdit savaşı başlatır!)";
 
