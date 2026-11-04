@@ -21,7 +21,16 @@ namespace Yazlab.Mekanikler
     /// </summary>
     public class PrensesKurtarmaGorevi : MonoBehaviour
     {
-        public static PrensesKurtarmaGorevi Ornek { get; private set; }
+        private static PrensesKurtarmaGorevi _ornek;
+        public static PrensesKurtarmaGorevi Ornek
+        {
+            get
+            {
+                if (_ornek == null) _ornek = UnityEngine.Object.FindAnyObjectByType<PrensesKurtarmaGorevi>();
+                return _ornek;
+            }
+            set => _ornek = value;
+        }
 
         public static bool OyunBittiMi => Ornek != null && Ornek.mevcutAsama == Asama.Zafer;
 
@@ -72,9 +81,18 @@ namespace Yazlab.Mekanikler
         private void Awake()
         {
             Ornek = this;
+            mevcutAsama = Asama.KuleyeGirisBekleniyor;
             _ses = gameObject.AddComponent<AudioSource>();
             _ses.playOnAwake = false;
             _ses.spatialBlend = 0f;
+        }
+
+        private void OnDestroy()
+        {
+            if (Ornek == this)
+            {
+                Ornek = null;
+            }
         }
 
         private void Start()
@@ -233,7 +251,7 @@ namespace Yazlab.Mekanikler
                     string vurulanAd = RunKristali.Adlar[kristal.indeks];
                     string siradakiAd = RunKristali.Adlar[_hedefSira[_vurulanAdim]];
                     DiyalogGoster("DOĞRU SIRA!",
-                        $"✓ {_vurulanAdim}. {vurulanAd} ZÜMRÜT VURULDU! ({_vurulanAdim}/3) — Şimdi sırada: {_vurulanAdim + 1}. {siradakiAd} ZÜMRÜT!",
+                        $"[{_vurulanAdim}/3] {vurulanAd} ZÜMRÜT VURULDU! Sırada: {_vurulanAdim + 1}. {siradakiAd} ZÜMRÜT",
                         6.0f, new Color(0.35f, 1.0f, 0.55f));
                 }
             }
@@ -259,7 +277,7 @@ namespace Yazlab.Mekanikler
 
                 SesCal(210f, 0.48f);
                 string yanlisAd = RunKristali.Adlar[kristal.indeks];
-                DiyalogGoster("✗ YANLIŞ SIRA — TEKRAR DENE!",
+                DiyalogGoster("YANLIŞ SIRA - TEKRAR DENE!",
                     $"Yanlışlıkla {yanlisAd} zümrütü vurdun! Tekrar denemelisin! Sırasıyla: 1. KIRMIZI  →  2. MAVİ  →  3. YEŞİL zümrütü vur!",
                     7.5f, new Color(1.0f, 0.30f, 0.30f));
             }
@@ -466,7 +484,7 @@ namespace Yazlab.Mekanikler
                         Rect r = new Rect(scr.x - bw * 0.5f, scr.y - bh * 0.5f, bw, bh);
                         GUI.DrawTexture(r, _texKoyu);
                         hedefStil.normal.textColor = RunKristali.RenkAl(k.indeks);
-                        GoruntuKalitesiYoneticisi.KeskinEtiketCiz(r, $"💎 {RunKristali.Adlar[k.indeks]} ZÜMRÜT", hedefStil);
+                        GoruntuKalitesiYoneticisi.KeskinEtiketCiz(r, $"{RunKristali.Adlar[k.indeks]} ZÜMRÜT", hedefStil);
                     }
                 }
             }
@@ -493,7 +511,7 @@ namespace Yazlab.Mekanikler
                     };
                     GoruntuKalitesiYoneticisi.StiliKeskinlestir(balonStil, Mathf.RoundToInt(13 * olcek));
                     balonStil.normal.textColor = new Color(0.45f, 1.0f, 0.65f);
-                    GoruntuKalitesiYoneticisi.KeskinEtiketCiz(r, "👑 Prenses Betül: \"Beni kurtardığın için çok teşekkür ederim!\"", balonStil);
+                    GoruntuKalitesiYoneticisi.KeskinEtiketCiz(r, "Prenses Betül: \"Beni kurtardığın için çok teşekkür ederim!\"", balonStil);
                 }
             }
 
@@ -598,7 +616,7 @@ namespace Yazlab.Mekanikler
             float cy = py + 24f * olcek;
 
             GoruntuKalitesiYoneticisi.KeskinEtiketCiz(new Rect(px + pad, cy, icW, 38f * olcek),
-                "★ GÖREV BAŞARILI ★", anaBaslikStil);
+                "GÖREV BAŞARILI", anaBaslikStil);
             cy += 42f * olcek;
 
             GoruntuKalitesiYoneticisi.KeskinEtiketCiz(new Rect(px + pad, cy, icW, 24f * olcek),
@@ -608,10 +626,10 @@ namespace Yazlab.Mekanikler
             string epilog =
                 "Prenses Betül (\"Beyaz Kuzgun\"): \"Beni o kapsülden kurtardığın için çok teşekkür ederim! Silahınla Kırmızı, Mavi ve Yeşil zümrütleri doğru sırayla kırıp bana özgürlüğümü geri verdin.\"\n\n" +
                 "TAMAMLANAN GÖREV ADIMLARI:\n" +
-                "  ✓ 1. BÖLÜM: Hendek Kanyonu & Eşzamanlı 2 Anahtarlı Askı Kapı ([G] + [E])\n" +
-                "  ✓ 2. BÖLÜM: Kablo Odası Elektrik Şalteri Bulmacası & Otomatik Savunma Tareti\n" +
-                "  ✓ 3. BÖLÜM: İç Kule Muhafızı (Ollama Yerel LLM) Müzakeresi & Çıkış Kapısı\n" +
-                "  ✓ 4. BÖLÜM (FİNAL): Kırmızı → Mavi → Yeşil Zümrütlerin Vurulması & Prenses Betül'ün Kurtarılması\n\n" +
+                "  [OK] 1. BÖLÜM: Hendek Kanyonu & Eşzamanlı 2 Anahtarlı Askı Kapı ([G] + [E])\n" +
+                "  [OK] 2. BÖLÜM: Kablo Odası Elektrik Şalteri, Taret & Baskın Askerleri, [G] Çift Kollu İç Kule Kapısı\n" +
+                "  [OK] 3. BÖLÜM: İç Kule Muhafızı (Ollama Yerel LLM) Müzakeresi & Çıkış Kapısı\n" +
+                "  [OK] 4. BÖLÜM (FİNAL): Kırmızı -> Mavi -> Yeşil Zümrütlerin Vurulması & Prenses Betül'ün Kurtarılması\n\n" +
                 "Tebrikler! Tüm engelleri aşarak oyunu başarıyla tamamladınız.";
 
             GoruntuKalitesiYoneticisi.KeskinEtiketCiz(new Rect(px + pad, cy, icW, 230f * olcek), epilog, ozetStil);
@@ -632,6 +650,10 @@ namespace Yazlab.Mekanikler
 
             if (GUI.Button(new Rect(bx1, cy, btnW, btnH), "YENİDEN OYNA", butonStil))
             {
+                mevcutAsama = Asama.KuleyeGirisBekleniyor;
+                Ornek = null;
+                Cursor.lockState = CursorLockMode.Locked;
+                Cursor.visible = false;
                 SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
             }
             if (GUI.Button(new Rect(bx2, cy, btnW, btnH), "OYUNDAN ÇIK", butonStil))

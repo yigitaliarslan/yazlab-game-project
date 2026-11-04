@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace Yazlab.Mekanikler
 {
@@ -9,8 +10,9 @@ namespace Yazlab.Mekanikler
     /// çok katmanlı bir "Kızıl Kule" inşa eder. Kulenin içinde Prenses Betül'ün tutulduğu Mühürlü Kapsül,
     /// Kehanet Küresi ve silahla vurularak kırılan 3 Zümrüt Kristali bulunur.
     ///
-    /// Sahne dosyasına dokunmadan, oyun başladığında (AfterSceneLoad) çalışma zamanında kurulur; böylece
-    /// mevcut harita, ekip arkadaşının sahne değişiklikleri ve NavMesh bozulmadan final bölümü eklenir.
+    /// Sahne dosyasına dokunmadan, oyun başladığında (AfterSceneLoad) ve sahne her yeniden yüklendiğinde
+    /// (SceneManager.sceneLoaded) çalışma zamanında kurulur; böylece oyun bittiğinde veya yeniden başlatıldığında
+    /// çıkış kapısı arkası ve Prenses kurtarma görevi her zaman kusursuz çalışır.
     /// </summary>
     public static class PrensesKulesiInsaci
     {
@@ -22,13 +24,40 @@ namespace Yazlab.Mekanikler
         public const float DuvarYukseklik = 10.5f;
 
         private static Material _tas, _koyuTas, _ahsap, _metal;
+        private static bool _eventKayitli = false;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+        private static void OtomatikKayitVeKurulum()
+        {
+            if (!_eventKayitli)
+            {
+                SceneManager.sceneLoaded -= OnSahneYuklendi;
+                SceneManager.sceneLoaded += OnSahneYuklendi;
+                _eventKayitli = true;
+            }
+            FinalKulesiniKur();
+        }
+
+        private static void OnSahneYuklendi(Scene sahne, LoadSceneMode mod)
+        {
+            FinalKulesiniKur();
+        }
+
         public static void FinalKulesiniKur()
         {
             if (GameObject.Find("--- HARITA_SEVIYESI ---") == null) return;
-            if (GameObject.Find(KokAdi) != null) return;
             if (GameObject.Find("NpcCikisKapisi") == null) return;
+
+            // Eğer kule zaten kurulduysa bile arka duvar ve eski tetikleyicinin kapalı olduğundan emin ol
+            GameObject mevcutKok = GameObject.Find(KokAdi);
+            if (mevcutKok != null)
+            {
+                GameObject eskiArka = GameObject.Find("KuleDuvar_Arka");
+                if (eskiArka != null && eskiArka.activeSelf) eskiArka.SetActive(false);
+                GameObject eskiTetik = GameObject.Find("BolumSonu_Tetikleyici");
+                if (eskiTetik != null && eskiTetik.activeSelf) eskiTetik.SetActive(false);
+                return;
+            }
 
             MateryalleriTopla();
 
@@ -41,6 +70,7 @@ namespace Yazlab.Mekanikler
             AydinlatmayiKur(kok.transform);
 
             PrensesKurtarmaGorevi gorev = kok.AddComponent<PrensesKurtarmaGorevi>();
+            PrensesKurtarmaGorevi.Ornek = gorev;
             gorev.kafesCubuklari = KafesKur(kok.transform, out gorev.muhurBariyeri);
             gorev.kehanetKuresi = KehanetKuresiKur(kok.transform, out gorev.kureIsigi);
             gorev.kristaller = new RunKristali[]
