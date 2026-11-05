@@ -24,11 +24,11 @@ namespace Yazlab.Yonetim
     [Serializable]
     public class OllamaSecenekler
     {
-        public float temperature = 0.25f;      // Halüsinasyonu ve saçmalamayı önleyen düşük sıcaklık
-        public float top_p = 0.85f;            // Odaklı kelime seçimi
-        public int top_k = 30;                 // Alakasız token üretimini engeller
-        public float repeat_penalty = 1.18f;   // Kelime/cümle tekrarını engeller
-        public int num_predict = 180;          // Kısa, net ve hızlı JSON yanıtı
+        public float temperature = 0.15f;      // Halüsinasyonu ve saçmalamayı önleyen düşük sıcaklık
+        public float top_p = 0.80f;            // Odaklı kelime seçimi
+        public int top_k = 20;                 // Alakasız token üretimini engeller
+        public float repeat_penalty = 1.12f;   // Kelime/cümle tekrarını dengeler
+        public int num_predict = 150;          // Kısa, net ve hızlı JSON yanıtı
     }
 
     [Serializable]
@@ -49,12 +49,10 @@ namespace Yazlab.Yonetim
     }
 
     /// <summary>
-    /// Kocaeli Üniversitesi YazLab-I Proje İsterlerine (Bölüm 3.2, 4.1, 4.2, 4.3, 4.4) %100 uyumlu
     /// Yerel Ollama LLM İstemcisi (IYerelDilModeliServisi implementasyonu).
-    /// - Asla ilk mesajda kolayca ikna olmaz; aşamalı sorgulama (kimlik/parola + kanıt/rüşvet) uygular.
-    /// - Yapılandırılmış JSON şeması ile oyun durumunu (Kapı Açma VEYA Savaş Tetikleme) kontrol eder.
-    /// - Halüsinasyon, bozuk JSON, İngilizce/anlamsız yanıt veya durum çelişkisi ürettiğinde akıllı denetleyici ile düzeltir.
-    /// - Sunucu kapalıysa, zaman aşımı olursa veya bozuk JSON gelirse oyunu ASLA çökertmez (Madde 4.3).
+    /// - Aşamalı sorgulama (kimlik/parola + kanıt/rüşvet) uygular.
+    /// - Yapılandırılmış JSON şeması ile oyun durumunu (Kapı Açma veya Savaş Tetikleme) kontrol eder.
+    /// - Sunucu kapalıysa, zaman aşımı olursa veya bozuk JSON gelirse hata yönetimi devreye girer.
     /// </summary>
     public class OllamaIstemcisi : MonoBehaviour, IYerelDilModeliServisi
     {
@@ -69,24 +67,20 @@ namespace Yazlab.Yonetim
         [SerializeField] private int zamanAsimiSaniye = 30;
 
         [Header("Muhafız Karakter Kimliği (System Prompt)")]
-        [TextArea(10, 18)]
+        [TextArea(6, 12)]
         [SerializeField] private string sistemYonergesi =
-            "Sen 'Komutan Varg' adında, Kızıl Kule'nin 2. katındaki çıkış kapısını koruyan sert, şüpheci ve disiplinli Kıdemli Kale Muhafızısın.\n" +
-            "SADECE akıcı ve doğal Türkçe konuş. Asla İngilizce kelime veya köşeli parantezli durum notu kullanma.\n" +
-            "KURALLAR:\n" +
-            "1. İlk aşamada (Aşama 0/2) ASLA kapıyı açma (`kapiyiAc: false`). Oyuncu gece parolasını ('Kızıl Şahin' veya 'Gece Kuzgunu') ya da Başkomutan emrini söylese bile, ikinci bir kanıt (kraliyet mührü veya 500+ altın kese) iste.\n" +
-            "2. İkinci aşamada (Aşama 1/2) oyuncu kanıtı, mührü veya 500+ altını da sunarsa ikna ol ve `kapiyiAc: true` yap.\n" +
-            "3. Hakaret/tehdit varsa `tepkiTuru: \"SaldirganKizdiran\"`, `guvenDegisimi: -35`, `savasTetikle: true`, `kapiyiAc: false` yap.\n" +
-            "4. Hava durumu, futbol, yemek gibi alakasız laflarda `tepkiTuru: \"AlakasizKonusma\"`, `guvenDegisimi: -10`, `kapiyiAc: false` yap.\n" +
-            "5. Kanıtsız ricada veya 50-100 altın gibi küçük tekliflerde `tepkiTuru: \"YetersizTeklif\"`, `guvenDegisimi: -5`, `kapiyiAc: false` yap.\n" +
-            "Yanıtını SADECE şu JSON şemasında ver:\n" +
-            "{\"cevap\": \"Komutan Varg'ın Türkçe yanıtı (1-2 cümle)\", \"tepkiTuru\": \"SupheciRed|IknaEdici|YetersizTeklif|AlakasizKonusma|SaldirganKizdiran\", \"guvenDegisimi\": 0, \"kapiyiAc\": false, \"savasTetikle\": false}";
+            "Sen Kızıl Kule kapısını nöbetçi olarak bekleyen Kıdemli Muhafız Komutan Varg'sın.\n" +
+            "Karşındaki oyuncuya doğrudan 1. tekil şahıs (\"ben\") olarak sert ve otoriter bir kale komutanı gibi Türkçe cevap ver.";
 
         private readonly List<OllamaMesaj> _konusmaGecmisi = new List<OllamaMesaj>();
         private bool _istekDevamEdiyor = false;
+        private bool _sunucuCevrimici = true;
+        private string _sonBaglantiDurumu = "Yerel Sunucu Hazır (localhost:11434)";
 
         public string AktifModelAdi => modelAdi;
         public bool IstekDevamEdiyorMu => _istekDevamEdiyor;
+        public bool SunucuCevrimiciMi => _sunucuCevrimici;
+        public string SonBaglantiDurumu => _sonBaglantiDurumu;
 
         private void Awake()
         {
@@ -97,6 +91,54 @@ namespace Yazlab.Yonetim
         {
             _konusmaGecmisi.Clear();
             _istekDevamEdiyor = false;
+        }
+
+        /// <summary>
+        /// Yerel Ollama sunucusunun açık olup olmadığını ve seçili modelin yüklü olup olmadığını
+        /// ana oyun akışını dondurmadan (asenkron) kontrol eder.
+        /// </summary>
+        public void SunucuDurumunuKontrolEt(Action<bool, string> onTamamlandi = null)
+        {
+            StartCoroutine(SunucuDurumuCoroutine(onTamamlandi));
+        }
+
+        private IEnumerator SunucuDurumuCoroutine(Action<bool, string> onTamamlandi)
+        {
+            string tagsUrl = "http://localhost:11434/api/tags";
+            try
+            {
+                Uri uri = new Uri(apiUrl);
+                tagsUrl = $"{uri.Scheme}://{uri.Authority}/api/tags";
+            }
+            catch { }
+
+            using (UnityWebRequest istek = UnityWebRequest.Get(tagsUrl))
+            {
+                istek.timeout = 4;
+                yield return istek.SendWebRequest();
+
+                if (istek.result != UnityWebRequest.Result.Success)
+                {
+                    _sunucuCevrimici = false;
+                    _sonBaglantiDurumu = "Çevrimdışı (Ollama Sunucusu Kapalı - Güvenli Yedek Mod Aktif)";
+                    onTamamlandi?.Invoke(false, _sonBaglantiDurumu);
+                    yield break;
+                }
+
+                string yanit = istek.downloadHandler != null ? istek.downloadHandler.text : "";
+                string kisaModelAdi = (modelAdi ?? "llama3.2").Split(':')[0].ToLowerInvariant();
+                if (!string.IsNullOrEmpty(yanit) && !yanit.ToLowerInvariant().Contains(kisaModelAdi))
+                {
+                    _sunucuCevrimici = false;
+                    _sonBaglantiDurumu = $"Uyarı: Ollama Açık Ancak '{modelAdi}' Modeli Yüklü Değil (Güvenli Mod)";
+                    onTamamlandi?.Invoke(false, _sonBaglantiDurumu);
+                    yield break;
+                }
+
+                _sunucuCevrimici = true;
+                _sonBaglantiDurumu = $"Çevrimiçi ({modelAdi} Hazır)";
+                onTamamlandi?.Invoke(true, _sonBaglantiDurumu);
+            }
         }
 
         public void MesajGonderAsenkron(
@@ -119,22 +161,19 @@ namespace Yazlab.Yonetim
         {
             _istekDevamEdiyor = true;
 
-            // 3B modelin bağlamının şişip sapıtmaması için sadece son 4 mesajı (2 konuşma turunu) tut
+            // Bağlam penceresini korumak için son 4 mesajı (2 konuşma turunu) tut
             while (_konusmaGecmisi.Count > 4)
             {
                 _konusmaGecmisi.RemoveAt(0);
             }
 
-            string asamaBilgisi = iknaAdimSayisi < 1
-                ? $"ŞU ANKİ DURUM: Güven=%{mevcutGuvenSkoru}, İkna Aşaması=0/2 (İLK AŞAMA). Oyuncu doğru parola veya emir söylese bile kapıyı henüz açma (`kapiyiAc: false`), ikinci doğrulama olarak kraliyet mührünü veya 500+ altın kesesini sor!"
-                : $"ŞU ANKİ DURUM: Güven=%{mevcutGuvenSkoru}, İkna Aşaması=1/2 (İKİNCİ AŞAMA). Oyuncu ilk aşamayı geçti; eğer bu mesajında da mühür, Başkomutan emri, parola veya 500+ altın sunuyorsa ikna ol ve kapıyı aç (`kapiyiAc: true`, `tepkiTuru: \"IknaEdici\"`, `guvenDegisimi: 30`)!";
+            string dinamikSistemIstemi = OlusturDurumaOzelSistemIstemi(oyuncuMesaji, mevcutGuvenSkoru, iknaAdimSayisi);
 
             List<OllamaMesaj> istekMesajlari = new List<OllamaMesaj>
             {
-                new OllamaMesaj("system", sistemYonergesi + "\n\n" + asamaBilgisi)
+                new OllamaMesaj("system", dinamikSistemIstemi)
             };
             istekMesajlari.AddRange(_konusmaGecmisi);
-            // Kullanıcı mesajına köşeli parantezli meta-veri EKLEME (modelin cevaba kopyalamasını önler)
             istekMesajlari.Add(new OllamaMesaj("user", oyuncuMesaji));
 
             OllamaChatIstegi istekVerisi = new OllamaChatIstegi
@@ -159,9 +198,16 @@ namespace Yazlab.Yonetim
 
                 _istekDevamEdiyor = false;
 
-                // HATA YÖNETİMİ 1: Sunucu kapalı, bağlantı reddedildi veya zaman aşımı (Madde 4.3)
+                // Bağlantı hatası, model eksikliği veya zaman aşımı durumu
                 if (istek.result != UnityWebRequest.Result.Success)
                 {
+                    _sunucuCevrimici = false;
+                    string detayliHata = OlusturBaglantiHataMesaji(istek);
+                    _sonBaglantiDurumu = "Çevrimdışı / Hata Yönetimi Aktif";
+                    Debug.LogWarning($"[OllamaIstemcisi] {detayliHata}");
+
+                    onHata?.Invoke(detayliHata);
+
                     MuhafizKararVerisi cevrimdisiKarar = CevrimdisiYedekKararOlustur(oyuncuMesaji, mevcutGuvenSkoru, iknaAdimSayisi);
                     DenetleVeDengeliPuanla(cevrimdisiKarar, oyuncuMesaji, mevcutGuvenSkoru, iknaAdimSayisi);
                     GecmiseTemizTurEkle(oyuncuMesaji, cevrimdisiKarar);
@@ -169,32 +215,59 @@ namespace Yazlab.Yonetim
                     yield break;
                 }
 
+                _sunucuCevrimici = true;
+                _sonBaglantiDurumu = $"Çevrimiçi ({modelAdi})";
                 string gelenHamJson = istek.downloadHandler.text;
 
-                // HATA YÖNETİMİ 2: Boş, bozuk veya halüsinasyon içeren JSON yanıtlarına karşı dayanıklı ayrıştırma
+                // Boş, bozuk veya geçersiz JSON yanıtlarına karşı ayrıştırma
                 try
                 {
                     OllamaChatYaniti disYanit = JsonUtility.FromJson<OllamaChatYaniti>(gelenHamJson);
                     string modelHamIcerik = (disYanit != null && disYanit.message != null) ? disYanit.message.content : "";
 
-                    MuhafizKararVerisi karar = EsnekJsonAyristir(modelHamIcerik, oyuncuMesaji);
+                    MuhafizKararVerisi karar = EsnekJsonAyristir(modelHamIcerik, oyuncuMesaji, out bool jsonOnarildiMi);
+                    if (jsonOnarildiMi)
+                    {
+                        string jsonUyari = "[GEÇERSİZ / BOZUK JSON ONARILDI] Yerel dil modeli standart şema dışında bir çıktı üretti. Hata yakalanarak yapılandırılmış veri güvenli biçimde onarıldı.";
+                        Debug.LogWarning($"[OllamaIstemcisi] {jsonUyari} Ham içerik: {modelHamIcerik}");
+                        onHata?.Invoke(jsonUyari);
+                    }
 
-                    // KURAL VE TUTARLILIK DENETİMİ: Puanlamayı, kapı açma kararını ve cevabın anlamlılığını kesinleştir
                     DenetleVeDengeliPuanla(karar, oyuncuMesaji, mevcutGuvenSkoru, iknaAdimSayisi);
-
-                    // Konuşma geçmişine sadece doğrulanmış, temiz JSON'u kaydet (sonraki turlarda sapıtmayı %100 engeller)
                     GecmiseTemizTurEkle(oyuncuMesaji, karar);
 
                     onBasarili?.Invoke(karar);
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
+                    string ayristirmaHatasi = $"[JSON AYRIŞTIRMA HATASI] Model yanıtı işlenirken beklenmedik hata oluştu ({ex.GetType().Name}). Oyun çökmeden güvenli yedek yanıtla devam ediyor.";
+                    Debug.LogWarning($"[OllamaIstemcisi] {ayristirmaHatasi}");
+                    onHata?.Invoke(ayristirmaHatasi);
+
                     MuhafizKararVerisi yedekKarar = CevrimdisiYedekKararOlustur(oyuncuMesaji, mevcutGuvenSkoru, iknaAdimSayisi);
                     DenetleVeDengeliPuanla(yedekKarar, oyuncuMesaji, mevcutGuvenSkoru, iknaAdimSayisi);
                     GecmiseTemizTurEkle(oyuncuMesaji, yedekKarar);
                     onBasarili?.Invoke(yedekKarar);
                 }
             }
+        }
+
+        private string OlusturBaglantiHataMesaji(UnityWebRequest istek)
+        {
+            string hamHata = istek != null && !string.IsNullOrEmpty(istek.error) ? istek.error : "Bilinmeyen ağ hatası";
+            long kod = istek != null ? istek.responseCode : 0;
+
+            if (hamHata.IndexOf("timeout", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return $"[ZAMAN AŞIMI UYARISI] Yerel Ollama sunucusu ({apiUrl}) {zamanAsimiSaniye} saniye içinde yanıt vermedi. Oyun akışı kesintisiz devam ediyor; güvenli karar mekanizması devreye alındı.";
+            }
+
+            if (kod == 404)
+            {
+                return $"[MODEL BULUNAMADI - HTTP 404] Yerel Ollama sunucusu açık ancak '{modelAdi}' modeli yüklü değil (Terminalde 'ollama pull {modelAdi}' komutunu çalıştırın). Oyun çökmeden güvenli modda devam ediyor.";
+            }
+
+            return $"[SUNUCU BAĞLANTI HATASI] Yerel Ollama sunucusuna ({apiUrl}) ulaşılamadı ({hamHata}). Ollama servisinin açık olduğundan emin olun. Oyun çökmeden çevrimdışı güvenli modda devam ediyor.";
         }
 
         private void GecmiseTemizTurEkle(string oyuncuMesaji, MuhafizKararVerisi karar)
@@ -207,8 +280,14 @@ namespace Yazlab.Yonetim
         /// Model farklı JSON alan adları ("yanit", "mesaj", "response") kullansa veya bozuk JSON üretse bile
         /// ham JSON anahtarlarını ("tepkiTuru", "guvenDegisimi") asla konuşma balonuna sızdırmadan ayrıştırır.
         /// </summary>
-        private MuhafizKararVerisi EsnekJsonAyristir(string hamIcerik, string oyuncuMesaji)
+        private MuhafizKararVerisi EsnekJsonAyristir(string hamIcerik, string oyuncuMesaji, out bool jsonOnarildiMi)
         {
+            jsonOnarildiMi = false;
+            if (string.IsNullOrWhiteSpace(hamIcerik) || !hamIcerik.Contains("{") || !hamIcerik.Contains("}"))
+            {
+                jsonOnarildiMi = true;
+            }
+
             string temizJson = TemizJsonAyikla(hamIcerik);
             MuhafizKararVerisi karar = null;
 
@@ -219,16 +298,19 @@ namespace Yazlab.Yonetim
             catch
             {
                 karar = null;
+                jsonOnarildiMi = true;
             }
 
             if (karar == null)
             {
                 karar = new MuhafizKararVerisi();
+                jsonOnarildiMi = true;
             }
 
             // Eğer model "cevap" yerine "yanit", "mesaj", "response", "text" gibi bir anahtar kullandıysa yakala
             if (string.IsNullOrWhiteSpace(karar.cevap) && !string.IsNullOrWhiteSpace(temizJson))
             {
+                jsonOnarildiMi = true;
                 string[] olasiAnahtarlar = { "cevap", "yanit", "yanıt", "mesaj", "response", "message", "text", "komutan_varg" };
                 foreach (string anahtar in olasiAnahtarlar)
                 {
@@ -242,6 +324,11 @@ namespace Yazlab.Yonetim
             }
 
             karar.cevap = YanitMetniniTemizle(karar.cevap);
+            if (!string.IsNullOrEmpty(karar.cevap) && (karar.cevap.Contains("{") || karar.cevap.Contains("tepkiTuru")))
+            {
+                jsonOnarildiMi = true;
+            }
+
             return karar;
         }
 
@@ -269,28 +356,123 @@ namespace Yazlab.Yonetim
             t = Regex.Replace(t, @"\[[^\]]*\]", "").Trim();
             // Başlangıçtaki "Komutan Varg:" gibi mükerrer isim öneklerini temizle
             t = Regex.Replace(t, @"^(Kıdemli\s+Muhafız\s+)?(Komutan\s+Varg|Muhafız\s+Varg|Varg)\s*:\s*", "", RegexOptions.IgnoreCase).Trim();
+            // 3B modelin zamir/özne kaymalarını doğal birinci tekil şahısa düzelt
+            t = Regex.Replace(t, @"sana\s+sunduğum", "bana sunduğun", RegexOptions.IgnoreCase);
+            t = Regex.Replace(t, @"kapıyı\s+açabilirsin(iz)?", "kapının kilidini açıyorum, geçebilirsin", RegexOptions.IgnoreCase);
+            t = Regex.Replace(t, @"kapiyi\s+acabilirsin(iz)?", "kapının kilidini açıyorum, geçebilirsin", RegexOptions.IgnoreCase);
             // Çift tırnak sarma kalıntılarını temizle
             t = t.Trim('"', '\'', ' ');
             return t;
         }
 
+        private string OlusturDurumaOzelSistemIstemi(string oyuncuMesaji, int mevcutGuvenSkoru, int iknaAdimSayisi)
+        {
+            OyuncuMesajiniAnalizEt(
+                oyuncuMesaji,
+                out bool tehditVar,
+                out bool parolaVar,
+                out bool emirKanitVar,
+                out bool rusvetVar,
+                out bool dusukRusvetVar,
+                out bool alakasizVar);
+
+            bool kapiAcilacak = (parolaVar || emirKanitVar || rusvetVar) && !dusukRusvetVar && !tehditVar && iknaAdimSayisi >= 1 && (mevcutGuvenSkoru + 30) >= 80;
+            MuhafizTepkiTuru hedefTepki =
+                tehditVar ? MuhafizTepkiTuru.SaldirganKizdiran :
+                ((parolaVar || emirKanitVar || rusvetVar) && !dusukRusvetVar ? MuhafizTepkiTuru.IknaEdici :
+                (alakasizVar && !dusukRusvetVar ? MuhafizTepkiTuru.AlakasizKonusma :
+                (dusukRusvetVar ? MuhafizTepkiTuru.YetersizTeklif : MuhafizTepkiTuru.SupheciRed)));
+
+            int hedefGuvenDegisimi =
+                hedefTepki == MuhafizTepkiTuru.SaldirganKizdiran ? -35 :
+                (hedefTepki == MuhafizTepkiTuru.IknaEdici ? 30 :
+                (hedefTepki == MuhafizTepkiTuru.SupheciRed ? -5 : -10));
+
+            bool hedefSavas = hedefTepki == MuhafizTepkiTuru.SaldirganKizdiran;
+
+            string ornekCevap = SenaryoyaUygunCevapUret(
+                hedefTepki,
+                kapiAcilacak,
+                iknaAdimSayisi,
+                parolaVar,
+                emirKanitVar,
+                rusvetVar,
+                dusukRusvetVar);
+
+            string durumAciklamasi;
+            if (tehditVar)
+            {
+                durumAciklamasi = "Oyuncu sana hakaret ve tehdit etti! Çok sert bir şekilde onu azarlayıp tehditlerine boyun eğmeyeceğini ve kapıyı açmayacağını söyle (kapiyiAc: false, savasTetikle: true).";
+            }
+            else if ((parolaVar || emirKanitVar || rusvetVar) && !dusukRusvetVar)
+            {
+                if (kapiAcilacak)
+                {
+                    durumAciklamasi = "Oyuncu 2. aşamayı da tamamladı! Oyuncunun sunduğu kanıtı/altını kabul ettiğini ve Kızıl Kule kapısının kilidini şimdi SENİN açtığını, geçebileceğini söyle (kapiyiAc: true).";
+                }
+                else
+                {
+                    durumAciklamasi = "Henüz İlk Aşamadasın (Aşama 0/2). Kapıyı henüz AÇMA (kapiyiAc: false). Oyuncunun sunduğu ilk kanıtın/teklifin olumlu olduğunu söyle ama kapıyı açmak için ikinci doğrulama kanıtını ('Kızıl Şahin' gece parolası veya kraliyet mührü/500 altın) da sunmasını iste.";
+                }
+            }
+            else if (dusukRusvetVar)
+            {
+                durumAciklamasi = "Oyuncu sana çok düşük bir rüşvet teklif etti. Onu tersle, en az 500 altın veya gece parolası ('Kızıl Şahin') olmadan kapıyı açmayacağını söyle (kapiyiAc: false).";
+            }
+            else if (alakasizVar)
+            {
+                durumAciklamasi = "Oyuncu nöbetle alakasız bir şey söyledi. Onu sertçe uyar, burasının Kızıl Kule nöbet noktası olduğunu ve gece parolasını ('Kızıl Şahin') açıklaması gerektiğini söyle (kapiyiAc: false).";
+            }
+            else
+            {
+                durumAciklamasi = "Oyuncu kanıtsız bir ricada bulundu. Kuru sözle kapıyı açmayacağını, gece parolasını ('Kızıl Şahin') veya 500 altınlık keseyi göstermesi gerektiğini söyle (kapiyiAc: false).";
+            }
+
+            return sistemYonergesi + "\n" +
+                   "ŞU ANKİ DURUM VE GÖREVİN:\n" + durumAciklamasi + "\n\n" +
+                   "ÖRNEK KONUŞMA ÜSLUBU (Oyuncunun sözlerine göre kendi cümleni kur):\n" +
+                   "\"" + ornekCevap + "\"\n\n" +
+                   "Yanıtını SADECE aşağıdaki JSON formatında ver:\n" +
+                   "{\n" +
+                   "  \"cevap\": \"Komutan Varg'ın oyuncunun mesajına özel 1-2 cümlelik Türkçe yanıtı\",\n" +
+                   "  \"tepkiTuru\": \"" + hedefTepki + "\",\n" +
+                   "  \"guvenDegisimi\": " + hedefGuvenDegisimi + ",\n" +
+                   "  \"kapiyiAc\": " + (kapiAcilacak ? "true" : "false") + ",\n" +
+                   "  \"savasTetikle\": " + (hedefSavas ? "true" : "false") + "\n" +
+                   "}";
+        }
+
         /// <summary>
-        /// Modelin ürettiği cevabın Türkçe, anlamlı, JSON sızıntısız ve mevcut oyun kararıyla (kapı açma / reddetme)
-        /// %100 uyumlu olup olmadığını denetler.
+        /// Modelin ürettiği cevabın Türkçe, anlamlı, rolüne uygun ve mevcut oyun kararıyla (kapı açma / reddetme)
+        /// tutarlı olup olmadığını denetler.
         /// </summary>
-        private bool CevapGecerliVeTutarliMi(string cevap, MuhafizTepkiTuru tepki, bool kapiAciliyor)
+        private bool CevapGecerliVeTutarliMi(
+            string cevap,
+            MuhafizTepkiTuru tepki,
+            bool kapiAciliyor,
+            bool parolaVar,
+            bool emirKanitVar,
+            bool rusvetVar)
         {
             if (string.IsNullOrWhiteSpace(cevap)) return false;
-            if (cevap.Length < 18 || cevap.Length > 420) return false;
+            if (cevap.Length < 28 || cevap.Length > 450) return false;
 
             string k = cevap.ToLowerInvariant();
 
-            // 1. JSON anahtarı, kod kalıntısı veya İngilizce/meta halüsinasyon kontrolü
+            // 1. JSON anahtarı, rol karmaşası ("kapıyı açabilirsin" vb.), bozuk alt-kelime veya İngilizce/meta halüsinasyon kontrolü
             string[] yasakliKalintilar =
             {
                 "tepkituru", "guvendegisimi", "kapiyiac", "savastetikle", "{", "}",
                 "guvenskoru", "iknaadimi", "oyun durumu", "as an ai", "i am ", "i cannot",
-                "here is", "json", "prompt", "system:", "user:", "assistant:", "true", "false"
+                "here is", "json", "prompt", "system:", "user:", "assistant:", "true", "false",
+                "açabilirsin", "acabilirsin", "açabilirsiniz", "acabilirsiniz", "kapıyı açın", "kapiyi acin",
+                "sen aç", "siz açın", "ne istiyorsun", "sana bir parola", "hediye olarak",
+                "sendedir", "oyuncuya", "deme", "örnek üslup", "durum:", "sana 500", "size 500",
+                "teklif etmedim", "aptal muhafız", "aptalca bir", "söylediği için", "karşılaşırsın",
+                "bilmediğinizi", "now", "job", "thing", "need", "require", "golden", "gurulda",
+                "ya veya", "varlını", "tamahecek", "açlması", "acılacaktır", "açlabilir", "gecele",
+                "ölümlük", "kapisinin", "mühürünün", "aptalli", "yolumdan çekil", "beklemeyecektir",
+                "beklemiyorum", "oyun sandın", "konusal", "advice", "devalafet"
             };
             foreach (string yasak in yasakliKalintilar)
             {
@@ -307,26 +489,58 @@ namespace Yazlab.Yonetim
             }
 
             // 3. Karar - Metin Çelişkisi Kontrolü:
-            // Kapı henüz açılmıyorsa (ör. 1. aşama), muhafız "kapıyı açıyorum / geçebilirsin" diyemez!
             bool metindeGecisIzniVar = k.Contains("kapıyı açıyorum") || k.Contains("kapiyi aciyorum") ||
+                                       k.Contains("kilidini açıyorum") || k.Contains("kilidini aciyorum") ||
+                                       k.Contains("kilidi açıyorum") || k.Contains("kilidi aciyorum") ||
+                                       k.Contains("kapısını açıyorum") || k.Contains("kapisini aciyorum") ||
+                                       k.Contains("kapı açılıyor") || k.Contains("kapi aciliyor") ||
                                        k.Contains("geçebilirsin") || k.Contains("gecebilirsin") ||
-                                       k.Contains("yolun açık") || k.Contains("yolun acik") ||
-                                       k.Contains("kilidi açtım") || k.Contains("kilidi actim") ||
-                                       k.Contains("içeri gir") || k.Contains("iceri gir");
+                                       k.Contains("girebilirsin") || k.Contains("yolun açık") ||
+                                       k.Contains("yolun acik") || k.Contains("kilidi açtım") ||
+                                       k.Contains("kilidi actim") || k.Contains("içeri gir") ||
+                                       k.Contains("iceri gir") || k.Contains("buyrun");
 
+            // Kapı henüz açılmıyorsa (ör. 1. aşama), muhafız "kapıyı açıyorum / geçebilirsin" diyemez
             if (!kapiAciliyor && metindeGecisIzniVar)
             {
                 return false;
             }
 
-            // Kapı açılıyorsa (2. aşama tamamlandıysa), muhafız "kapıyı açmam / geçemezsin" diyemez!
-            bool metindeRedVar = k.Contains("açmam") || k.Contains("acmam") ||
-                                 k.Contains("açmıyorum") || k.Contains("acmiyorum") ||
-                                 k.Contains("geçemezsin") || k.Contains("gecemezsin") ||
-                                 k.Contains("izin vermiyorum") || k.Contains("reddediyorum") ||
-                                 k.Contains("yetersiz");
+            // 1. Aşamada (IknaEdici ama kapı henüz açılmıyor) muhafız oyuncunun zaten sunduğu kanıtı tekrar istememeli, ikinci kanıtı istemeli
+            if (!kapiAciliyor && tepki == MuhafizTepkiTuru.IknaEdici)
+            {
+                bool ikinciKanitIstiyor = k.Contains("parola") || k.Contains("kızıl şahin") || k.Contains("mühür") ||
+                                          k.Contains("mühr") || k.Contains("500") || k.Contains("altın") ||
+                                          k.Contains("emir") || k.Contains("emri");
+                if (!ikinciKanitIstiyor) return false;
 
-            if (kapiAciliyor && (metindeRedVar || !metindeGecisIzniVar))
+                if (rusvetVar && !parolaVar && !(k.Contains("parola") || k.Contains("kızıl şahin")))
+                {
+                    return false;
+                }
+                if (parolaVar && !rusvetVar && !(k.Contains("mühür") || k.Contains("mühr") || k.Contains("500") || k.Contains("altın")))
+                {
+                    return false;
+                }
+            }
+
+            // Kapı açılıyorsa (2. aşama tamamlandıysa):
+            // Muhafız soru soramaz ("?"), reddedemez ve bizzat kendisinin kapıyı/kilidi açtığını belirtmelidir
+            bool metindeRedVeyaSartVar = k.Contains("?") ||
+                                         k.Contains("açmam") || k.Contains("acmam") ||
+                                         k.Contains("açmıyorum") || k.Contains("acmiyorum") ||
+                                         k.Contains("geçemezsin") || k.Contains("gecemezsin") ||
+                                         k.Contains("izin vermiyorum") || k.Contains("reddediyorum") ||
+                                         k.Contains("yetersiz") || k.Contains("yetmez") ||
+                                         k.Contains("nereden bileyim") || k.Contains("göster") ||
+                                         k.Contains("kanıtla") || k.Contains("kesesini sun");
+
+            bool birinciSahisKapiAcmaVar = k.Contains("kapıyı açıyorum") || k.Contains("kapiyi aciyorum") ||
+                                           k.Contains("kilidini açıyorum") || k.Contains("kilidini aciyorum") ||
+                                           k.Contains("kilidi açıyorum") || k.Contains("kilidi aciyorum") ||
+                                           k.Contains("kapısını açıyorum") || k.Contains("kapisini aciyorum");
+
+            if (kapiAciliyor && (!birinciSahisKapiAcmaVar || !metindeGecisIzniVar || metindeRedVeyaSartVar))
             {
                 return false;
             }
@@ -416,21 +630,33 @@ namespace Yazlab.Yonetim
                 case MuhafizTepkiTuru.IknaEdici:
                     if (kapiAciliyor)
                     {
+                        if (rusvetVar && parolaVar)
+                        {
+                            return "Pekâlâ asker! Hem 'Kızıl Şahin' gece parolasını hem de 500 altınlık ağır keseyi eksiksiz sundun. Güvenimi kazandın; Kızıl Kule çıkış kapısının kilidini açıyorum, şimdi geçebilirsin!";
+                        }
                         if (rusvetVar)
                         {
-                            return "Pekâlâ! Hem parolayı doğruladın hem de 500 altınlık ağır keseyle sadakatini kanıtladın. Güvenimi kazandın asker, Kızıl Kule kapısını açıyorum; geçebilirsin!";
+                            return "Pekâlâ asker! Önceki doğrulamanın üzerine bu 500 altınlık ağır keseyle de sadakatini kanıtladın. Güvenimi kazandın; Kızıl Kule çıkış kapısının kilidini açıyorum, şimdi geçebilirsin!";
                         }
-                        return "Pekâlâ! Hem 'Kızıl Şahin' gece parolasını hem de Başkomutanın mühürlü emrini eksiksiz doğruladın. Kızıl Kule çıkış kapısını açıyorum, yolun açık olsun asker!";
+                        if (parolaVar)
+                        {
+                            return "Pekâlâ asker! Sunduğun kanıtın üzerine 'Kızıl Şahin' gece parolasını da eksiksiz doğruladın. Kızıl Kule çıkış kapısının kilidini açıyorum, yolun açık olsun!";
+                        }
+                        return "Pekâlâ asker! Başkomutanın kraliyet mührünü ve gizli görev emrini eksiksiz doğruladın. Kızıl Kule çıkış kapısının kilidini açıyorum, şimdi geçebilirsin!";
                     }
                     else
                     {
+                        if (parolaVar && rusvetVar)
+                        {
+                            return "Hem 'Kızıl Şahin' parolasını biliyorsun hem de 500 altınlık keseyi sunuyorsun demek! Neredeyse ikna oldum asker; son teyit olarak Başkomutanın kraliyet mührünü veya gizli görev emrini de söyle ki kapıyı açayım!";
+                        }
                         if (parolaVar)
                         {
-                            return "Hmm... 'Kızıl Şahin' gece parolasını biliyorsun demek! Ancak tek başına parola yetmez; şimdi bana Başkomutanın kraliyet mührünü göster ya da 500 altınlık ikramiye kesesini sun!";
+                            return "Hmm... 'Kızıl Şahin' gece parolasını biliyorsun demek! Ancak tek başına parola yetmez; kapıyı açmam için şimdi bana Başkomutanın kraliyet mührünü göster ya da 500 altınlık ikramiye kesesini sun!";
                         }
                         if (rusvetVar)
                         {
-                            return "Bu ağır altın kesesi kulağa hoş geliyor... Ama senin casus olmadığını nereden bileyim? Kapıyı açmam için bu gecenin nöbet parolasını ('Kızıl Şahin') veya Başkomutanın mühürlü emrini de söyle!";
+                            return "Beş yüz altınlık bu ağır kese kulağa hoş geliyor asker... Ama senin casus olmadığını nereden bileyim? Kapıyı açmam için bu gecenin nöbet parolasını ('Kızıl Şahin') veya Başkomutanın mühürlü emrini de söyle!";
                         }
                         return "Başkomutanın emrinden bahsediyorsun ha? Sözlerin tutarlı görünüyor ama son bir doğrulama şart: Gece parolasını ('Kızıl Şahin') veya 500 altınlık kraliyet ödeneğini hemen kanıtla!";
                     }
@@ -455,8 +681,7 @@ namespace Yazlab.Yonetim
         }
 
         /// <summary>
-        /// Küçük (3B) dil modellerinin tek mesajda hemen ikna olma eğilimini, alakasız/saçma yanıtlara puan vermesini
-        /// ve metin-karar çelişkilerini oyun kurallarıyla %100 uyumlu hale getirir.
+        /// Dil modelinin ürettiği kararı ve güven puanı değişimini oyun kurallarıyla denetler.
         /// </summary>
         private void DenetleVeDengeliPuanla(MuhafizKararVerisi karar, string oyuncuMesaji, int mevcutGuven, int iknaAdimSayisi)
         {
@@ -469,24 +694,25 @@ namespace Yazlab.Yonetim
                 out bool dusukRusvetVar,
                 out bool alakasizVar);
 
-            bool gucluArgumanVar = (parolaVar || emirKanitVar || rusvetVar) && !dusukRusvetVar && (oyuncuMesaji ?? "").Trim().Length >= 10;
+            bool modelIknaOlduMu = karar.GetTepkiEnum() == MuhafizTepkiTuru.IknaEdici && karar.guvenDegisimi > 0 && !alakasizVar && !dusukRusvetVar && !tehditVar;
+            bool gucluArgumanVar = ((parolaVar || emirKanitVar || rusvetVar) || modelIknaOlduMu) && !dusukRusvetVar && (oyuncuMesaji ?? "").Trim().Length >= 8;
 
-            // 1. Saldırgan / Kızdıran / Tehditkar mesaj kontrolü
-            if (tehditVar || karar.GetTepkiEnum() == MuhafizTepkiTuru.SaldirganKizdiran)
+            // 1. Saldırgan / Tehditkar mesaj kontrolü
+            if (tehditVar || (karar.GetTepkiEnum() == MuhafizTepkiTuru.SaldirganKizdiran && !parolaVar && !emirKanitVar && !rusvetVar))
             {
                 karar.tepkiTuru = "SaldirganKizdiran";
                 karar.guvenDegisimi = -35;
                 karar.kapiyiAc = false;
                 karar.savasTetikle = true;
 
-                if (!CevapGecerliVeTutarliMi(karar.cevap, MuhafizTepkiTuru.SaldirganKizdiran, false))
+                if (!CevapGecerliVeTutarliMi(karar.cevap, MuhafizTepkiTuru.SaldirganKizdiran, false, parolaVar, emirKanitVar, rusvetVar))
                 {
                     karar.cevap = SenaryoyaUygunCevapUret(MuhafizTepkiTuru.SaldirganKizdiran, false, iknaAdimSayisi, parolaVar, emirKanitVar, rusvetVar, dusukRusvetVar);
                 }
                 return;
             }
 
-            // 2. Güçlü argüman varsa (Parola / Başkomutan Emri / Mühür / 500+ Altın)
+            // 2. İkna edici argüman kontrolü
             if (gucluArgumanVar)
             {
                 karar.tepkiTuru = "IknaEdici";
@@ -494,17 +720,17 @@ namespace Yazlab.Yonetim
                 karar.savasTetikle = false;
 
                 int yeniGuven = Mathf.Clamp(mevcutGuven + karar.guvenDegisimi, 0, 100);
-                // İlk adımda (iknaAdimSayisi == 0) kapı ASLA açılmaz; 2. adımda ve güven >= 80 olduğunda açılır
+                // Kapı 2. adımda ve güven >= 80 olduğunda açılır
                 karar.kapiyiAc = (iknaAdimSayisi >= 1 && yeniGuven >= 80);
 
-                if (!CevapGecerliVeTutarliMi(karar.cevap, MuhafizTepkiTuru.IknaEdici, karar.kapiyiAc))
+                if (!CevapGecerliVeTutarliMi(karar.cevap, MuhafizTepkiTuru.IknaEdici, karar.kapiyiAc, parolaVar, emirKanitVar, rusvetVar))
                 {
                     karar.cevap = SenaryoyaUygunCevapUret(MuhafizTepkiTuru.IknaEdici, karar.kapiyiAc, iknaAdimSayisi, parolaVar, emirKanitVar, rusvetVar, dusukRusvetVar);
                 }
                 return;
             }
 
-            // 3. Güçlü argüman YOKSA modelin yanlışlıkla güven artırmasını veya kapıyı açmasını KESİNLİKLE engelle!
+            // 3. Yetersiz veya alakasız argüman kontrolü
             karar.kapiyiAc = false;
             karar.savasTetikle = false;
 
@@ -513,14 +739,20 @@ namespace Yazlab.Yonetim
                 karar.tepkiTuru = "AlakasizKonusma";
                 karar.guvenDegisimi = -10;
             }
-            else
+            else if (dusukRusvetVar)
             {
                 karar.tepkiTuru = "YetersizTeklif";
-                karar.guvenDegisimi = dusukRusvetVar ? -10 : -5;
+                karar.guvenDegisimi = -10;
+            }
+            else
+            {
+                MuhafizTepkiTuru mevcutEnum = karar.GetTepkiEnum();
+                karar.tepkiTuru = (mevcutEnum == MuhafizTepkiTuru.SupheciRed) ? "SupheciRed" : "YetersizTeklif";
+                karar.guvenDegisimi = -5;
             }
 
             MuhafizTepkiTuru hedefTepki = karar.GetTepkiEnum();
-            if (!CevapGecerliVeTutarliMi(karar.cevap, hedefTepki, false))
+            if (!CevapGecerliVeTutarliMi(karar.cevap, hedefTepki, false, parolaVar, emirKanitVar, rusvetVar))
             {
                 karar.cevap = SenaryoyaUygunCevapUret(hedefTepki, false, iknaAdimSayisi, parolaVar, emirKanitVar, rusvetVar, dusukRusvetVar);
             }

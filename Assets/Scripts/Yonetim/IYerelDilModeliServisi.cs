@@ -4,7 +4,6 @@ namespace Yazlab.Yonetim
 {
     /// <summary>
     /// Muhafızın diyalog sırasındaki duygusal ve mantıksal tepki kategorisi.
-    /// YazLab-I Proje İsterleri (Bölüm 4.4): En az 5 farklı diyalog senaryosunu sınıflandırır.
     /// </summary>
     public enum MuhafizTepkiTuru
     {
@@ -12,13 +11,12 @@ namespace Yazlab.Yonetim
         IknaEdici = 1,        // Mantıklı argüman, parola, belge veya rüşvetle güven kazandıran adım
         YetersizTeklif = 2,   // Çok düşük rüşvet veya zayıf bahane ("10 altınla beni mi kandıracaksın?")
         AlakasizKonusma = 3,  // Konu dışı / saçma konuşma ("Burası sohbet yeri değil, nöbetteyim!")
-        SaldirganKizdiran = 4 // Hakaret, tehdit veya aşırı şüphe uyandıran düşmanca tavır -> SAVAŞ TETİKLER!
+        SaldirganKizdiran = 4 // Hakaret, tehdit veya aşırı şüphe uyandıran düşmanca tavır
     }
 
     /// <summary>
     /// LLM'in ürettiği yapılandırılmış (structured JSON) çıktının ayrıştırıldığı veri modeli (DTO).
-    /// YazLab-I Proje İsterleri (Bölüm 3.2 & 4.2): Kırılgan serbest metin eşleştirmesi yerine
-    /// oyun durumunu değiştirecek veriler (kapı açma, savaş tetikleme, güven değişimi) bu sınıfla ayrıştırılır.
+    /// Oyun durumunu değiştirecek veriler (kapı açma, savaş tetikleme, güven değişimi) bu sınıfla ayrıştırılır.
     /// </summary>
     [Serializable]
     public class MuhafizKararVerisi
@@ -53,7 +51,10 @@ namespace Yazlab.Yonetim
     {
         string AktifModelAdi { get; }
         bool IstekDevamEdiyorMu { get; }
+        bool SunucuCevrimiciMi { get; }
+        string SonBaglantiDurumu { get; }
         void SohbetiSifirla();
+        void SunucuDurumunuKontrolEt(Action<bool, string> onTamamlandi = null);
         void MesajGonderAsenkron(
             string oyuncuMesaji,
             int mevcutGuvenSkoru,
