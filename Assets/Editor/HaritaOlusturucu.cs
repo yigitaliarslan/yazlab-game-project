@@ -462,8 +462,8 @@ namespace Yazlab.Editor
             tk.sensorPointLight = pointLight;
             tk.maksimumCan = 200f;
             tk.mevcutCan = 200f;
-            tk.atesHasari = 14f;
-            tk.atesAraligi = 0.42f;
+            tk.atesHasari = 22f;
+            tk.atesAraligi = 0.34f;
             tk.recoilMiktari = 0.35f;
 
             // --- DOĞU SURLARI BOYUNCA GİZLİ YAN KORİDOR VE YEDEK JENERATÖR ODASI ---

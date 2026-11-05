@@ -46,7 +46,7 @@ public class DusmanKontrol : MonoBehaviour
     public float atesAraligi = 0.95f;
 
     [Tooltip("Her atışta oyuncuya vereceği hasar.")]
-    public float atesHasari = 11f;
+    public float atesHasari = 18f;
 
     [Tooltip("Atış isabet sapması / doğruluğu (0: tam isabet, 1: hafif sapmalı).")]
     public float isabetSapmasi = 0.25f;
@@ -109,8 +109,8 @@ public class DusmanKontrol : MonoBehaviour
         maksimumCan = 120f;
         mevcutCan = maksimumCan;
         gorunenCan = maksimumCan;
-        atesHasari = 11f;
-        atesAraligi = 0.90f;
+        atesHasari = 18f;
+        atesAraligi = 0.85f;
 
         animator = GetComponent<Animator>();
         if (animator == null) animator = GetComponentInChildren<Animator>();

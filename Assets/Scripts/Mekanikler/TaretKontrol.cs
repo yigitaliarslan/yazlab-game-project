@@ -48,8 +48,8 @@ namespace Yazlab.Mekanikler
         public float taramaHizi = 1.35f;
 
         [Header("Çift Hedef & Eşzamanlı Ateş")]
-        public float hasarOyuncu = 10.0f;
-        public float hasarYardimci = 10.0f;
+        public float hasarOyuncu = 18.0f;
+        public float hasarYardimci = 15.0f;
 
         private Vector3 namluSolOrijinalLocalPos;
         private Vector3 namluSagOrijinalLocalPos;
@@ -81,8 +81,10 @@ namespace Yazlab.Mekanikler
             maksimumCan = 380f;
             mevcutCan = maksimumCan;
             gorusMenzili = 55f;
-            atesAraligi = 0.36f; // Seri ve agresif çift atış
-            atesHasari = 14f;
+            atesAraligi = 0.34f; // Seri ve agresif çift atış
+            atesHasari = 22f;
+            hasarOyuncu = 18f;
+            hasarYardimci = 15f;
             donusHizi = 8.5f;   // Çok daha hızlı hedefe kilitlenme
             canBariYukseklikOfseti = 1.15f;
             canBariGenislik = 140f;
@@ -759,10 +761,11 @@ namespace Yazlab.Mekanikler
                 dk.yurumeHizi = 3.2f + (i % 2) * 0.35f;
                 dk.durmaMesafesi = 3.6f + (i % 2) * 0.8f;
                 dk.gorusMenzili = 45f;
-                dk.atesAraligi = 0.95f;
-                dk.atesHasari = 9f;
+                dk.atesAraligi = 0.85f;
+                dk.atesHasari = 18f;
 
                 asker.SetActive(true);
+                dk.atesHasari = 18f;
                 dk.RengiUygula();
             }
 

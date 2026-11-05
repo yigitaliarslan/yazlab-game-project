@@ -42,7 +42,6 @@ public class OyuncuCani : MonoBehaviour
 
     void Awake()
     {
-        // Sahnedeki eski serialize edilmiş düşük can değerlerini ezerek yüksek dayanıklılık uygula
         if (maksimumCan < 260f) maksimumCan = 260f;
         mermiHasarLimiti = 5f;
         hasarKorumasi = 0.30f;

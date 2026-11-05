@@ -110,7 +110,6 @@ public class KarakterHareket : MonoBehaviour
             try { gameObject.tag = "Player"; } catch { }
         }
 
-        // Eğer sahnede eski merdiven korkulukları / yan boşlukları kalmışsa çalışma zamanında da koruma duvarlarını ve rampayı garantile
         MerdivenBosluklariniGuvenliKapat();
     }
 
@@ -119,7 +118,6 @@ public class KarakterHareket : MonoBehaviour
         GameObject bolge3 = GameObject.Find("4_Bolum3_IcKaleKulesi_Ve_NpcOdasi") ?? GameObject.Find("5_Bolge3_YikikKule_Merdivenler_Ve_Npc");
         if (bolge3 == null) return;
 
-        // Eski ince platform varsa altını doldur
         Transform ustPlat = bolge3.transform.Find("Kule_IkinciKat_Platformu");
         if (ustPlat != null && ustPlat.localScale.y < 1.5f)
         {
@@ -127,7 +125,7 @@ public class KarakterHareket : MonoBehaviour
             ustPlat.localScale = new Vector3(16.5f, 2.2f, 15f);
         }
 
-        // Merdivenin sol ve sağ yanlarındaki boşlukları kapat (Aşağı düşüp sıkışmayı %100 engeller)
+        // Merdivenin sol ve sağ yanlarındaki boşlukları kapat
         if (GameObject.Find("MerdivenHolu_SolDuvar") == null)
         {
             Material mat = ustPlat != null ? ustPlat.GetComponent<MeshRenderer>()?.sharedMaterial : null;

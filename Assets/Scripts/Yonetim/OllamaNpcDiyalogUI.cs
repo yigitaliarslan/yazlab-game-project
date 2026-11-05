@@ -30,6 +30,7 @@ namespace Yazlab.Yonetim
         private bool _savasBasladi = false;
         private Vector2 _kaydirmaPozisyonu = Vector2.zero;
         private bool _odakVerildi = false;
+        private bool _sunucuUyarisiGosterildi = false;
 
         private readonly List<SohbetSatiri> _sohbetKayitlari = new List<SohbetSatiri>();
 
@@ -99,6 +100,22 @@ namespace Yazlab.Yonetim
             Cursor.visible = true;
 
             MuhafiziOyuncuyaDondur();
+
+            if (_llmServisi != null)
+            {
+                _llmServisi.SunucuDurumunuKontrolEt((cevrimici, durum) =>
+                {
+                    if (!cevrimici && !_sunucuUyarisiGosterildi)
+                    {
+                        _sunucuUyarisiGosterildi = true;
+                        HatayiGoster($"Yerel Ollama sunucusuna ulaşılamadı veya model hazır değil ({durum}). Oyun çökmeden güvenli yedek karar mekanizmasıyla devam ediyor.");
+                    }
+                    else if (cevrimici)
+                    {
+                        _sunucuUyarisiGosterildi = false;
+                    }
+                });
+            }
         }
 
         public void DiyalogPenceresiniKapat()
@@ -257,7 +274,7 @@ namespace Yazlab.Yonetim
             {
                 konusan = "HATA YÖNETİMİ (BAĞLANTI / MODEL UYARISI)",
                 mesaj = hataMesaji,
-                etiketBilgisi = "[Sistem Çökmeden Güvenli Modda Devam Ediyor - Madde 4.3]",
+                etiketBilgisi = "[Sistem Çökmeden Güvenli Modda Devam Ediyor]",
                 oyuncuMu = false,
                 hataMi = true
             });
@@ -446,9 +463,10 @@ namespace Yazlab.Yonetim
                 return;
             }
 
-            // 2. Üst Bilgi: Güven Skoru, İkna Aşaması ve Son JSON Tepki Türü
+            // 2. Üst Bilgi: Güven Skoru, İkna Aşaması, Son JSON Tepki Türü ve Sunucu Bağlantı Durumu
             float barY = y + ustBarH + 8f * olcek;
-            string durumBilgisi = $"Güven Skoru: %{_mevcutGuvenSkoru}/100 (Hedef: %80+)   |   İkna Aşaması: {Mathf.Min(_basariliIknaAdimi, 2)}/2   |   Son Analiz: {_sonTepkiTuru}";
+            string sunucuEtiketi = (_llmServisi != null && _llmServisi.SunucuCevrimiciMi) ? "Çevrimiçi" : "Çevrimdışı (Güvenli Mod)";
+            string durumBilgisi = $"Güven: %{_mevcutGuvenSkoru}/100 (Hedef: %80+)  |  Aşama: {Mathf.Min(_basariliIknaAdimi, 2)}/2  |  Analiz: {_sonTepkiTuru}  |  Sunucu: {sunucuEtiketi}";
             GUI.Label(new Rect(x + kenar, barY, icGenislikTam, 22f * olcek), durumBilgisi, _altBaslikStil);
 
             float barH = Mathf.Round(10f * olcek);
@@ -462,7 +480,7 @@ namespace Yazlab.Yonetim
             GUI.DrawTexture(new Rect(x + kenar, barY + 22f * olcek, dolguW, barH), Texture2D.whiteTexture);
             GUI.color = Color.white;
 
-            // 3. Alt İpucu & İkna Rehberi Kutusu (Dinamik yükseklik ile yazının sığmaması %100 engellenir!)
+            // 3. Alt İpucu & İkna Rehberi Kutusu
             string ipucuMetni =
                 "NASIL İKNA EDİLİR? (Gece Parolası & 2 Aşamalı İkna Rehberi):\n" +
                 "• 1. Adım (Gece Parolası & Emir): Gece parolasının \"Kızıl Şahin\" (veya \"Gece Kuzgunu\") olduğunu ve Başkomutanın gizli istihbarat emriyle geldiğinizi yazın.\n" +
@@ -473,12 +491,12 @@ namespace Yazlab.Yonetim
             float ipucuKutuH = Mathf.Max(68f * olcek, ipucuMetinYuk + 14f * olcek);
             float ipucuY = y + h - ipucuKutuH - 10f * olcek;
 
-            // 4. Serbest Metin Giriş Alanı (İpucu kutusunun hemen üstünde)
+            // 4. Serbest Metin Giriş Alanı
             float girdiH = Mathf.Round(38f * olcek);
             float girdiY = ipucuY - girdiH - 8f * olcek;
             float gonderBtnW = Mathf.Round(145f * olcek);
 
-            // 5. Sohbet Geçmişi Kutusu (Üst bar ile giriş alanı arasındaki tüm boşluğa tam oturur)
+            // 5. Sohbet Geçmişi Kutusu
             float sohbetY = barY + barH + 28f * olcek;
             float sohbetH = Mathf.Max(110f * olcek, girdiY - sohbetY - 10f * olcek);
             Rect disAlani = new Rect(x + kenar, sohbetY, icGenislikTam, sohbetH);
@@ -517,12 +535,12 @@ namespace Yazlab.Yonetim
                 curY += kutuYuk + 8f * olcek;
             }
 
-            // Madde 3.2: Modelin yanıt üretme süresi (latency) boyunca görsel geri bildirim ("Düşünüyor...")
+            // Model yanıt üretirken görsel geri bildirim
             if (_llmServisi.IstekDevamEdiyorMu)
             {
                 int noktaSayisi = Mathf.FloorToInt(Time.time * 3f) % 4;
                 string noktalar = new string('.', noktaSayisi);
-                string dusunuyorMetni = $"⏳ Komutan Varg düşünüyor{noktalar} (Yerel LLM JSON yanıtı üretiyor, oyun akışı asenkron devam ediyor)";
+                string dusunuyorMetni = $"Komutan Varg düşünüyor{noktalar} (Yerel LLM JSON yanıtı üretiyor, oyun akışı asenkron devam ediyor)";
                 float dusYuk = _mesajMuhafizStil.CalcHeight(new GUIContent(dusunuyorMetni), mesajKutuGenislik) + 8f * olcek;
                 GUI.Box(new Rect(6f * olcek, curY, mesajKutuGenislik, dusYuk), dusunuyorMetni, _mesajMuhafizStil);
             }

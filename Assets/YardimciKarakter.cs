@@ -1,16 +1,39 @@
 using System.Collections;
 using UnityEngine;
+using UnityEngine.AI;
 
 /// <summary>
-/// Oyuncunun müttefiki olan asker kontrolcüsü.
-/// - Canı sonsuzdur (ölmez ve HUD'da can barı gösterilmez).
-/// - Sahnede düşman gördüğünde onlara ateş açar ve hasar verir.
-/// - Co-op bulmacalarda (ör. 2 Anahtarlı Asma Köprü) emredilen görev noktasına koşup anahtarı tutar.
-/// - Serbest durumdayken oyuncuyu akıcı şekilde yürüme/koşma animasyonuyla takip eder.
+/// NavMesh tabanlı otonom yardımcı karakterin temel sözleşmesi.
 /// </summary>
-public class YardimciKarakter : MonoBehaviour
+public interface IOtonomAjan
+{
+    YardimciKarakter.AjanDurumu MevcutAjanDurumu { get; }
+    bool GorevAktifMi { get; }
+    bool GorevNoktasindaMi { get; }
+    void GorevNoktasinaGit(Vector3 nokta);
+    void GoreviBitirVeTakipEt();
+}
+
+/// <summary>
+/// Oyuncunun müttefiki olan NavMesh ve Raycast sensör tabanlı otonom asker kontrolcüsü.
+/// - Sonlu Durum Makinesi (FSM: OyuncuTakip, GorevNoktasinaIlerleme, GorevNoktasindaBekleme, DusmanlaCatisma) ile karar alır.
+/// - Sahnede düşman gördüğünde Raycast sensörüyle görüş hattını doğrulayıp ateş açar.
+/// - Co-op bulmacalarda emredilen görev noktasına ilerleyip mekanizmayı tetikler.
+/// </summary>
+public class YardimciKarakter : MonoBehaviour, IOtonomAjan
 {
     public static YardimciKarakter Instance { get; private set; }
+
+    /// <summary>
+    /// Otonom ajanın Sonlu Durum Makinesi (Finite State Machine - FSM) durumları.
+    /// </summary>
+    public enum AjanDurumu
+    {
+        OyuncuTakip,
+        GorevNoktasinaIlerleme,
+        GorevNoktasindaBekleme,
+        DusmanlaCatisma
+    }
 
     public enum DonusModu
     {
@@ -61,11 +84,16 @@ public class YardimciKarakter : MonoBehaviour
     private bool gorevAktif = false;
     private Vector3 gorevHedefNoktasi;
     private bool gorevNoktasinaUlasti = false;
+    private AjanDurumu mevcutAjanDurumu = AjanDurumu.OyuncuTakip;
 
     // Yan karakterin canı sonsuzdur, asla ölmez
     public bool IsDead => false;
     public bool GorevAktifMi => gorevAktif;
     public bool GorevNoktasindaMi => gorevAktif && gorevNoktasinaUlasti;
+    public AjanDurumu MevcutAjanDurumu => mevcutAjanDurumu;
+
+    private NavMeshAgent agent;
+    public NavMeshAgent Agent => agent;
 
     void Awake()
     {
@@ -74,7 +102,6 @@ public class YardimciKarakter : MonoBehaviour
         maksimumCan = 999999f;
         mevcutCan = 999999f;
 
-        // Sahnedeki eski serialize edilmiş değerleri ezerek dengeli-güçlü ajan değerlerini uygula
         atesMenzili = 44f;
         atesAraligi = 0.62f;
         atesHasari = 34f;
@@ -111,6 +138,23 @@ public class YardimciKarakter : MonoBehaviour
         namluNoktasi = namluObj.transform;
 
         KurMermiEfektleri();
+
+        agent = GetComponent<NavMeshAgent>();
+        if (agent == null)
+        {
+            agent = gameObject.AddComponent<NavMeshAgent>();
+        }
+        agent.speed = hareketHizi;
+        agent.angularSpeed = donusHizi * 35f;
+        agent.acceleration = 18f;
+        agent.stoppingDistance = takipMesafesi;
+        agent.radius = 0.35f;
+        agent.height = 1.8f;
+        agent.baseOffset = 0f;
+        agent.updatePosition = true;
+        agent.updateRotation = false;
+        agent.autoBraking = true;
+        agent.obstacleAvoidanceType = ObstacleAvoidanceType.LowQualityObstacleAvoidance;
     }
 
     private void HazirlaAnimator()
@@ -141,6 +185,14 @@ public class YardimciKarakter : MonoBehaviour
         RengiUygula();
         HazirlaAnimator();
         HareketAnimasyonuGuncelle(false);
+
+        if (agent != null && !agent.isOnNavMesh)
+        {
+            if (NavMesh.SamplePosition(transform.position, out NavMeshHit hit, 5.0f, NavMesh.AllAreas))
+            {
+                agent.Warp(hit.position);
+            }
+        }
     }
 
     /// <summary>
@@ -149,8 +201,14 @@ public class YardimciKarakter : MonoBehaviour
     public void GorevNoktasinaGit(Vector3 nokta)
     {
         gorevAktif = true;
-        gorevHedefNoktasi = new Vector3(nokta.x, transform.position.y, nokta.z);
+        gorevHedefNoktasi = nokta;
         gorevNoktasinaUlasti = false;
+        if (agent != null && agent.isOnNavMesh)
+        {
+            agent.stoppingDistance = 0.35f;
+            agent.isStopped = false;
+            agent.SetDestination(nokta);
+        }
     }
 
     /// <summary>
@@ -160,6 +218,11 @@ public class YardimciKarakter : MonoBehaviour
     {
         gorevAktif = false;
         gorevNoktasinaUlasti = false;
+        if (agent != null && agent.isOnNavMesh)
+        {
+            agent.stoppingDistance = takipMesafesi;
+            agent.isStopped = false;
+        }
     }
 
     public void RengiUygula()
@@ -179,6 +242,7 @@ public class YardimciKarakter : MonoBehaviour
     {
         if (Yazlab.Mekanikler.KapiBulmacaPaneli.MinigameAcik || Yazlab.Yonetim.OllamaNpcDiyalogUI.DiyalogAcikMi || Yazlab.Mekanikler.PrensesKurtarmaGorevi.OyunBittiMi)
         {
+            if (agent != null && agent.isOnNavMesh) agent.isStopped = true;
             HareketAnimasyonuGuncelle(false);
             return;
         }
@@ -188,36 +252,45 @@ public class YardimciKarakter : MonoBehaviour
         // 1. Co-op Görev Noktası Hareketi (Öncelikli - Asma Köprü Anahtarı vb.)
         if (gorevAktif)
         {
-            Vector3 fark = gorevHedefNoktasi - transform.position;
-            fark.y = 0f;
-            float mesafe = fark.magnitude;
-
-            if (mesafe > 0.45f)
+            if (agent != null && agent.isOnNavMesh)
             {
-                gorevNoktasinaUlasti = false;
-                Vector3 yon = fark.normalized;
-                transform.position += yon * hareketHizi * Time.deltaTime;
-                ZeminYuksekliginiHizala(gorevHedefNoktasi.y);
+                agent.stoppingDistance = 0.35f;
+                agent.isStopped = false;
+                agent.SetDestination(gorevHedefNoktasi);
 
-                Quaternion hedefRot = Quaternion.LookRotation(yon);
-                transform.rotation = Quaternion.Slerp(transform.rotation, hedefRot, Time.deltaTime * donusHizi * 1.5f);
-                HareketAnimasyonuGuncelle(true);
-                return;
-            }
-            else
-            {
-                gorevNoktasinaUlasti = true;
-                HareketAnimasyonuGuncelle(false);
-                Quaternion ileriRot = Quaternion.Euler(0f, 0f, 0f);
-                transform.rotation = Quaternion.Slerp(transform.rotation, ileriRot, Time.deltaTime * donusHizi);
-                return;
+                float kalanMesafe = agent.pathPending ? Vector3.Distance(transform.position, gorevHedefNoktasi) : agent.remainingDistance;
+                if (kalanMesafe <= 0.45f)
+                {
+                    gorevNoktasinaUlasti = true;
+                    mevcutAjanDurumu = AjanDurumu.GorevNoktasindaBekleme;
+                    agent.isStopped = true;
+                    HareketAnimasyonuGuncelle(false);
+                    Quaternion ileriRot = Quaternion.Euler(0f, 0f, 0f);
+                    transform.rotation = Quaternion.Slerp(transform.rotation, ileriRot, Time.deltaTime * donusHizi);
+                    return;
+                }
+                else
+                {
+                    gorevNoktasinaUlasti = false;
+                    mevcutAjanDurumu = AjanDurumu.GorevNoktasinaIlerleme;
+                    HareketAnimasyonuGuncelle(true);
+                    Vector3 hareketYonu = agent.desiredVelocity.sqrMagnitude > 0.01f ? agent.desiredVelocity.normalized : (gorevHedefNoktasi - transform.position).normalized;
+                    hareketYonu.y = 0f;
+                    if (hareketYonu.sqrMagnitude > 0.001f)
+                    {
+                        Quaternion hedefRot = Quaternion.LookRotation(hareketYonu);
+                        transform.rotation = Quaternion.Slerp(transform.rotation, hedefRot, Time.deltaTime * donusHizi * 1.5f);
+                    }
+                    return;
+                }
             }
         }
 
         // 2. En yakın canlı düşmanı bul
         hedefDusman = EnYakinCanliDusmaniBul();
+        mevcutAjanDurumu = hedefDusman != null ? AjanDurumu.DusmanlaCatisma : AjanDurumu.OyuncuTakip;
 
-        // 3. Oyuncuyu Takip Etme (Hem normalde hem çatışmada oyuncudan kopmaması için)
+        // 3. Oyuncuyu Takip Etme (NavMeshAgent Tabanlı Akıcı ve Işınlanmasız Takip)
         bool suKaredeYurudu = false;
 
         if (hedef != null)
@@ -227,97 +300,56 @@ public class YardimciKarakter : MonoBehaviour
             takipOfseti.y = 0f;
             Vector3 arzuEdilenNokta = hedef.position + takipOfseti;
 
-            Vector3 oyuncuFark = hedef.position - transform.position;
-            oyuncuFark.y = 0f;
-            float oyuncuMesafe = oyuncuFark.magnitude;
+            float oyuncuMesafe = Vector3.Distance(transform.position, hedef.position);
+            float noktaMesafe = Vector3.Distance(transform.position, arzuEdilenNokta);
 
-            Vector3 noktaFark = arzuEdilenNokta - transform.position;
-            noktaFark.y = 0f;
-            float noktaMesafe = noktaFark.magnitude;
-
-            // Oyuncu henüz hendeğin güneyindeyse veya köprü kapalıysa yardımcı da suya girmesin
             bool kopruKapali = !Yazlab.Mekanikler.AsmaKopruKontrol.KopruAcikMi;
             bool oyuncuHendekGuneyinde = (hedef.position.z < -13.5f || kopruKapali) && transform.position.z < -13.5f;
             if (oyuncuHendekGuneyinde && arzuEdilenNokta.z > -14.4f)
             {
                 arzuEdilenNokta.z = -14.6f;
-                noktaFark = arzuEdilenNokta - transform.position;
-                noktaFark.y = 0f;
-                noktaMesafe = noktaFark.magnitude;
             }
 
-            // Köprü açıksa ve yardımcı karakter hendeğin güneyinden kuzeyine geçecekse,
-            // yandan (suyun üstünden) yürümemesi için önce köprü girişine/ortasına (X: -1.1 .. +1.1) hizalanmasını sağla
-            if (!kopruKapali && transform.position.z < -7.8f && hedef.position.z > -14.2f)
+            if (agent != null && agent.isOnNavMesh)
             {
-                if (transform.position.z < -14.1f && Mathf.Abs(transform.position.x) > 1.35f)
+                float aktifTakipEsigi = (hedefDusman != null) ? (takipMesafesi + 1.2f) : takipMesafesi;
+                agent.stoppingDistance = aktifTakipEsigi;
+
+                if (oyuncuMesafe > aktifTakipEsigi || noktaMesafe > 0.75f)
                 {
-                    // Henüz köprüye girmediyse ve sağda/solda açıktaysa önce köprü ağzına gel
-                    arzuEdilenNokta = new Vector3(Mathf.Clamp(transform.position.x, -0.9f, 0.9f), hedef.position.y, -14.4f);
+                    agent.isStopped = false;
+                    agent.speed = oyuncuMesafe > 6.0f ? (hareketHizi * 1.25f) : hareketHizi;
+                    agent.SetDestination(arzuEdilenNokta);
+                    suKaredeYurudu = agent.velocity.sqrMagnitude > 0.12f || agent.desiredVelocity.sqrMagnitude > 0.12f;
                 }
                 else
                 {
-                    // Köprü üzerindeyken hedef X noktasını köprü genişliği (-1.1 .. +1.1) içinde tut
-                    arzuEdilenNokta.x = Mathf.Clamp(arzuEdilenNokta.x, -1.1f, 1.1f);
-                }
-                noktaFark = arzuEdilenNokta - transform.position;
-                noktaFark.y = 0f;
-                noktaMesafe = noktaFark.magnitude;
-            }
-
-            // Eğer yardımcı karakter çok geride kaldıysa veya bir yere takıldıysa oyuncunun yanına ışınla
-            if (oyuncuMesafe > 13.5f && !oyuncuHendekGuneyinde && !kopruKapali)
-            {
-                Vector3 kurtarmaKonumu = hedef.position - hedef.forward * 2.0f + hedef.right * 0.8f;
-                if (kurtarmaKonumu.z > -14.5f && kurtarmaKonumu.z < -8.0f)
-                {
-                    kurtarmaKonumu.x = Mathf.Clamp(kurtarmaKonumu.x, -1.1f, 1.1f);
-                }
-                kurtarmaKonumu.y = hedef.position.y;
-                transform.position = kurtarmaKonumu;
-                oyuncuMesafe = 2.2f;
-                noktaMesafe = 0.3f;
-            }
-
-            // Çatışma varken biraz daha esnek durma mesafesi, çatışma yokken yakın takip
-            float aktifTakipEsigi = (hedefDusman != null) ? (takipMesafesi + 1.2f) : takipMesafesi;
-
-            if (oyuncuMesafe > aktifTakipEsigi && noktaMesafe > 0.65f)
-            {
-                // Köprü bölgesindeyken (Z: -15 .. -7.5) sağa/sola engel kaçışı yapıp köprü dışına çıkmasını engelle
-                bool kopruBolgesinde = transform.position.z > -15.2f && transform.position.z < -7.5f;
-                Vector3 hareketYonu = kopruBolgesinde ? noktaFark.normalized : EngelsizYonBul(noktaFark.normalized, oyuncuFark.normalized);
-                float anlikHiz = oyuncuMesafe > 5.0f ? (hareketHizi * 1.18f) : hareketHizi;
-
-                // Köprü kapalıysa veya oyuncu henüz hendeği geçmediyse hendek boşluğuna (-14.3 ile -8.5 arası) girmesini önle
-                Vector3 yeniKonum = transform.position + hareketYonu * anlikHiz * Time.deltaTime;
-                if (oyuncuHendekGuneyinde && yeniKonum.z > -14.3f && yeniKonum.z < -8.5f)
-                {
-                    yeniKonum.z = transform.position.z;
-                }
-                else if (!kopruKapali && yeniKonum.z > -14.4f && yeniKonum.z < -8.0f)
-                {
-                    // Köprü açıkken hendeği geçiyorsa tam köprü tahtaları ortasında (X: -1.25 .. +1.25) yürümesini sağla
-                    yeniKonum.x = Mathf.Clamp(yeniKonum.x, -1.25f, 1.25f);
+                    agent.isStopped = true;
+                    suKaredeYurudu = false;
                 }
 
-                transform.position = yeniKonum;
-                ZeminYuksekliginiHizala(hedef.position.y);
-                suKaredeYurudu = true;
-
-                // Düşman yoksa veya oyuncudan çok uzaklaştıysa yürüdüğü yöne baksın; düşman varsa düşmana dönecek
+                // Düşman yoksa gittiği yöne baksın
                 if (hedefDusman == null || oyuncuMesafe > 9.5f)
                 {
-                    if (hareketYonu.sqrMagnitude > 0.001f)
+                    Vector3 bakisYonu = agent.velocity.sqrMagnitude > 0.1f ? agent.velocity : agent.desiredVelocity;
+                    bakisYonu.y = 0f;
+                    if (bakisYonu.sqrMagnitude > 0.01f)
                     {
-                        Quaternion kosuRot = Quaternion.LookRotation(hareketYonu);
+                        Quaternion kosuRot = Quaternion.LookRotation(bakisYonu.normalized);
                         transform.rotation = Quaternion.Slerp(transform.rotation, kosuRot, Time.deltaTime * donusHizi * 1.4f);
                     }
                 }
             }
             else
             {
-                ZeminYuksekliginiHizala(hedef.position.y);
+                // NavMesh dışına düşmüşse en yakın NavMesh yüzeyine bağla
+                if (agent != null && !agent.isOnNavMesh)
+                {
+                    if (NavMesh.SamplePosition(transform.position, out NavMeshHit hit, 5.0f, NavMesh.AllAreas))
+                    {
+                        agent.Warp(hit.position);
+                    }
+                }
             }
         }
 
