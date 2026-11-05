@@ -311,7 +311,7 @@ namespace Yazlab.Mekanikler
             altBaslikStili.normal.textColor = Color.white;
 
             GUI.color = Color.white;
-            GoruntuKalitesiYoneticisi.KeskinEtiketCiz(new Rect(kutuX, kutuY, w, h), "⚡ [E] ELEKTRİK ŞALTERİNİ AÇ", altBaslikStili);
+            GoruntuKalitesiYoneticisi.KeskinEtiketCiz(new Rect(kutuX, kutuY, w, h), "[E] ELEKTRİK ŞALTERİNİ AÇ", altBaslikStili);
 
             GUI.color = eski;
         }
@@ -433,14 +433,14 @@ namespace Yazlab.Mekanikler
 
             GUI.color = Color.white;
             GUI.Label(new Rect(panelX + 18 * olcek, panelY + 14 * olcek, baslikMetinW, 28 * olcek),
-                "⚡ ELEKTRİK KONTROL ÜNİTESİ // 1. KAPI SİGORTALARI", baslikStili);
+                "ELEKTRİK KONTROL ÜNİTESİ // 1. KAPI SİGORTALARI", baslikStili);
 
             GUI.Label(new Rect(panelX + 18 * olcek, panelY + 42 * olcek, baslikMetinW, 32 * olcek),
                 "Tüm sigortaları (Fare veya [1-5] tuşlarıyla) AÇIK konuma getirerek ana jeneratörü devreye sokun.", aciklamaStili);
 
             // Sağ Üst [X] ÇIKIŞ Butonu
             GUI.color = new Color(0.85f, 0.22f, 0.22f, 1f);
-            if (GUI.Button(new Rect(panelX + panelW - cikisBtnW - 18 * olcek, panelY + 24 * olcek, cikisBtnW, cikisBtnH), "✕ ÇIKIŞ [ESC]", cikisButonStili))
+            if (GUI.Button(new Rect(panelX + panelW - cikisBtnW - 18 * olcek, panelY + 24 * olcek, cikisBtnW, cikisBtnH), "ÇIKIŞ [ESC]", cikisButonStili))
             {
                 PaneliKapat();
                 GUI.color = eski;
@@ -525,7 +525,7 @@ namespace Yazlab.Mekanikler
             if (!bulmacaCozuldu)
             {
                 GUI.color = new Color(0.18f, 0.85f, 0.35f, 1f);
-                string anaButonYazi = "⚡ ŞALTERİ AÇ & KAPIYI KALDIR (MENÜYÜ KAPAT)";
+                string anaButonYazi = "ŞALTERİ AÇ & KAPIYI KALDIR (MENÜYÜ KAPAT)";
                 if (GUI.Button(new Rect(panelX + 24 * olcek, altY + 10 * olcek, panelW - 48 * olcek, altH - 20 * olcek), anaButonYazi, anaButonStili))
                 {
                     BulmacayiTamamla();
@@ -536,7 +536,7 @@ namespace Yazlab.Mekanikler
                 GUI.color = Color.white;
                 baslikStili.normal.textColor = new Color(0.20f, 1.0f, 0.40f);
                 GUI.Label(new Rect(panelX + 20 * olcek, altY + 18 * olcek, panelW - 40 * olcek, 38 * olcek),
-                    "✓ GÜÇ VERİLDİ! GÜNEŞ DOĞUYOR VE 1. KAPI AÇILIYOR...", baslikStili);
+                    "GÜÇ VERİLDİ! GÜNEŞ DOĞUYOR VE 1. KAPI AÇILIYOR...", baslikStili);
             }
 
             GUI.color = eski;

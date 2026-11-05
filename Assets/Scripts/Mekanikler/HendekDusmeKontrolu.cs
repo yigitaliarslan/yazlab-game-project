@@ -251,7 +251,7 @@ namespace Yazlab.Mekanikler
             float h = 92f * olcek;
             Rect r = new Rect(Mathf.Round((Screen.width - w) * 0.5f), Mathf.Round((Screen.height - h) * 0.42f), w, h);
             GUI.Box(r, GUIContent.none, kutuStil);
-            GoruntuKalitesiYoneticisi.KeskinEtiketCiz(new Rect(r.x, r.y + 14f * olcek, r.width, 32f * olcek), "🌊 HENDEK SUYUNA DÜŞTÜNÜZ!", _baslikStil);
+            GoruntuKalitesiYoneticisi.KeskinEtiketCiz(new Rect(r.x, r.y + 14f * olcek, r.width, 32f * olcek), "HENDEK SUYUNA DÜŞTÜNÜZ!", _baslikStil);
             GoruntuKalitesiYoneticisi.KeskinEtiketCiz(new Rect(r.x, r.y + 48f * olcek, r.width, 28f * olcek), "Başlangıç Noktasından Yeniden Başlatılıyor...", _altStil);
 
             GUI.color = eski;

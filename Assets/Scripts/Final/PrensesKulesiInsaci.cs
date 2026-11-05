@@ -492,7 +492,15 @@ namespace Yazlab.Mekanikler
             g.transform.position = pos;
             g.transform.localScale = scale;
             if (mat != null) g.GetComponent<MeshRenderer>().sharedMaterial = mat;
-            if (!collider) Object.Destroy(g.GetComponent<Collider>());
+            if (!collider)
+            {
+                Collider c = g.GetComponent<Collider>();
+                if (c != null)
+                {
+                    if (Application.isPlaying) Object.Destroy(c);
+                    else Object.DestroyImmediate(c);
+                }
+            }
             return g;
         }
 
@@ -500,7 +508,11 @@ namespace Yazlab.Mekanikler
         private static void MeshColliderYap(GameObject g)
         {
             Collider eski = g.GetComponent<Collider>();
-            if (eski != null) Object.DestroyImmediate(eski);
+            if (eski != null)
+            {
+                if (Application.isPlaying) Object.Destroy(eski);
+                else Object.DestroyImmediate(eski);
+            }
             MeshCollider mc = g.AddComponent<MeshCollider>();
             mc.sharedMesh = g.GetComponent<MeshFilter>().sharedMesh;
         }

@@ -50,10 +50,10 @@ namespace Yazlab.Editor
             {
                 EditorUtility.DisplayDialog("3 Bölümlü Kale Haritası Hazır!",
                     "3 Bölümlü Taktiksel Kale Haritası ve Prosedürel Kaplamalar başarıyla inşa edildi!\n\n" +
-                    "✓ 1. BÖLÜM: Kale dışı başlangıç alanı, Hendek (Moat), Eşzamanlı 2 Anahtar Sütunu ([G] + [E]) ve Askı Kapı (Asma Köprü) kuruldu.\n" +
-                    "✓ 2. BÖLÜM: Ayrı Kablo & Şalter Odası, Eğilme ([C]/[Ctrl]) siperleri ve Taret Savunma Odası birbirinden duvarlarla ayrıldı.\n" +
-                    "✓ 3. BÖLÜM: Çok katlı gerçek İç Kule (Keep), yan boşlukları kapatılmış pürüzsüz taş merdiven holü ve 2. kat NPC Muhafız Odası inşa edildi.\n\n" +
-                    "Şimdi Play (▶) tuşuna basarak operasyona başlayabilirsiniz!", "Harika!");
+                    "- 1. BÖLÜM: Kale dışı başlangıç alanı, Hendek (Moat), Eşzamanlı 2 Anahtar Sütunu ([G] + [E]) ve Askı Kapı (Asma Köprü) kuruldu.\n" +
+                    "- 2. BÖLÜM: Ayrı Kablo & Şalter Odası, Eğilme ([C]/[Ctrl]) siperleri ve Taret Savunma Odası birbirinden duvarlarla ayrıldı.\n" +
+                    "- 3. BÖLÜM: Çok katlı gerçek İç Kule (Keep), yan boşlukları kapatılmış pürüzsüz taş merdiven holü ve 2. kat NPC Muhafız Odası inşa edildi.\n\n" +
+                    "Şimdi Play tuşuna basarak operasyona başlayabilirsiniz!", "Harika!");
             }
         }
 
@@ -462,7 +462,7 @@ namespace Yazlab.Editor
             tk.sensorPointLight = pointLight;
             tk.maksimumCan = 200f;
             tk.mevcutCan = 200f;
-            tk.atesHasari = 9f;
+            tk.atesHasari = 14f;
             tk.atesAraligi = 0.42f;
             tk.recoilMiktari = 0.35f;
 
@@ -538,7 +538,7 @@ namespace Yazlab.Editor
             KutuOlustur("Kule_UstCatiKirisi_2", new Vector3(0f, 9.4f, 34f), new Vector3(18.5f, 0.8f, 1.5f), matKoyuTas, bolge3.transform);
             KutuOlustur("Kule_UstCatiKirisi_3", new Vector3(0f, 9.4f, 40f), new Vector3(18.5f, 0.8f, 1.5f), matKoyuTas, bolge3.transform);
 
-            // --- TAM DOLGULU 2. KAT PLATFORMU (Altı tamamen dolu taş kütle: Y = 0'dan Y = 2.2m'ye kadar, altına girip sıkışmak imkansız!) ---
+            // 2. Kat Platformu
             GameObject ustPlatform = GameObject.CreatePrimitive(PrimitiveType.Cube);
             ustPlatform.name = "Kule_IkinciKat_Platformu";
             ustPlatform.transform.SetParent(bolge3.transform);
@@ -546,7 +546,7 @@ namespace Yazlab.Editor
             ustPlatform.transform.localScale = new Vector3(16.5f, 2.2f, 15f);
             ustPlatform.GetComponent<MeshRenderer>().sharedMaterial = matKoyuTas;
 
-            // --- YANLARI TAMAMEN KAPALI MERDİVEN HOLÜ (Sol ve sağ çukurlar tamamen taş duvarla dolduruldu; aşağı düşüp sıkışma %100 önlendi!) ---
+            // Merdiven Holü Yan Duvarları
             KutuOlustur("MerdivenHolu_SolDuvar", new Vector3(-5.6f, 4.5f, 25.6f), new Vector3(5.2f, 9.0f, 7.2f), matTasDuvar, bolge3.transform);
             KutuOlustur("MerdivenHolu_SagDuvar", new Vector3(5.6f, 4.5f, 25.6f), new Vector3(5.2f, 9.0f, 7.2f), matTasDuvar, bolge3.transform);
 
@@ -859,9 +859,6 @@ namespace Yazlab.Editor
             Camera mainCam = Camera.main;
             if (mainCam != null)
             {
-                OyuncuHareket oh = mainCam.GetComponent<OyuncuHareket>();
-                if (oh != null) Object.DestroyImmediate(oh);
-
                 KameraTakip kt = mainCam.GetComponent<KameraTakip>();
                 if (kt == null) kt = mainCam.gameObject.AddComponent<KameraTakip>();
 

@@ -82,7 +82,7 @@ namespace Yazlab.Mekanikler
             mevcutCan = maksimumCan;
             gorusMenzili = 55f;
             atesAraligi = 0.36f; // Seri ve agresif çift atış
-            atesHasari = 10f;
+            atesHasari = 14f;
             donusHizi = 8.5f;   // Çok daha hızlı hedefe kilitlenme
             canBariYukseklikOfseti = 1.15f;
             canBariGenislik = 140f;
@@ -760,7 +760,7 @@ namespace Yazlab.Mekanikler
                 dk.durmaMesafesi = 3.6f + (i % 2) * 0.8f;
                 dk.gorusMenzili = 45f;
                 dk.atesAraligi = 0.95f;
-                dk.atesHasari = 6f;
+                dk.atesHasari = 9f;
 
                 asker.SetActive(true);
                 dk.RengiUygula();
@@ -960,7 +960,7 @@ namespace Yazlab.Mekanikler
             GUI.color = Color.white;
             float baslikH = Mathf.Max(20f, 20f * olcek);
             GoruntuKalitesiYoneticisi.KeskinEtiketCiz(
-                new Rect(solX - 35f, ustY - baslikH - 2f, genislik + 70f, baslikH), "⚔ DÜŞMAN TARET", taretBaslikStili);
+                new Rect(solX - 35f, ustY - baslikH - 2f, genislik + 70f, baslikH), "DÜŞMAN TARET", taretBaslikStili);
 
             if (taretCanStili == null)
             {

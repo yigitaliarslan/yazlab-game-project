@@ -156,7 +156,7 @@ namespace Yazlab.Mekanikler
                 bagliKopru.Ac();
             }
 
-            BildirimGoster("✓ EŞZAMANLI KİLİT AÇILDI! Askı Kapı (Asma Köprü) Hendeğin Üzerine İniyor!", 5.0f);
+            BildirimGoster("EŞZAMANLI KİLİT AÇILDI! Askı Kapı (Asma Köprü) Hendeğin Üzerine İniyor!", 5.0f);
             StartCoroutine(YardimciyiAvluyaIlerlet());
         }
 
@@ -264,7 +264,7 @@ namespace Yazlab.Mekanikler
 
             if (bildirimAktif)
             {
-                ustYazi = "★ 1. BÖLÜM: KALE DIŞI & HENDEK GEÇİDİ ★";
+                ustYazi = "1. BÖLÜM: KALE DIŞI & HENDEK GEÇİDİ";
                 altYazi = _bildirimMesaji;
             }
             else
@@ -277,7 +277,7 @@ namespace Yazlab.Mekanikler
                 altYazi = $"{sagDurum}   |   SOL ANAHTAR: YAKLAŞIP [E] BASIN";
             }
 
-            // Sol üstteki BolumYoneticisi görev kutusuyla ASLA çakışmaması için ekranın orta-alt kısmında konumlandırılır
+            // Sol üstteki görev kutusuyla çakışmaması için ekranın orta-alt kısmında konumlandırılır
             float genislik = Mathf.Min(Screen.width - 40f, 660f * olcek);
             float icGenislik = genislik - 24f * olcek;
             float ustH = Mathf.Max(22f * olcek, _baslikStil.CalcHeight(new GUIContent(ustYazi), icGenislik) + 4f);

@@ -559,7 +559,7 @@ namespace Yazlab.Mekanikler
                 float y = Screen.height - h - 56f * olcek;
 
                 GUI.DrawTexture(new Rect(x, y, w, h), _texKoyu);
-                GoruntuKalitesiYoneticisi.KeskinEtiketCiz(new Rect(x + 12f * olcek, y + 6f * olcek, icW, bH), $"◆ {gosterilecekBaslik} ◆", baslik);
+                GoruntuKalitesiYoneticisi.KeskinEtiketCiz(new Rect(x + 12f * olcek, y + 6f * olcek, icW, bH), $"{gosterilecekBaslik}", baslik);
                 GoruntuKalitesiYoneticisi.KeskinEtiketCiz(new Rect(x + 12f * olcek, y + 6f * olcek + bH, icW, mH), gosterilecekMetin, metin);
             }
         }

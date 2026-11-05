@@ -29,12 +29,6 @@ public class YardimciKarakterKurulum
         Camera mainCam = Camera.main;
         if (mainCam != null)
         {
-            OyuncuHareket oh = mainCam.GetComponent<OyuncuHareket>();
-            if (oh != null)
-            {
-                Object.DestroyImmediate(oh);
-            }
-
             KameraTakip kt = mainCam.GetComponent<KameraTakip>();
             if (kt == null)
             {
@@ -96,8 +90,6 @@ public class YardimciKarakterKurulum
 
                 KarakterHareket kh = instance.GetComponent<KarakterHareket>();
                 if (kh != null) Object.DestroyImmediate(kh);
-                OyuncuHareket oh = instance.GetComponent<OyuncuHareket>();
-                if (oh != null) Object.DestroyImmediate(oh);
                 CharacterController cc = instance.GetComponent<CharacterController>();
                 if (cc != null) Object.DestroyImmediate(cc);
 
@@ -124,6 +116,14 @@ public class YardimciKarakterKurulum
                     col.center = new Vector3(0f, 0.9f, 0f);
                 }
 
+                UnityEngine.AI.NavMeshAgent nav = instance.GetComponent<UnityEngine.AI.NavMeshAgent>();
+                if (nav == null) nav = instance.AddComponent<UnityEngine.AI.NavMeshAgent>();
+                nav.speed = yk.hareketHizi;
+                nav.radius = 0.35f;
+                nav.height = 1.8f;
+                nav.stoppingDistance = yk.takipMesafesi;
+                nav.updateRotation = false;
+
                 Animator anim = instance.GetComponent<Animator>();
                 if (anim != null && animCtrl != null)
                 {
@@ -147,8 +147,15 @@ public class YardimciKarakterKurulum
             if (oyuncu != null)
             {
                 yk.hedef = oyuncu.transform;
-                EditorUtility.SetDirty(yk);
             }
+            UnityEngine.AI.NavMeshAgent nav = yk.GetComponent<UnityEngine.AI.NavMeshAgent>();
+            if (nav == null) nav = yk.gameObject.AddComponent<UnityEngine.AI.NavMeshAgent>();
+            nav.speed = yk.hareketHizi;
+            nav.radius = 0.35f;
+            nav.height = 1.8f;
+            nav.stoppingDistance = yk.takipMesafesi;
+            nav.updateRotation = false;
+            EditorUtility.SetDirty(yk);
         }
 
         if (!Application.isPlaying && !Application.isBatchMode)

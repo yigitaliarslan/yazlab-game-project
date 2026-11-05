@@ -148,7 +148,7 @@ namespace Yazlab.Mekanikler
         }
 
         /// <summary>
-        /// Kullanıcının sahneye eklediği iki açma kolunu (Salter_Kol + Jenerator_DurumIsigi) bulup inceler,
+        /// Sahnedeki iki açma kolunu (Salter_Kol + Jenerator_DurumIsigi) bağlar,
         /// arka duvar panellerini tamamlar ve İç Kule giriş kemerine kilitli kapıyı (IcKuleGirisKapisi) kurar.
         /// </summary>
         public void SahneNesneleriniBaglaVeyaOlustur()
@@ -156,7 +156,7 @@ namespace Yazlab.Mekanikler
             GameObject bolum3 = GameObject.Find("4_Bolum3_IcKaleKulesi_Ve_NpcOdasi");
             Transform parentTransform = bolum3 != null ? bolum3.transform : transform;
 
-            // 1. Kullanıcının sahneye yerleştirdiği Sol ve Sağ Açma Kollarını (Salter_Kol) ve Işıklarını (Jenerator_DurumIsigi) bul
+            // 1. Sahnedeki Sol ve Sağ Açma Kollarını (Salter_Kol) ve Işıklarını (Jenerator_DurumIsigi) bul
             Transform[] tumTransformlar = Object.FindObjectsByType<Transform>(FindObjectsInactive.Include);
             foreach (Transform t in tumTransformlar)
             {
@@ -180,7 +180,7 @@ namespace Yazlab.Mekanikler
                 }
             }
 
-            // Eğer sahnede eksikse kullanıcının belirlediği koordinatlarda oluştur
+            // Sahnede eksikse varsayılan koordinatlarda oluştur
             if (solKol == null)
             {
                 GameObject sk = GameObject.CreatePrimitive(PrimitiveType.Cube);
