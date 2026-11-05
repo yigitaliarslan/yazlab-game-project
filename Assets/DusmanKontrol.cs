@@ -46,7 +46,7 @@ public class DusmanKontrol : MonoBehaviour
     public float atesAraligi = 0.95f;
 
     [Tooltip("Her atışta oyuncuya vereceği hasar.")]
-    public float atesHasari = 7f;
+    public float atesHasari = 11f;
 
     [Tooltip("Atış isabet sapması / doğruluğu (0: tam isabet, 1: hafif sapmalı).")]
     public float isabetSapmasi = 0.25f;
@@ -109,7 +109,7 @@ public class DusmanKontrol : MonoBehaviour
         maksimumCan = 120f;
         mevcutCan = maksimumCan;
         gorunenCan = maksimumCan;
-        atesHasari = 7f;
+        atesHasari = 11f;
         atesAraligi = 0.90f;
 
         animator = GetComponent<Animator>();
@@ -146,7 +146,6 @@ public class DusmanKontrol : MonoBehaviour
 
         KurMermiEfektleri();
 
-        // Varsa eski NavMeshAgent'ı devre dışı bırak (doğrudan akıcı fiziksel yürüyüş kullanıyoruz)
         UnityEngine.AI.NavMeshAgent eskiNav = GetComponent<UnityEngine.AI.NavMeshAgent>();
         if (eskiNav != null)
         {
@@ -744,7 +743,7 @@ public class DusmanKontrol : MonoBehaviour
         GUI.color = Color.white;
         float baslikH = Mathf.Max(20f, 20f * olcek);
         Yazlab.Yonetim.GoruntuKalitesiYoneticisi.KeskinEtiketCiz(
-            new Rect(solX - 30f, ustY - baslikH - 2f, genislik + 60f, baslikH), "⚔ DÜŞMAN ASKER", dusmanBaslikStili);
+            new Rect(solX - 30f, ustY - baslikH - 2f, genislik + 60f, baslikH), "DÜŞMAN ASKER", dusmanBaslikStili);
 
         // 6. Can Miktarı Metni
         if (canMetniStili == null)

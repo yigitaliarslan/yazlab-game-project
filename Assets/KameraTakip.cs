@@ -79,7 +79,6 @@ public class KameraTakip : MonoBehaviour
             cam.fieldOfView = normalFOV;
         }
 
-        // Sahnedeki eski Inspector değerlerini yeni omuz üstü (Over-the-Shoulder) standartlarına yükselt
         if (bakisYuksekligi < 1.65f) bakisYuksekligi = 1.74f;
         if (omuzSagOfset < 0.55f) omuzSagOfset = 0.72f;
         if (mesafe > 3.8f) mesafe = 3.5f;
