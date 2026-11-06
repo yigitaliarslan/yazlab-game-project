@@ -6,7 +6,7 @@
 
 ## 👥 Ekip Bilgileri
 
-| Adı Soyadı | Öğrenci Numarası | GitHub Kullanıcı Adı | E-Posta | Rol ve Görev Dağılımı |
+| Adı Soyadı | GitHub Kullanıcı Adı | Öğrenci Numarası | E-Posta | Rol ve Görev Dağılımı |
 | :--- | :--- | :--- | :--- | :--- |
 | **Sadık Abdullatif** | *medianmarch* | `241307030` | sadikabdullatif3@gmail.com | 3-Bölümlü & Final Kale Seviye Mimarisi, Hendek & Canlı Su Animasyonu/Fiziği, Co-op Asma Köprü, Eğilme (Crouch) & TPS Kamera, Rün Bulmacası ve Prenses Kurtarma Bölümü |
 | **Yiğit Ali Arslan** | *yigitaliarslan* | `241307088` | yigitaliarslan27@gmail.com | Ollama Yerel LLM Entegrasyonu & System Prompt, Structured JSON Parser, Yoldaş Savaş/Hasar Mantığı, Düşman Spawn Sistemi ve Görüntü Kalitesi İyileştirmeleri |
@@ -46,8 +46,8 @@ Oyun, düşman kontrolündeki müstahkem bir kaleye sızan istihbarat ajanımız
   Köprüden geçen ajanlar iç avluya girer. Avlu, yüksek hasar veren otomatik bir savunma tareti tarafından taranmaktadır. Oyuncu alçak siperlerin arkasında eğilerek (`[C]` veya `[Left Ctrl]`) taretin görüşünden gizlenir. Bağımsız kablo odasındaki elektrik şalteri bulmacasını (`KapiBulmacaPaneli`) çözer veya doğu koridorundaki jeneratör kolunu indirerek taret odası bölme kapısını açar ve tareti etkisiz hale getirir.
 * **3. Bölüm — İç Kule Merdiven Holü ve Muhafız Odası (Sosyal / Mantıksal Engel):**  
   Kapalı taş merdiven holünden 2. kata çıkan oyuncu, çıkış kapısını tutan kale garnizon komutanı **Komutan Varg** ile karşılaşır. Kapı kilitlidir ve kaba kuvvetle açılamaz. Oyuncu `[E]` tuşuna basarak Ollama yerel dil modeliyle desteklenen canlı diyalog arayüzüne girer. Oyuncu serbest metinle muhafızla müzakere eder (gece parolası, diplomatik sahte emir veya rüşvet teklifi).
-* **4. Bölüm (FİNAL) — Kızıl Kule & Prenses Aylin'i Kurtarma ("Beyaz Kuzgun" Operasyonu):**  
-  Komutan Varg ikna edildiğinde açılan kemerli kapı kaleden kaçış değil, kalenin gizli merkezi olan **Kızıl Kule**'ye açılır. Kulede, kraliyetin rehin alınan baş istihbarat ajanı **Prenses Aylin** kadim bir Rün Mühür Kafesi'nde tutulmaktadır. Oyuncu Kehanet Küresi'nin gösterdiği renk sırasına göre (Kızıl → Mavi → Zümrüt) kristalleri vurarak mührü kırar. Alarm çalınca kuleyi basan muhafızlar püskürtülür; Prenses hendek su tüneline açılan kaçış çarkını çevirir ve gizli su yolundan tahliye ile operasyon zaferle tamamlanır.
+* **4. Bölüm (FİNAL) — Kızıl Kule & Prenses'i Kurtarma ("Beyaz Kuzgun" Operasyonu):**  
+  Komutan Varg ikna edildiğinde açılan kemerli kapı kaleden kaçış değil, kalenin gizli merkezi olan **Kızıl Kule**'ye açılır. Kulede, kraliyetin rehin alınan baş istihbarat ajanı **Prenses** kadim bir Rün Mühür Kafesi'nde tutulmaktadır. Oyuncu Kehanet Küresi'nin gösterdiği renk sırasına göre (Kızıl → Mavi → Zümrüt) kristalleri vurarak mührü kırar. Alarm çalınca kuleyi basan muhafızlar püskürtülür; Prenses hendek su tüneline açılan kaçış çarkını çevirir ve gizli su yolundan tahliye ile operasyon zaferle tamamlanır.
 
 ---
 
@@ -107,7 +107,7 @@ Muhafız Komutan Varg, katı disiplinli, şüpheci ve rüşvete/emre karşı tem
 
 ```text
 SEN: Kale Garnizon Komutanı VARG'sın.
-GÖREVİN: Kalenin kilitli demir kapısını korumak. Kapının arkasında rehin tutulan Prenses Aylin var.
+GÖREVİN: Kalenin kilitli demir kapısını korumak. Kapının arkasında rehin tutulan Prenses var.
 KİŞİLİK: Sert, şüpheci, disiplinli, rüşvete veya üst komutan emrine karşı temkinli.
 
 DAVRANIŞ KURALLARI:
