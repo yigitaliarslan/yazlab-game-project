@@ -8,8 +8,8 @@
 
 | Adı Soyadı | Öğrenci Numarası | GitHub Kullanıcı Adı | E-Posta | Rol ve Görev Dağılımı |
 | :--- | :--- | :--- | :--- | :--- |
-| **Sadık Abdullatif** | *medianmarch* | `medianmarch` | sadikabdullatif3@gmail.com | 3-Bölümlü & Final Kale Seviye Mimarisi, Hendek & Canlı Su Animasyonu/Fiziği, Co-op Asma Köprü, Eğilme (Crouch) & TPS Kamera, Rün Bulmacası ve Prenses Kurtarma Bölümü |
-| **Yiğit Ali Arslan** | *yigitaliarslan* | `yigitaliarslan` | yigitaliarslan27@gmail.com | Ollama Yerel LLM Entegrasyonu & System Prompt, Structured JSON Parser, Yoldaş Savaş/Hasar Mantığı, Düşman Spawn Sistemi ve Görüntü Kalitesi İyileştirmeleri |
+| **Sadık Abdullatif** | *medianmarch* | `241307030` | sadikabdullatif3@gmail.com | 3-Bölümlü & Final Kale Seviye Mimarisi, Hendek & Canlı Su Animasyonu/Fiziği, Co-op Asma Köprü, Eğilme (Crouch) & TPS Kamera, Rün Bulmacası ve Prenses Kurtarma Bölümü |
+| **Yiğit Ali Arslan** | *yigitaliarslan* | `241307088` | yigitaliarslan27@gmail.com | Ollama Yerel LLM Entegrasyonu & System Prompt, Structured JSON Parser, Yoldaş Savaş/Hasar Mantığı, Düşman Spawn Sistemi ve Görüntü Kalitesi İyileştirmeleri |
 
 * **Teslim Tarihi:** 6 Kasım 2026
 * **Oyun Motoru:** Unity 2022.3 LTS (C#)
